@@ -180,6 +180,14 @@ function blockLabel(i, blockMinutes) {
   return `H${half} ${start}:00–${end}:00`;
 }
 
+function computeSubs(prevBlock, currBlock) {
+  const prevIds = new Set(prevBlock.lineup.map(p => p.id));
+  const currIds = new Set(currBlock.lineup.map(p => p.id));
+  const out = prevBlock.lineup.filter(p => !currIds.has(p.id));
+  const inn = currBlock.lineup.filter(p => !prevIds.has(p.id));
+  return { out, inn };
+}
+
 function renderRotation(rotation, players) {
   rotationBody.innerHTML = '';
   rotation.result.forEach((block, i) => {
@@ -189,10 +197,23 @@ function renderRotation(rotation, players) {
       <td class="lineup">${block.lineup.map(p=>escapeHtml(p.name)).join(' · ')}</td>
       <td class="bench">${block.bench.length ? block.bench.map(p=>escapeHtml(p.name)).join(', ') : '—'}</td>`;
     rotationBody.appendChild(tr);
+
+    if (i < rotation.result.length - 1) {
+      const { out, inn } = computeSubs(block, rotation.result[i + 1]);
+      if (out.length || inn.length) {
+        const subTr = document.createElement('tr');
+        subTr.className = 'sub-row';
+        const parts = [];
+        if (out.length) parts.push(`<span class="sub-out">OUT: ${out.map(p=>escapeHtml(p.name)).join(', ')}</span>`);
+        if (inn.length) parts.push(`<span class="sub-in">IN: ${inn.map(p=>escapeHtml(p.name)).join(', ')}</span>`);
+        subTr.innerHTML = `<td colspan="3">${parts.join(' · ')}</td>`;
+        rotationBody.appendChild(subTr);
+      }
+    }
   });
 
   const sorted = [...players].sort((a,b)=>rotation.minutes[b.id]-rotation.minutes[a.id] || b.skill-a.skill);
-  minutesGrid.innerHTML = sorted.map(p => `<div class="minute-card"><strong>${escapeHtml(p.name)}</strong><span>${rotation.minutes[p.id]} min · Skill ${p.skill} · ${p.positions.join('/') || '—'}</span></div>`).join('');
+  minutesGrid.innerHTML = sorted.map(p => `<div class="minute-card"><strong>${escapeHtml(p.name)}</strong><span>${rotation.minutes[p.id]} min</span></div>`).join('');
   summary.textContent = `${players.length} players · ${rotation.blockMinutes}-minute blocks · ${document.querySelector('#mode').selectedOptions[0].text}`;
   rotationCard.classList.remove('hidden');
 }
@@ -290,14 +311,30 @@ function renderRotationCanvas(rotation, players) {
 
   const measure = document.createElement('canvas').getContext('2d');
   measure.font = cellFont;
-  const rows = rotation.result.map((block, i) => {
+  const subFontCanvas = `600 12.5px ${fontFamily}`;
+  const rows = [];
+  rotation.result.forEach((block, i) => {
     const label = blockLabel(i, rotation.blockMinutes);
     const lineupText = block.lineup.map(p => p.name).join(' · ');
     const benchText = block.bench.length ? block.bench.map(p => p.name).join(', ') : '—';
     const lineupLines = wrapText(measure, lineupText, listColWidth - 16);
     const benchLines = wrapText(measure, benchText, listColWidth - 16);
     const lineCount = Math.max(lineupLines.length, benchLines.length, 1);
-    return { label, lineupLines, benchLines, height: lineCount * lineHeight + rowVPad };
+    rows.push({ type: 'block', label, lineupLines, benchLines, height: lineCount * lineHeight + rowVPad });
+
+    if (i < rotation.result.length - 1) {
+      const { out, inn } = computeSubs(block, rotation.result[i + 1]);
+      if (out.length || inn.length) {
+        measure.font = subFontCanvas;
+        const outText = out.length ? `OUT: ${out.map(p => p.name).join(', ')}` : '';
+        const inText = inn.length ? `IN: ${inn.map(p => p.name).join(', ')}` : '';
+        const outLines = outText ? wrapText(measure, outText, contentWidth - 16) : [];
+        const inLines = inText ? wrapText(measure, inText, contentWidth - 16) : [];
+        measure.font = cellFont;
+        const totalLines = outLines.length + inLines.length;
+        rows.push({ type: 'sub', outLines, inLines, height: totalLines * 16 + 12 });
+      }
+    }
   });
 
   const titleTop = padding;
@@ -307,8 +344,8 @@ function renderRotationCanvas(rotation, players) {
 
   const sorted = [...players].sort((a, b) => rotation.minutes[b.id] - rotation.minutes[a.id] || b.skill - a.skill);
   const cardGap = 10;
-  const cardW = 190;
-  const cardH = 56;
+  const cardW = 150;
+  const cardH = 46;
   const cols = Math.max(1, Math.floor((contentWidth + cardGap) / (cardW + cardGap)));
   const minuteRows = sorted.length ? Math.ceil(sorted.length / cols) : 0;
   const minutesTop = tableTop + tableHeight + 34;
@@ -347,11 +384,29 @@ function renderRotationCanvas(rotation, players) {
   ctx.strokeStyle = theme.line;
   ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
 
-  rows.forEach((row, idx) => {
-    if (idx % 2 === 1) {
+  let blockIdx = 0;
+  rows.forEach((row) => {
+    if (row.type === 'sub') {
+      ctx.fillStyle = '#0a1220';
+      ctx.fillRect(padding, y, width - padding * 2, row.height);
+      ctx.font = subFontCanvas;
+      let lineY = y + 6;
+      ctx.fillStyle = '#ff8a8a';
+      row.outLines.forEach(line => { ctx.fillText(line, padding, lineY); lineY += 16; });
+      ctx.fillStyle = '#6bdc9c';
+      row.inLines.forEach(line => { ctx.fillText(line, padding, lineY); lineY += 16; });
+      y += row.height;
+      ctx.strokeStyle = theme.line;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
+      ctx.setLineDash([]);
+      return;
+    }
+    if (blockIdx % 2 === 1) {
       ctx.fillStyle = theme.rowAlt;
       ctx.fillRect(padding, y, width - padding * 2, row.height);
     }
+    blockIdx++;
     const textY = y + rowVPad / 2;
     ctx.font = cellFont;
     ctx.fillStyle = theme.text;
@@ -383,8 +438,7 @@ function renderRotationCanvas(rotation, players) {
       ctx.fillText(p.name, x + 12, cy + 10);
       ctx.font = subFont;
       ctx.fillStyle = theme.muted;
-      const meta = `${rotation.minutes[p.id]} min · Skill ${p.skill} · ${p.positions.join('/') || '—'}`;
-      ctx.fillText(meta, x + 12, cy + 30);
+      ctx.fillText(`${rotation.minutes[p.id]} min`, x + 12, cy + 28);
     });
   }
 
