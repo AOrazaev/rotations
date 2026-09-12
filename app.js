@@ -14,6 +14,8 @@ const defaultPlayers = [
   { id: crypto.randomUUID(), name: 'Anton', positions: ['C'], skill: 70, present: false },
 ];
 
+const LEGACY_MODE_INTENSITY = { equal: 0, balanced: 50, competitive: 100 };
+
 let state = loadState();
 let lastRotation = null;
 
@@ -28,9 +30,15 @@ const seedInput = document.querySelector('#regenerateSeed');
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved?.players?.length) return saved;
+    if (saved?.players?.length) {
+      if (typeof saved.intensity !== 'number') {
+        saved.intensity = LEGACY_MODE_INTENSITY[saved.mode] ?? 100;
+      }
+      delete saved.mode;
+      return saved;
+    }
   } catch (_) {}
-  return { players: defaultPlayers, blockMinutes: 4, mode: 'competitive' };
+  return { players: defaultPlayers, blockMinutes: 4, intensity: 100 };
 }
 
 function saveState() {
@@ -109,7 +117,7 @@ function createSeededRng(seed) {
 // single best one, so "Regenerate" can offer different, still-solid results.
 const REGENERATE_TOP_K = 3;
 
-function buildRotation(players, blockMinutes, mode, rng) {
+function buildRotation(players, blockMinutes, intensity, rng) {
   if (players.length < 5) throw new Error('You need at least 5 available players.');
   const totalMinutes = 40;
   const blocks = Math.ceil(totalMinutes / blockMinutes);
@@ -123,11 +131,13 @@ function buildRotation(players, blockMinutes, mode, rng) {
   const minSkill = Math.min(...skills), maxSkill = Math.max(...skills);
   const norm = p => maxSkill === minSkill ? 0.5 : (p.skill-minSkill)/(maxSkill-minSkill);
 
+  // t=0 => Equal minutes, t=1 => fully Competitive. Balanced sits at t=0.5.
   // Target shares are soft constraints, not exact minute contracts.
-  let weights;
-  if (mode === 'equal') weights = Object.fromEntries(players.map(p => [p.id, 1]));
-  else if (mode === 'balanced') weights = Object.fromEntries(players.map(p => [p.id, 0.75 + 0.5*norm(p)]));
-  else weights = Object.fromEntries(players.map(p => [p.id, 0.55 + 0.9*norm(p)]));
+  const t = Math.min(1, Math.max(0, (Number(intensity) || 0) / 100));
+  const weightBase = 1 - 0.45 * t;
+  const weightSpread = 0.9 * t;
+  const skillMultiplier = 0.45 + 1.05 * t;
+  const weights = Object.fromEntries(players.map(p => [p.id, weightBase + weightSpread * norm(p)]));
 
   const totalWeight = Object.values(weights).reduce((a,b)=>a+b,0);
   const targetBlocks = Object.fromEntries(players.map(p => [p.id, (blocks*5)*(weights[p.id]/totalWeight)]));
@@ -140,7 +150,7 @@ function buildRotation(players, blockMinutes, mode, rng) {
       let score = 0;
       const ids = new Set(lineup.map(p=>p.id));
       const skillScore = lineup.reduce((s,p)=>s+p.skill,0);
-      score += skillScore * (mode === 'competitive' ? 1.5 : mode === 'balanced' ? 1.0 : 0.45);
+      score += skillScore * skillMultiplier;
 
       if (hasRole(lineup,'C')) score += 26; else score -= 55;
       if (hasRole(lineup,'G')) score += 18; else score -= 40;
@@ -161,9 +171,9 @@ function buildRotation(players, blockMinutes, mode, rng) {
         }
       }
 
-      if (closing && mode !== 'equal') {
-        score += skillScore * 2.2;
-        if (hasRole(lineup,'C') && hasRole(lineup,'G')) score += 30;
+      if (closing) {
+        score += skillScore * 2.2 * t;
+        if (hasRole(lineup,'C') && hasRole(lineup,'G')) score += 30 * t;
       }
 
       // Reduce excessive lineup repetition.
@@ -240,8 +250,16 @@ function renderRotation(rotation, players) {
 
   const sorted = [...players].sort((a,b)=>rotation.minutes[b.id]-rotation.minutes[a.id] || b.skill-a.skill);
   minutesGrid.innerHTML = sorted.map(p => `<div class="minute-card"><strong>${escapeHtml(p.name)}</strong><span>${rotation.minutes[p.id]} min</span></div>`).join('');
-  summary.textContent = `${players.length} players · ${rotation.blockMinutes}-minute blocks · ${document.querySelector('#mode').selectedOptions[0].text}`;
+  summary.textContent = `${players.length} players · ${rotation.blockMinutes}-minute blocks · ${intensityLabel(state.intensity)}`;
   rotationCard.classList.remove('hidden');
+}
+
+function intensityLabel(v) {
+  if (v <= 10) return 'Equal minutes';
+  if (v >= 90) return 'Competitive';
+  if (v < 40) return `Mostly equal (${v}%)`;
+  if (v > 60) return `Mostly competitive (${v}%)`;
+  return `Balanced (${v}%)`;
 }
 
 function escapeHtml(s) {
@@ -250,11 +268,11 @@ function escapeHtml(s) {
 
 function generate() {
   state.blockMinutes = Number(document.querySelector('#blockMinutes').value);
-  state.mode = document.querySelector('#mode').value;
+  state.intensity = Number(document.querySelector('#intensity').value);
   saveState();
   const players = state.players.filter(p=>p.present);
   try {
-    lastRotation = buildRotation(players, state.blockMinutes, state.mode);
+    lastRotation = buildRotation(players, state.blockMinutes, state.intensity);
     renderRotation(lastRotation, players);
     seedInput.value = '';
     rotationCard.scrollIntoView({behavior:'smooth', block:'start'});
@@ -263,7 +281,7 @@ function generate() {
 
 function applySeed(seed, players) {
   const rng = createSeededRng(seed);
-  lastRotation = buildRotation(players, state.blockMinutes, state.mode, rng);
+  lastRotation = buildRotation(players, state.blockMinutes, state.intensity, rng);
   renderRotation(lastRotation, players);
   seedInput.value = String(seed);
 }
@@ -274,10 +292,18 @@ document.querySelector('#addPlayer').addEventListener('click', () => {
 });
 document.querySelector('#generate').addEventListener('click', generate);
 document.querySelector('#blockMinutes').value = String(state.blockMinutes || 4);
-document.querySelector('#mode').value = state.mode || 'competitive';
+const intensityInput = document.querySelector('#intensity');
+const intensityValueEl = document.querySelector('#intensityValue');
+intensityInput.value = String(state.intensity ?? 100);
+intensityValueEl.textContent = intensityLabel(Number(intensityInput.value));
+intensityInput.addEventListener('input', () => {
+  intensityValueEl.textContent = intensityLabel(Number(intensityInput.value));
+});
 document.querySelector('#resetApp').addEventListener('click', () => {
   if (!confirm('Reset roster and settings to defaults?')) return;
-  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, mode:'competitive' }; saveState(); renderRoster(); rotationCard.classList.add('hidden'); seedInput.value = '';
+  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, intensity:100 }; saveState(); renderRoster();
+  intensityInput.value = '100'; intensityValueEl.textContent = intensityLabel(100);
+  rotationCard.classList.add('hidden'); seedInput.value = '';
 });
 document.querySelector('#regenerateRotation').addEventListener('click', () => {
   if (!lastRotation) return;

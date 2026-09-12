@@ -38,12 +38,13 @@
         </select>
       </div>
       <div>
-        <label for="mode">Rotation style</label>
-        <select id="mode">
-          <option value="competitive">Competitive</option>
-          <option value="balanced">Balanced</option>
-          <option value="equal">Equal minutes</option>
-        </select>
+        <label for="intensity">Rotation style <span id="intensityValue" class="intensity-value"></span></label>
+        <input id="intensity" type="range" min="0" max="100" step="5" />
+        <div class="intensity-scale">
+          <span>Equal minutes</span>
+          <span>Balanced</span>
+          <span>Competitive</span>
+        </div>
       </div>
       <div>
         <label for="halves">Game format</label>
