@@ -234,4 +234,207 @@ document.querySelector('#copyRotation').addEventListener('click', async () => {
   const btn = document.querySelector('#copyRotation'); const old = btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=old,1200);
 });
 
+// --- Rotation-as-image export -----------------------------------------
+// Draws the rotation table + minutes grid onto a plain <canvas> using the
+// in-memory rotation data (no DOM screenshot library needed), then either
+// copies the resulting PNG to the clipboard or falls back to a download.
+
+function wrapText(ctx, text, maxWidth) {
+  const words = String(text).split(' ');
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (current && ctx.measureText(test).width > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function renderRotationCanvas(rotation, players) {
+  const theme = {
+    bg: '#0b1020', card: '#121a2b', line: '#26324b',
+    text: '#f6f7fb', muted: '#91a0b8', rowAlt: '#0f1727',
+  };
+  const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+  const titleFont = `700 22px ${fontFamily}`;
+  const subFont = `400 13px ${fontFamily}`;
+  const headFont = `600 12px ${fontFamily}`;
+  const cellFont = `500 14px ${fontFamily}`;
+  const cardNameFont = `700 15px ${fontFamily}`;
+
+  const scale = 2;
+  const width = 860;
+  const padding = 28;
+  const contentWidth = width - padding * 2;
+  const blockColWidth = 110;
+  const gapCol = 20;
+  const listColWidth = (contentWidth - blockColWidth - gapCol) / 2;
+  const lineHeight = 18;
+  const rowVPad = 16;
+
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = cellFont;
+  const rows = rotation.result.map((block, i) => {
+    const label = blockLabel(i, rotation.blockMinutes);
+    const lineupText = block.lineup.map(p => p.name).join(' · ');
+    const benchText = block.bench.length ? block.bench.map(p => p.name).join(', ') : '—';
+    const lineupLines = wrapText(measure, lineupText, listColWidth - 16);
+    const benchLines = wrapText(measure, benchText, listColWidth - 16);
+    const lineCount = Math.max(lineupLines.length, benchLines.length, 1);
+    return { label, lineupLines, benchLines, height: lineCount * lineHeight + rowVPad };
+  });
+
+  const titleTop = padding;
+  const tableTop = titleTop + 54;
+  const tableHeaderHeight = 30;
+  const tableHeight = tableHeaderHeight + rows.reduce((s, r) => s + r.height, 0);
+
+  const sorted = [...players].sort((a, b) => rotation.minutes[b.id] - rotation.minutes[a.id] || b.skill - a.skill);
+  const cardGap = 10;
+  const cardW = 190;
+  const cardH = 56;
+  const cols = Math.max(1, Math.floor((contentWidth + cardGap) / (cardW + cardGap)));
+  const minuteRows = sorted.length ? Math.ceil(sorted.length / cols) : 0;
+  const minutesTop = tableTop + tableHeight + 34;
+  const minutesLabelHeight = sorted.length ? 24 : 0;
+  const minutesHeight = minuteRows ? minuteRows * cardH + (minuteRows - 1) * cardGap : 0;
+
+  const totalHeight = minutesTop + minutesLabelHeight + minutesHeight + padding;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(width * scale);
+  canvas.height = Math.ceil(totalHeight * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.textBaseline = 'top';
+
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, width, totalHeight);
+  roundRect(ctx, 6, 6, width - 12, totalHeight - 12, 16);
+  ctx.fillStyle = theme.card;
+  ctx.fill();
+
+  ctx.fillStyle = theme.text;
+  ctx.font = titleFont;
+  ctx.fillText('Rotation', padding, titleTop);
+  ctx.font = subFont;
+  ctx.fillStyle = theme.muted;
+  ctx.fillText(summary.textContent || '', padding, titleTop + 30);
+
+  let y = tableTop;
+  ctx.font = headFont;
+  ctx.fillStyle = theme.muted;
+  ctx.fillText('BLOCK', padding, y);
+  ctx.fillText('LINEUP', padding + blockColWidth, y);
+  ctx.fillText('BENCH', padding + blockColWidth + listColWidth + gapCol, y);
+  y += tableHeaderHeight;
+  ctx.strokeStyle = theme.line;
+  ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
+
+  rows.forEach((row, idx) => {
+    if (idx % 2 === 1) {
+      ctx.fillStyle = theme.rowAlt;
+      ctx.fillRect(padding, y, width - padding * 2, row.height);
+    }
+    const textY = y + rowVPad / 2;
+    ctx.font = cellFont;
+    ctx.fillStyle = theme.text;
+    ctx.fillText(row.label, padding, textY);
+    row.lineupLines.forEach((line, li) => ctx.fillText(line, padding + blockColWidth, textY + li * lineHeight));
+    ctx.fillStyle = theme.muted;
+    row.benchLines.forEach((line, li) => ctx.fillText(line, padding + blockColWidth + listColWidth + gapCol, textY + li * lineHeight));
+    y += row.height;
+    ctx.strokeStyle = theme.line;
+    ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
+  });
+
+  if (sorted.length) {
+    ctx.font = headFont;
+    ctx.fillStyle = theme.muted;
+    ctx.fillText('MINUTES', padding, minutesTop);
+    const gridTop = minutesTop + minutesLabelHeight;
+    sorted.forEach((p, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const cardWidth = cardW - cardGap;
+      const x = padding + col * (cardW + cardGap);
+      const cy = gridTop + row * (cardH + cardGap);
+      roundRect(ctx, x, cy, cardWidth, cardH, 10);
+      ctx.fillStyle = theme.rowAlt;
+      ctx.fill();
+      ctx.fillStyle = theme.text;
+      ctx.font = cardNameFont;
+      ctx.fillText(p.name, x + 12, cy + 10);
+      ctx.font = subFont;
+      ctx.fillStyle = theme.muted;
+      const meta = `${rotation.minutes[p.id]} min · Skill ${p.skill} · ${p.positions.join('/') || '—'}`;
+      ctx.fillText(meta, x + 12, cy + 30);
+    });
+  }
+
+  return canvas;
+}
+
+function canvasToBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+document.querySelector('#copyRotationImage').addEventListener('click', async () => {
+  if (!lastRotation) return;
+  const btn = document.querySelector('#copyRotationImage');
+  const old = btn.textContent;
+  const players = state.players.filter(p => p.present);
+  try {
+    const canvas = renderRotationCanvas(lastRotation, players);
+    const blob = await canvasToBlob(canvas);
+    if (!blob) throw new Error('Could not create image.');
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      btn.textContent = 'Copied!';
+    } else {
+      downloadBlob(blob, 'rotation.png');
+      btn.textContent = 'Downloaded';
+    }
+  } catch (e) {
+    try {
+      const canvas = renderRotationCanvas(lastRotation, players);
+      const blob = await canvasToBlob(canvas);
+      if (blob) { downloadBlob(blob, 'rotation.png'); btn.textContent = 'Downloaded'; }
+      else throw e;
+    } catch (e2) {
+      alert('Could not copy or download the image.');
+      return;
+    }
+  } finally {
+    setTimeout(() => { btn.textContent = old; }, 1400);
+  }
+});
+
 renderRoster();
