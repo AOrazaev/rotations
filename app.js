@@ -23,6 +23,7 @@ const rotationCard = document.querySelector('#rotationCard');
 const rotationBody = document.querySelector('#rotationBody');
 const minutesGrid = document.querySelector('#minutesGrid');
 const summary = document.querySelector('#rotationSummary');
+const seedInput = document.querySelector('#regenerateSeed');
 
 function loadState() {
   try {
@@ -90,7 +91,25 @@ function combinations(arr, k) {
 function hasRole(lineup, role) { return lineup.some(p => p.positions.includes(role)); }
 function avgSkill(lineup) { return lineup.reduce((s,p)=>s+p.skill,0)/lineup.length; }
 
-function buildRotation(players, blockMinutes, mode) {
+function createSeededRng(seed) {
+  // mulberry32 — small, fast, deterministic PRNG so a given seed always
+  // reproduces the exact same "randomized" rotation.
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// rng is optional: omitted => strict greedy/deterministic (used by the main
+// "Generate rotation" button). Provided => at each block, sample randomly
+// among the top-scoring candidate lineups instead of always taking the
+// single best one, so "Regenerate" can offer different, still-solid results.
+const REGENERATE_TOP_K = 3;
+
+function buildRotation(players, blockMinutes, mode, rng) {
   if (players.length < 5) throw new Error('You need at least 5 available players.');
   const totalMinutes = 40;
   const blocks = Math.ceil(totalMinutes / blockMinutes);
@@ -115,7 +134,7 @@ function buildRotation(players, blockMinutes, mode) {
 
   for (let b=0; b<blocks; b++) {
     const closing = b === blocks-1;
-    let best = null, bestScore = -Infinity;
+    const scored = [];
 
     for (const lineup of combos) {
       let score = 0;
@@ -153,8 +172,15 @@ function buildRotation(players, blockMinutes, mode) {
         if (overlap === 5) score -= 35;
       }
 
-      if (score > bestScore) { bestScore = score; best = lineup; }
+      scored.push({ lineup, score });
     }
+
+    // Stable sort keeps the original (deterministic) winner at index 0 when
+    // there's no rng, matching the previous strict-greedy behavior exactly.
+    scored.sort((a, b) => b.score - a.score);
+    const best = rng
+      ? scored[Math.floor(rng() * Math.min(REGENERATE_TOP_K, scored.length))].lineup
+      : scored[0].lineup;
 
     const ids = new Set(best.map(p=>p.id));
     players.forEach(p => {
@@ -230,8 +256,16 @@ function generate() {
   try {
     lastRotation = buildRotation(players, state.blockMinutes, state.mode);
     renderRotation(lastRotation, players);
+    seedInput.value = '';
     rotationCard.scrollIntoView({behavior:'smooth', block:'start'});
   } catch (e) { alert(e.message); }
+}
+
+function applySeed(seed, players) {
+  const rng = createSeededRng(seed);
+  lastRotation = buildRotation(players, state.blockMinutes, state.mode, rng);
+  renderRotation(lastRotation, players);
+  seedInput.value = String(seed);
 }
 
 document.querySelector('#addPlayer').addEventListener('click', () => {
@@ -243,7 +277,20 @@ document.querySelector('#blockMinutes').value = String(state.blockMinutes || 4);
 document.querySelector('#mode').value = state.mode || 'competitive';
 document.querySelector('#resetApp').addEventListener('click', () => {
   if (!confirm('Reset roster and settings to defaults?')) return;
-  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, mode:'competitive' }; saveState(); renderRoster(); rotationCard.classList.add('hidden');
+  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, mode:'competitive' }; saveState(); renderRoster(); rotationCard.classList.add('hidden'); seedInput.value = '';
+});
+document.querySelector('#regenerateRotation').addEventListener('click', () => {
+  if (!lastRotation) return;
+  const players = state.players.filter(p=>p.present);
+  const seed = Math.floor(Math.random() * 1_000_000_000);
+  try { applySeed(seed, players); } catch (e) { alert(e.message); }
+});
+seedInput.addEventListener('change', () => {
+  if (!lastRotation) return;
+  const value = Math.floor(Number(seedInput.value));
+  if (!Number.isFinite(value)) return;
+  const players = state.players.filter(p=>p.present);
+  try { applySeed(value, players); } catch (e) { alert(e.message); }
 });
 document.querySelector('#copyRotation').addEventListener('click', async () => {
   if (!lastRotation) return;
