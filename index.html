@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <title>Basketball Rotation Planner</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Basketball Rotation Planner</p>
+        <h1>Build a 4-minute rotation in seconds</h1>
+        <p class="subtitle">Pick who showed up, tweak roles and skill levels, then generate a balanced 40-minute rotation. Everything stays in your browser.</p>
+      </div>
+      <button id="resetApp" class="secondary">Reset app</button>
+    </header>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>Roster</h2>
+          <p>Check players who are available today.</p>
+        </div>
+        <button id="addPlayer" class="primary">+ Add player</button>
+      </div>
+      <div id="roster" class="roster"></div>
+    </section>
+
+    <section class="card settings-grid">
+      <div>
+        <label for="blockMinutes">Block length</label>
+        <select id="blockMinutes">
+          <option value="4">4 minutes</option>
+          <option value="5">5 minutes</option>
+        </select>
+      </div>
+      <div>
+        <label for="mode">Rotation style</label>
+        <select id="mode">
+          <option value="competitive">Competitive</option>
+          <option value="balanced">Balanced</option>
+          <option value="equal">Equal minutes</option>
+        </select>
+      </div>
+      <div>
+        <label for="halves">Game format</label>
+        <select id="halves">
+          <option value="20">2 × 20 min</option>
+        </select>
+      </div>
+      <div class="generate-wrap">
+        <button id="generate" class="primary big">Generate rotation</button>
+      </div>
+    </section>
+
+    <section id="rotationCard" class="card hidden">
+      <div class="section-head">
+        <div>
+          <h2>Rotation</h2>
+          <p id="rotationSummary"></p>
+        </div>
+        <button id="copyRotation" class="secondary">Copy</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Block</th><th>Lineup</th><th>Bench</th></tr>
+          </thead>
+          <tbody id="rotationBody"></tbody>
+        </table>
+      </div>
+      <div class="minutes-grid" id="minutesGrid"></div>
+    </section>
+
+    <footer>
+      <p>No account. No server. Data is saved locally in this browser.</p>
+    </footer>
+  </main>
+
+  <template id="playerTemplate">
+    <article class="player-row">
+      <label class="check-wrap">
+        <input class="present" type="checkbox" />
+        <span class="checkmark"></span>
+      </label>
+      <input class="name" type="text" aria-label="Player name" />
+      <div class="positions" aria-label="Positions">
+        <label><input type="checkbox" value="G" />G</label>
+        <label><input type="checkbox" value="F" />F</label>
+        <label><input type="checkbox" value="C" />C</label>
+      </div>
+      <div class="skill-wrap">
+        <input class="skill" type="range" min="1" max="100" step="1" />
+        <span class="skill-value"></span>
+      </div>
+      <button class="delete icon-button" aria-label="Delete player">×</button>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
