@@ -49,6 +49,30 @@ th { color:var(--muted); font-weight:600; font-size:.85rem; }
 .sub-row td { padding:6px 12px; font-size:.82rem; background:#0a1220; border-bottom:1px dashed var(--line); }
 .sub-out { color:var(--danger); }
 .sub-in { color:#6bdc9c; }
+.view-tabs { display:flex; gap:8px; margin-bottom:14px; }
+.view-tab { background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:10px; padding:8px 16px; font-weight:600; }
+.view-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.timeline-wrap { overflow-x:auto; }
+.timeline-legend { display:flex; gap:18px; color:var(--muted); font-size:.85rem; margin-bottom:10px; }
+.timeline-legend .swatch { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle; }
+.swatch-on { background:var(--accent); }
+.swatch-off { background:#1b2540; border:1px solid var(--line); }
+.timeline-grid { display:grid; min-width:640px; row-gap:6px; column-gap:0; }
+.timeline-row-label { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-right:10px; font-weight:650; white-space:nowrap; overflow:hidden; }
+.timeline-row-label span:first-child { overflow:hidden; text-overflow:ellipsis; }
+.timeline-row-label .tl-minutes { color:var(--muted); font-weight:500; font-size:.8rem; }
+.timeline-header-cell { color:var(--muted); font-size:.72rem; text-align:center; padding-bottom:6px; line-height:1.2; border-bottom:1px solid var(--line); }
+.timeline-half-divider { border-left:2px solid var(--accent2); }
+.timeline-cell { height:26px; background:#0f1727; position:relative; }
+.timeline-cell.on { background:var(--accent); }
+.timeline-cell.run-start { border-top-left-radius:8px; border-bottom-left-radius:8px; }
+.timeline-cell.run-end { border-top-right-radius:8px; border-bottom-right-radius:8px; }
+.sub-label {
+  position:absolute; top:50%; left:4px; transform:translateY(-50%);
+  font-size:9px; line-height:1; white-space:nowrap; color:#fff;
+  background:rgba(0,0,0,.35); padding:2px 5px; border-radius:6px;
+  z-index:3; pointer-events:none;
+}
 .rotation-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .seed-picker { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:.85rem; }
 .seed-picker input { width:110px; background:#0a1220; color:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 10px; }

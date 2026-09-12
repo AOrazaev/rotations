@@ -73,13 +73,24 @@
           <button id="copyRotationImage" class="secondary">Copy image</button>
         </div>
       </div>
-      <div class="table-wrap">
+      <div class="view-tabs" role="tablist">
+        <button id="tabTable" class="view-tab active" role="tab" aria-selected="true">Table</button>
+        <button id="tabTimeline" class="view-tab" role="tab" aria-selected="false">Timeline</button>
+      </div>
+      <div id="tableView" class="table-wrap">
         <table>
           <thead>
             <tr><th>Block</th><th>Lineup</th><th>Bench</th></tr>
           </thead>
           <tbody id="rotationBody"></tbody>
         </table>
+      </div>
+      <div id="timelineView" class="timeline-wrap hidden">
+        <div class="timeline-legend">
+          <span><i class="swatch swatch-on"></i>On court</span>
+          <span><i class="swatch swatch-off"></i>Bench</span>
+        </div>
+        <div id="timelineGrid" class="timeline-grid"></div>
       </div>
       <div class="minutes-grid" id="minutesGrid"></div>
     </section>

@@ -18,6 +18,8 @@ const LEGACY_MODE_INTENSITY = { equal: 0, balanced: 50, competitive: 100 };
 
 let state = loadState();
 let lastRotation = null;
+let lastPlayers = null;
+let activeView = 'table';
 
 const rosterEl = document.querySelector('#roster');
 const playerTemplate = document.querySelector('#playerTemplate');
@@ -25,6 +27,11 @@ const rotationCard = document.querySelector('#rotationCard');
 const rotationBody = document.querySelector('#rotationBody');
 const minutesGrid = document.querySelector('#minutesGrid');
 const summary = document.querySelector('#rotationSummary');
+const tableView = document.querySelector('#tableView');
+const timelineView = document.querySelector('#timelineView');
+const timelineGrid = document.querySelector('#timelineGrid');
+const tabTable = document.querySelector('#tabTable');
+const tabTimeline = document.querySelector('#tabTimeline');
 const seedInput = document.querySelector('#regenerateSeed');
 
 function loadState() {
@@ -224,6 +231,21 @@ function computeSubs(prevBlock, currBlock) {
   return { out, inn };
 }
 
+// Pairs each incoming player with an outgoing player at the same transition
+// (by array order — lineup counts always match, so every "in" gets an "out").
+// Used to label "who this player is subbing in for" on the timeline.
+function buildSubLookup(rotation) {
+  const lookup = new Map();
+  for (let i = 1; i < rotation.result.length; i++) {
+    const { out, inn } = computeSubs(rotation.result[i - 1], rotation.result[i]);
+    inn.forEach((inPlayer, idx) => {
+      const outPlayer = out[idx];
+      if (outPlayer) lookup.set(`${i}:${inPlayer.id}`, outPlayer.name);
+    });
+  }
+  return lookup;
+}
+
 function renderRotation(rotation, players) {
   rotationBody.innerHTML = '';
   rotation.result.forEach((block, i) => {
@@ -251,8 +273,80 @@ function renderRotation(rotation, players) {
   const sorted = [...players].sort((a,b)=>rotation.minutes[b.id]-rotation.minutes[a.id] || b.skill-a.skill);
   minutesGrid.innerHTML = sorted.map(p => `<div class="minute-card"><strong>${escapeHtml(p.name)}</strong><span>${rotation.minutes[p.id]} min</span></div>`).join('');
   summary.textContent = `${players.length} players · ${rotation.blockMinutes}-minute blocks · ${intensityLabel(state.intensity)}`;
+  renderTimeline(rotation, players);
+  lastPlayers = players;
   rotationCard.classList.remove('hidden');
 }
+
+function halfForBlock(i, blockMinutes) {
+  return (i * blockMinutes) < 20 ? 1 : 2;
+}
+
+function shortBlockHeader(i, blockMinutes) {
+  const minuteIntoGame = i * blockMinutes;
+  const half = halfForBlock(i, blockMinutes);
+  const intoHalf = minuteIntoGame % 20;
+  const start = 20 - intoHalf;
+  const end = Math.max(0, start - blockMinutes);
+  return { half, label: `${start}-${end}` };
+}
+
+function renderTimeline(rotation, players) {
+  const blocks = rotation.result.length;
+  const sorted = [...players].sort((a,b)=>rotation.minutes[b.id]-rotation.minutes[a.id] || b.skill-a.skill);
+  const subLookup = buildSubLookup(rotation);
+
+  timelineGrid.style.gridTemplateColumns = `160px repeat(${blocks}, minmax(34px, 1fr))`;
+
+  let html = '<div class="timeline-header-cell"></div>';
+  for (let i = 0; i < blocks; i++) {
+    const { half, label } = shortBlockHeader(i, rotation.blockMinutes);
+    const prevHalf = i > 0 ? halfForBlock(i - 1, rotation.blockMinutes) : half;
+    const dividerClass = (i > 0 && half !== prevHalf) ? ' timeline-half-divider' : '';
+    html += `<div class="timeline-header-cell${dividerClass}">H${half}<br>${label}</div>`;
+  }
+
+  sorted.forEach(p => {
+    html += `<div class="timeline-row-label"><span>${escapeHtml(p.name)}</span><span class="tl-minutes">${rotation.minutes[p.id]}m</span></div>`;
+    for (let i = 0; i < blocks; i++) {
+      const on = rotation.result[i].lineup.some(x => x.id === p.id);
+      const prevOn = i > 0 && rotation.result[i - 1].lineup.some(x => x.id === p.id);
+      const nextOn = i < blocks - 1 && rotation.result[i + 1].lineup.some(x => x.id === p.id);
+      const half = halfForBlock(i, rotation.blockMinutes);
+      const prevHalf = i > 0 ? halfForBlock(i - 1, rotation.blockMinutes) : half;
+      let cls = 'timeline-cell';
+      let label = '';
+      if (on) {
+        cls += ' on';
+        if (!prevOn) {
+          cls += ' run-start';
+          const subOut = i > 0 ? subLookup.get(`${i}:${p.id}`) : null;
+          if (subOut) label = `<span class="sub-label">🔄 ${escapeHtml(subOut)}</span>`;
+        }
+        if (!nextOn) cls += ' run-end';
+      }
+      if (i > 0 && half !== prevHalf) cls += ' timeline-half-divider';
+      const subOutForTitle = on && !prevOn && i > 0 ? subLookup.get(`${i}:${p.id}`) : null;
+      const titleText = `${p.name} — ${blockLabel(i, rotation.blockMinutes)} — ${on ? 'On court' : 'Bench'}${subOutForTitle ? ` (in for ${subOutForTitle})` : ''}`;
+      html += `<div class="${cls}" title="${escapeHtml(titleText)}">${label}</div>`;
+    }
+  });
+
+  timelineGrid.innerHTML = html;
+}
+
+function setActiveView(view) {
+  activeView = view;
+  tabTable.classList.toggle('active', view === 'table');
+  tabTimeline.classList.toggle('active', view === 'timeline');
+  tabTable.setAttribute('aria-selected', String(view === 'table'));
+  tabTimeline.setAttribute('aria-selected', String(view === 'timeline'));
+  tableView.classList.toggle('hidden', view !== 'table');
+  timelineView.classList.toggle('hidden', view !== 'timeline');
+}
+
+tabTable.addEventListener('click', () => setActiveView('table'));
+tabTimeline.addEventListener('click', () => setActiveView('timeline'));
 
 function intensityLabel(v) {
   if (v <= 10) return 'Equal minutes';
@@ -518,6 +612,128 @@ function renderRotationCanvas(rotation, players) {
   return canvas;
 }
 
+function renderTimelineCanvas(rotation, players) {
+  const theme = {
+    bg: '#0b1020', card: '#121a2b', line: '#26324b',
+    text: '#f6f7fb', muted: '#91a0b8', rowAlt: '#0f1727', accent: '#6d7cff', accent2: '#8290ff',
+  };
+  const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+  const titleFont = `700 22px ${fontFamily}`;
+  const subFont = `400 13px ${fontFamily}`;
+  const labelFont = `650 14px ${fontFamily}`;
+  const minutesFont = `500 12px ${fontFamily}`;
+  const headerFont = `600 11px ${fontFamily}`;
+  const subLabelFont = `600 9px ${fontFamily}`;
+  const subLookup = buildSubLookup(rotation);
+
+  const scale = 2;
+  const padding = 28;
+  const labelColWidth = 160;
+  const blocks = rotation.result.length;
+  const cellWidth = Math.max(34, Math.min(60, 720 / blocks));
+  const width = padding * 2 + labelColWidth + cellWidth * blocks;
+
+  const titleTop = padding;
+  const headerTop = titleTop + 54;
+  const headerHeight = 34;
+  const rowHeight = 26;
+  const rowGap = 8;
+  const gridTop = headerTop + headerHeight + 8;
+
+  const sorted = [...players].sort((a, b) => rotation.minutes[b.id] - rotation.minutes[a.id] || b.skill - a.skill);
+  const totalHeight = gridTop + sorted.length * (rowHeight + rowGap) + padding;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(width * scale);
+  canvas.height = Math.ceil(totalHeight * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.textBaseline = 'top';
+
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, width, totalHeight);
+  roundRect(ctx, 6, 6, width - 12, totalHeight - 12, 16);
+  ctx.fillStyle = theme.card;
+  ctx.fill();
+
+  ctx.fillStyle = theme.text;
+  ctx.font = titleFont;
+  ctx.fillText('Rotation timeline', padding, titleTop);
+  ctx.font = subFont;
+  ctx.fillStyle = theme.muted;
+  ctx.fillText(summary.textContent || '', padding, titleTop + 30);
+
+  // Column headers
+  for (let i = 0; i < blocks; i++) {
+    const { half, label } = shortBlockHeader(i, rotation.blockMinutes);
+    const prevHalf = i > 0 ? halfForBlock(i - 1, rotation.blockMinutes) : half;
+    const x = padding + labelColWidth + i * cellWidth;
+    if (i > 0 && half !== prevHalf) {
+      ctx.strokeStyle = theme.accent2;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, headerTop); ctx.lineTo(x, totalHeight - padding); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    ctx.font = headerFont;
+    ctx.fillStyle = theme.muted;
+    ctx.textAlign = 'center';
+    ctx.fillText(`H${half}`, x + cellWidth / 2, headerTop);
+    ctx.fillText(label, x + cellWidth / 2, headerTop + 14);
+    ctx.textAlign = 'left';
+  }
+
+  sorted.forEach((p, rowIdx) => {
+    const rowY = gridTop + rowIdx * (rowHeight + rowGap);
+    ctx.font = labelFont;
+    ctx.fillStyle = theme.text;
+    ctx.fillText(p.name, padding, rowY + 6);
+    ctx.font = minutesFont;
+    ctx.fillStyle = theme.muted;
+    ctx.textAlign = 'right';
+    ctx.fillText(`${rotation.minutes[p.id]}m`, padding + labelColWidth - 12, rowY + 7);
+    ctx.textAlign = 'left';
+
+    // Row background track
+    roundRect(ctx, padding + labelColWidth, rowY, cellWidth * blocks - 2, rowHeight, 6);
+    ctx.fillStyle = theme.rowAlt;
+    ctx.fill();
+
+    // Draw contiguous "on court" runs as single rounded bars
+    let runStart = null;
+    for (let i = 0; i <= blocks; i++) {
+      const on = i < blocks && rotation.result[i].lineup.some(x => x.id === p.id);
+      if (on && runStart === null) runStart = i;
+      if (!on && runStart !== null) {
+        const x = padding + labelColWidth + runStart * cellWidth + 1;
+        const w = (i - runStart) * cellWidth - 2;
+        roundRect(ctx, x, rowY, w, rowHeight, 6);
+        ctx.fillStyle = theme.accent;
+        ctx.fill();
+
+        if (runStart > 0) {
+          const subOut = subLookup.get(`${runStart}:${p.id}`);
+          if (subOut) {
+            const text = `🔄 ${subOut}`;
+            const maxWidth = Math.max(0, w - 8);
+            ctx.save();
+            roundRect(ctx, x, rowY, w, rowHeight, 6);
+            ctx.clip();
+            ctx.font = subLabelFont;
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, x + 5, rowY + rowHeight / 2 + 1, maxWidth);
+            ctx.textBaseline = 'top';
+            ctx.restore();
+          }
+        }
+        runStart = null;
+      }
+    }
+  });
+
+  return canvas;
+}
+
 function canvasToBlob(canvas) {
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 }
@@ -538,8 +754,11 @@ document.querySelector('#copyRotationImage').addEventListener('click', async () 
   const btn = document.querySelector('#copyRotationImage');
   const old = btn.textContent;
   const players = state.players.filter(p => p.present);
+  const renderCanvas = () => activeView === 'timeline'
+    ? renderTimelineCanvas(lastRotation, players)
+    : renderRotationCanvas(lastRotation, players);
   try {
-    const canvas = renderRotationCanvas(lastRotation, players);
+    const canvas = renderCanvas();
     const blob = await canvasToBlob(canvas);
     if (!blob) throw new Error('Could not create image.');
     if (navigator.clipboard && window.ClipboardItem) {
@@ -551,7 +770,7 @@ document.querySelector('#copyRotationImage').addEventListener('click', async () 
     }
   } catch (e) {
     try {
-      const canvas = renderRotationCanvas(lastRotation, players);
+      const canvas = renderCanvas();
       const blob = await canvasToBlob(canvas);
       if (blob) { downloadBlob(blob, 'rotation.png'); btn.textContent = 'Downloaded'; }
       else throw e;
