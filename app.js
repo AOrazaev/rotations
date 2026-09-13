@@ -1,17 +1,17 @@
 const STORAGE_KEY = 'basketball-rotation-planner-v1';
 
 const defaultPlayers = [
-  { id: crypto.randomUUID(), name: 'Dmytro', positions: ['F','G'], skill: 80, present: false },
-  { id: crypto.randomUUID(), name: 'Aman', positions: ['F','G'], skill: 75, present: true },
-  { id: crypto.randomUUID(), name: 'Bohdan', positions: ['C','F'], skill: 90, present: false },
-  { id: crypto.randomUUID(), name: 'Denis', positions: ['F'], skill: 70, present: true },
-  { id: crypto.randomUUID(), name: 'Anatoly', positions: ['G'], skill: 50, present: true },
-  { id: crypto.randomUUID(), name: 'Bek', positions: ['G'], skill: 50, present: true },
-  { id: crypto.randomUUID(), name: 'Vlad', positions: ['C','F','G'], skill: 75, present: true },
-  { id: crypto.randomUUID(), name: 'Valya', positions: ['F','G'], skill: 70, present: true },
-  { id: crypto.randomUUID(), name: 'Yedil', positions: ['C'], skill: 70, present: true },
-  { id: crypto.randomUUID(), name: 'Nikita', positions: ['F','G'], skill: 95, present: false },
-  { id: crypto.randomUUID(), name: 'Anton', positions: ['C'], skill: 70, present: false },
+  { id: crypto.randomUUID(), name: 'Dmytro', number: '', positions: ['F','G'], skill: 80, present: false },
+  { id: crypto.randomUUID(), name: 'Aman', number: '', positions: ['F','G'], skill: 75, present: true },
+  { id: crypto.randomUUID(), name: 'Bohdan', number: '', positions: ['C','F'], skill: 90, present: false },
+  { id: crypto.randomUUID(), name: 'Denis', number: '', positions: ['F'], skill: 70, present: true },
+  { id: crypto.randomUUID(), name: 'Anatoly', number: '', positions: ['G'], skill: 50, present: true },
+  { id: crypto.randomUUID(), name: 'Bek', number: '', positions: ['G'], skill: 50, present: true },
+  { id: crypto.randomUUID(), name: 'Vlad', number: '', positions: ['C','F','G'], skill: 75, present: true },
+  { id: crypto.randomUUID(), name: 'Valya', number: '', positions: ['F','G'], skill: 70, present: true },
+  { id: crypto.randomUUID(), name: 'Yedil', number: '', positions: ['C'], skill: 70, present: true },
+  { id: crypto.randomUUID(), name: 'Nikita', number: '', positions: ['F','G'], skill: 95, present: false },
+  { id: crypto.randomUUID(), name: 'Anton', number: '', positions: ['C'], skill: 70, present: false },
 ];
 
 const LEGACY_MODE_INTENSITY = { equal: 0, balanced: 50, competitive: 100 };
@@ -19,7 +19,7 @@ const LEGACY_MODE_INTENSITY = { equal: 0, balanced: 50, competitive: 100 };
 let state = loadState();
 let lastRotation = null;
 let lastPlayers = null;
-let activeView = 'table';
+let activeView = 'timeline';
 
 const rosterEl = document.querySelector('#roster');
 const playerTemplate = document.querySelector('#playerTemplate');
@@ -42,6 +42,7 @@ function loadState() {
         saved.intensity = LEGACY_MODE_INTENSITY[saved.mode] ?? 100;
       }
       delete saved.mode;
+      saved.players.forEach(p => { if (typeof p.number !== 'string') p.number = ''; });
       return saved;
     }
   } catch (_) {}
@@ -57,12 +58,14 @@ function renderRoster() {
   for (const player of state.players) {
     const node = playerTemplate.content.firstElementChild.cloneNode(true);
     const present = node.querySelector('.present');
+    const jersey = node.querySelector('.jersey');
     const name = node.querySelector('.name');
     const skill = node.querySelector('.skill');
     const skillValue = node.querySelector('.skill-value');
     const posBoxes = [...node.querySelectorAll('.positions input')];
 
     present.checked = !!player.present;
+    jersey.value = player.number || '';
     name.value = player.name;
     skill.value = player.skill;
     skillValue.textContent = player.skill;
@@ -70,6 +73,8 @@ function renderRoster() {
 
     const update = () => {
       player.present = present.checked;
+      player.number = jersey.value.replace(/[^0-9]/g, '').slice(0, 3);
+      jersey.value = player.number;
       player.name = name.value.trim() || 'Unnamed';
       player.skill = Number(skill.value);
       player.positions = posBoxes.filter(x => x.checked).map(x => x.value);
@@ -78,6 +83,7 @@ function renderRoster() {
     };
 
     present.addEventListener('change', update);
+    jersey.addEventListener('input', update);
     name.addEventListener('input', update);
     skill.addEventListener('input', update);
     posBoxes.forEach(box => box.addEventListener('change', update));
@@ -240,7 +246,7 @@ function buildSubLookup(rotation) {
     const { out, inn } = computeSubs(rotation.result[i - 1], rotation.result[i]);
     inn.forEach((inPlayer, idx) => {
       const outPlayer = out[idx];
-      if (outPlayer) lookup.set(`${i}:${inPlayer.id}`, outPlayer.name);
+      if (outPlayer) lookup.set(`${i}:${inPlayer.id}`, outPlayer);
     });
   }
   return lookup;
@@ -252,8 +258,8 @@ function renderRotation(rotation, players) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${blockLabel(i, rotation.blockMinutes)}</td>
-      <td class="lineup">${block.lineup.map(p=>escapeHtml(p.name)).join(' · ')}</td>
-      <td class="bench">${block.bench.length ? block.bench.map(p=>escapeHtml(p.name)).join(', ') : '—'}</td>`;
+      <td class="lineup">${block.lineup.map(p=>playerLabelHtml(p)).join(' · ')}</td>
+      <td class="bench">${block.bench.length ? block.bench.map(p=>playerLabelHtml(p)).join(', ') : '—'}</td>`;
     rotationBody.appendChild(tr);
 
     if (i < rotation.result.length - 1) {
@@ -262,8 +268,8 @@ function renderRotation(rotation, players) {
         const subTr = document.createElement('tr');
         subTr.className = 'sub-row';
         const parts = [];
-        if (out.length) parts.push(`<span class="sub-out">OUT: ${out.map(p=>escapeHtml(p.name)).join(', ')}</span>`);
-        if (inn.length) parts.push(`<span class="sub-in">IN: ${inn.map(p=>escapeHtml(p.name)).join(', ')}</span>`);
+        if (out.length) parts.push(`<span class="sub-out">OUT: ${out.map(p=>playerLabelHtml(p)).join(', ')}</span>`);
+        if (inn.length) parts.push(`<span class="sub-in">IN: ${inn.map(p=>playerLabelHtml(p)).join(', ')}</span>`);
         subTr.innerHTML = `<td colspan="3">${parts.join(' · ')}</td>`;
         rotationBody.appendChild(subTr);
       }
@@ -271,7 +277,7 @@ function renderRotation(rotation, players) {
   });
 
   const sorted = [...players].sort((a,b)=>rotation.minutes[b.id]-rotation.minutes[a.id] || b.skill-a.skill);
-  minutesGrid.innerHTML = sorted.map(p => `<div class="minute-card"><strong>${escapeHtml(p.name)}</strong><span>${rotation.minutes[p.id]} min</span></div>`).join('');
+  minutesGrid.innerHTML = sorted.map(p => `<div class="minute-card"><strong>${playerLabelHtml(p)}</strong><span>${rotation.minutes[p.id]} min</span></div>`).join('');
   summary.textContent = `${players.length} players · ${rotation.blockMinutes}-minute blocks · ${intensityLabel(state.intensity)}`;
   renderTimeline(rotation, players);
   lastPlayers = players;
@@ -307,7 +313,7 @@ function renderTimeline(rotation, players) {
   }
 
   sorted.forEach(p => {
-    html += `<div class="timeline-row-label"><span>${escapeHtml(p.name)}</span><span class="tl-minutes">${rotation.minutes[p.id]}m</span></div>`;
+    html += `<div class="timeline-row-label"><span>${playerLabelSupHtml(p)}</span><span class="tl-minutes">${rotation.minutes[p.id]}m</span></div>`;
     for (let i = 0; i < blocks; i++) {
       const on = rotation.result[i].lineup.some(x => x.id === p.id);
       const prevOn = i > 0 && rotation.result[i - 1].lineup.some(x => x.id === p.id);
@@ -320,14 +326,14 @@ function renderTimeline(rotation, players) {
         cls += ' on';
         if (!prevOn) {
           cls += ' run-start';
-          const subOut = i > 0 ? subLookup.get(`${i}:${p.id}`) : null;
-          if (subOut) label = `<span class="sub-label">🔄 ${escapeHtml(subOut)}</span>`;
+          const subOutPlayer = i > 0 ? subLookup.get(`${i}:${p.id}`) : null;
+          if (subOutPlayer) label = `<span class="sub-label">🔄 ${playerLabelSupHtml(subOutPlayer)}</span>`;
         }
         if (!nextOn) cls += ' run-end';
       }
       if (i > 0 && half !== prevHalf) cls += ' timeline-half-divider';
-      const subOutForTitle = on && !prevOn && i > 0 ? subLookup.get(`${i}:${p.id}`) : null;
-      const titleText = `${p.name} — ${blockLabel(i, rotation.blockMinutes)} — ${on ? 'On court' : 'Bench'}${subOutForTitle ? ` (in for ${subOutForTitle})` : ''}`;
+      const subOutPlayerForTitle = on && !prevOn && i > 0 ? subLookup.get(`${i}:${p.id}`) : null;
+      const titleText = `${playerLabel(p)} — ${blockLabel(i, rotation.blockMinutes)} — ${on ? 'On court' : 'Bench'}${subOutPlayerForTitle ? ` (in for ${playerLabel(subOutPlayerForTitle)})` : ''}`;
       html += `<div class="${cls}" title="${escapeHtml(titleText)}">${label}</div>`;
     }
   });
@@ -360,6 +366,35 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
 
+// Plain-text label (used in canvas exports / clipboard text): "#12 Name" or "Name".
+function playerLabel(p) {
+  return p.number ? `#${p.number} ${p.name}` : p.name;
+}
+
+// HTML label with a styled jersey-number badge (used in on-page DOM rendering).
+function playerLabelHtml(p) {
+  const badge = p.number ? `<span class="jersey-badge">${escapeHtml(p.number)}</span>` : '';
+  return `${badge}${escapeHtml(p.name)}`;
+}
+
+// Compact HTML label: jersey number as a superscript (no "#"), for the
+// space-constrained timeline view (row labels, sub-in tags).
+function playerLabelSupHtml(p) {
+  const sup = p.number ? `<sup class="jersey-sup">${escapeHtml(p.number)}</sup>` : '';
+  return `${escapeHtml(p.name)}${sup}`;
+}
+
+const SUPERSCRIPT_DIGITS = { '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹' };
+
+// Plain-text label with the jersey number rendered as superscript Unicode
+// digits (no "#") — used where a single fillText/string is needed, e.g. the
+// canvas timeline's clipped sub-in labels.
+function playerLabelSupText(p) {
+  if (!p.number) return p.name;
+  const sup = String(p.number).split('').map(d => SUPERSCRIPT_DIGITS[d] || d).join('');
+  return `${p.name}${sup}`;
+}
+
 function generate() {
   state.blockMinutes = Number(document.querySelector('#blockMinutes').value);
   state.intensity = Number(document.querySelector('#intensity').value);
@@ -368,6 +403,7 @@ function generate() {
   try {
     lastRotation = buildRotation(players, state.blockMinutes, state.intensity);
     renderRotation(lastRotation, players);
+    setActiveView('timeline');
     seedInput.value = '';
     rotationCard.scrollIntoView({behavior:'smooth', block:'start'});
   } catch (e) { alert(e.message); }
@@ -381,7 +417,7 @@ function applySeed(seed, players) {
 }
 
 document.querySelector('#addPlayer').addEventListener('click', () => {
-  state.players.push({ id: crypto.randomUUID(), name:'New player', positions:['F'], skill:60, present:true });
+  state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true });
   saveState(); renderRoster();
 });
 document.querySelector('#generate').addEventListener('click', generate);
@@ -415,9 +451,9 @@ seedInput.addEventListener('change', () => {
 document.querySelector('#copyRotation').addEventListener('click', async () => {
   if (!lastRotation) return;
   const players = state.players.filter(p=>p.present);
-  const lines = lastRotation.result.map((b,i)=>`${blockLabel(i,lastRotation.blockMinutes)}: ${b.lineup.map(p=>p.name).join(', ')}`);
+  const lines = lastRotation.result.map((b,i)=>`${blockLabel(i,lastRotation.blockMinutes)}: ${b.lineup.map(p=>playerLabel(p)).join(', ')}`);
   lines.push('', 'Minutes:');
-  players.sort((a,b)=>lastRotation.minutes[b.id]-lastRotation.minutes[a.id]).forEach(p=>lines.push(`${p.name}: ${lastRotation.minutes[p.id]} min`));
+  players.sort((a,b)=>lastRotation.minutes[b.id]-lastRotation.minutes[a.id]).forEach(p=>lines.push(`${playerLabel(p)}: ${lastRotation.minutes[p.id]} min`));
   await navigator.clipboard.writeText(lines.join('\n'));
   const btn = document.querySelector('#copyRotation'); const old = btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=old,1200);
 });
@@ -482,8 +518,8 @@ function renderRotationCanvas(rotation, players) {
   const rows = [];
   rotation.result.forEach((block, i) => {
     const label = blockLabel(i, rotation.blockMinutes);
-    const lineupText = block.lineup.map(p => p.name).join(' · ');
-    const benchText = block.bench.length ? block.bench.map(p => p.name).join(', ') : '—';
+    const lineupText = block.lineup.map(p => playerLabel(p)).join(' · ');
+    const benchText = block.bench.length ? block.bench.map(p => playerLabel(p)).join(', ') : '—';
     const lineupLines = wrapText(measure, lineupText, listColWidth - 16);
     const benchLines = wrapText(measure, benchText, listColWidth - 16);
     const lineCount = Math.max(lineupLines.length, benchLines.length, 1);
@@ -493,8 +529,8 @@ function renderRotationCanvas(rotation, players) {
       const { out, inn } = computeSubs(block, rotation.result[i + 1]);
       if (out.length || inn.length) {
         measure.font = subFontCanvas;
-        const outText = out.length ? `OUT: ${out.map(p => p.name).join(', ')}` : '';
-        const inText = inn.length ? `IN: ${inn.map(p => p.name).join(', ')}` : '';
+        const outText = out.length ? `OUT: ${out.map(p => playerLabel(p)).join(', ')}` : '';
+        const inText = inn.length ? `IN: ${inn.map(p => playerLabel(p)).join(', ')}` : '';
         const outLines = outText ? wrapText(measure, outText, contentWidth - 16) : [];
         const inLines = inText ? wrapText(measure, inText, contentWidth - 16) : [];
         measure.font = cellFont;
@@ -602,7 +638,7 @@ function renderRotationCanvas(rotation, players) {
       ctx.fill();
       ctx.fillStyle = theme.text;
       ctx.font = cardNameFont;
-      ctx.fillText(p.name, x + 12, cy + 10);
+      ctx.fillText(playerLabel(p), x + 12, cy + 10);
       ctx.font = subFont;
       ctx.fillStyle = theme.muted;
       ctx.fillText(`${rotation.minutes[p.id]} min`, x + 12, cy + 28);
@@ -687,6 +723,12 @@ function renderTimelineCanvas(rotation, players) {
     ctx.font = labelFont;
     ctx.fillStyle = theme.text;
     ctx.fillText(p.name, padding, rowY + 6);
+    if (p.number) {
+      const nameWidth = ctx.measureText(p.name).width;
+      ctx.font = `800 10px ${fontFamily}`;
+      ctx.fillStyle = theme.muted;
+      ctx.fillText(p.number, padding + nameWidth + 2, rowY + 2);
+    }
     ctx.font = minutesFont;
     ctx.fillStyle = theme.muted;
     ctx.textAlign = 'right';
@@ -711,9 +753,9 @@ function renderTimelineCanvas(rotation, players) {
         ctx.fill();
 
         if (runStart > 0) {
-          const subOut = subLookup.get(`${runStart}:${p.id}`);
-          if (subOut) {
-            const text = `🔄 ${subOut}`;
+          const subOutPlayer = subLookup.get(`${runStart}:${p.id}`);
+          if (subOutPlayer) {
+            const text = `🔄 ${playerLabelSupText(subOutPlayer)}`;
             const maxWidth = Math.max(0, w - 8);
             ctx.save();
             roundRect(ctx, x, rowY, w, rowHeight, 6);
