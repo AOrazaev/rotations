@@ -1,17 +1,17 @@
 const STORAGE_KEY = 'basketball-rotation-planner-v1';
 
 const defaultPlayers = [
-  { id: crypto.randomUUID(), name: 'Dmytro', number: '', positions: ['F','G'], skill: 80, present: false },
-  { id: crypto.randomUUID(), name: 'Aman', number: '', positions: ['F','G'], skill: 75, present: true },
-  { id: crypto.randomUUID(), name: 'Bohdan', number: '', positions: ['C','F'], skill: 90, present: false },
-  { id: crypto.randomUUID(), name: 'Denis', number: '', positions: ['F'], skill: 70, present: true },
-  { id: crypto.randomUUID(), name: 'Anatoly', number: '', positions: ['G'], skill: 50, present: true },
-  { id: crypto.randomUUID(), name: 'Bek', number: '', positions: ['G'], skill: 50, present: true },
-  { id: crypto.randomUUID(), name: 'Vlad', number: '', positions: ['C','F','G'], skill: 75, present: true },
-  { id: crypto.randomUUID(), name: 'Valya', number: '', positions: ['F','G'], skill: 70, present: true },
-  { id: crypto.randomUUID(), name: 'Yedil', number: '', positions: ['C'], skill: 70, present: true },
-  { id: crypto.randomUUID(), name: 'Nikita', number: '', positions: ['F','G'], skill: 95, present: false },
-  { id: crypto.randomUUID(), name: 'Anton', number: '', positions: ['C'], skill: 70, present: false },
+  { id: crypto.randomUUID(), name: 'Dmytro', number: '13', positions: ['F','G'], skill: 80, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Aman', number: '7', positions: ['F','G'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Bohdan', number: '27', positions: ['C','F'], skill: 90, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Denis', number: '50', positions: ['F'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Anatoly', number: '3', positions: ['G'], skill: 50, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Bek', number: '40', positions: ['G'], skill: 50, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Vlad', number: '5', positions: ['C','F','G'], skill: 75, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Valya', number: '60', positions: ['F','G'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Yedil', number: '70', positions: ['C'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Nikita', number: '', positions: ['F','G'], skill: 95, present: false, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Anton', number: '1', positions: ['C'], skill: 70, present: false, minMinutes: null, maxMinutes: null },
 ];
 
 const LEGACY_MODE_INTENSITY = { equal: 0, balanced: 50, competitive: 100 };
@@ -42,7 +42,11 @@ function loadState() {
         saved.intensity = LEGACY_MODE_INTENSITY[saved.mode] ?? 100;
       }
       delete saved.mode;
-      saved.players.forEach(p => { if (typeof p.number !== 'string') p.number = ''; });
+      saved.players.forEach(p => {
+        if (typeof p.number !== 'string') p.number = '';
+        if (typeof p.minMinutes !== 'number') p.minMinutes = null;
+        if (typeof p.maxMinutes !== 'number') p.maxMinutes = null;
+      });
       return saved;
     }
   } catch (_) {}
@@ -63,6 +67,8 @@ function renderRoster() {
     const skill = node.querySelector('.skill');
     const skillValue = node.querySelector('.skill-value');
     const posBoxes = [...node.querySelectorAll('.positions input')];
+    const minMinutes = node.querySelector('.min-minutes');
+    const maxMinutes = node.querySelector('.max-minutes');
 
     present.checked = !!player.present;
     jersey.value = player.number || '';
@@ -70,6 +76,8 @@ function renderRoster() {
     skill.value = player.skill;
     skillValue.textContent = player.skill;
     posBoxes.forEach(box => box.checked = player.positions.includes(box.value));
+    minMinutes.value = player.minMinutes ?? '';
+    maxMinutes.value = player.maxMinutes ?? '';
 
     const update = () => {
       player.present = present.checked;
@@ -79,6 +87,8 @@ function renderRoster() {
       player.skill = Number(skill.value);
       player.positions = posBoxes.filter(x => x.checked).map(x => x.value);
       skillValue.textContent = player.skill;
+      player.minMinutes = minMinutes.value === '' ? null : Math.max(0, Number(minMinutes.value));
+      player.maxMinutes = maxMinutes.value === '' ? null : Math.max(0, Number(maxMinutes.value));
       saveState();
     };
 
@@ -87,6 +97,8 @@ function renderRoster() {
     name.addEventListener('input', update);
     skill.addEventListener('input', update);
     posBoxes.forEach(box => box.addEventListener('change', update));
+    minMinutes.addEventListener('input', update);
+    maxMinutes.addEventListener('input', update);
     node.querySelector('.delete').addEventListener('click', () => {
       state.players = state.players.filter(p => p.id !== player.id);
       saveState();
@@ -140,6 +152,33 @@ function buildRotation(players, blockMinutes, intensity, rng) {
   const lastPlayed = Object.fromEntries(players.map(p => [p.id, -99]));
   const result = [];
 
+  // Convert each player's optional minute floor/ceiling into block counts.
+  // Unset min => 0 (no floor). Unset max => blocks (no ceiling).
+  const minBlocks = {};
+  const maxBlocks = {};
+  for (const p of players) {
+    const rawMin = Number(p.minMinutes);
+    const rawMax = Number(p.maxMinutes);
+    minBlocks[p.id] = (p.minMinutes != null && p.minMinutes !== '' && Number.isFinite(rawMin) && rawMin > 0)
+      ? Math.min(blocks, Math.round(rawMin / blockMinutes))
+      : 0;
+    maxBlocks[p.id] = (p.maxMinutes != null && p.maxMinutes !== '' && Number.isFinite(rawMax))
+      ? Math.max(0, Math.min(blocks, Math.round(rawMax / blockMinutes)))
+      : blocks;
+    if (minBlocks[p.id] > maxBlocks[p.id]) {
+      throw new Error(`${p.name}: minimum minutes can't exceed maximum minutes.`);
+    }
+  }
+  const totalSlots = blocks * 5;
+  const sumMin = players.reduce((s, p) => s + minBlocks[p.id], 0);
+  const sumMax = players.reduce((s, p) => s + maxBlocks[p.id], 0);
+  if (sumMin > totalSlots) {
+    throw new Error('Total minimum minutes across players exceed the available playing time. Lower some minimums.');
+  }
+  if (sumMax < totalSlots) {
+    throw new Error('Maximum minute limits leave too little playing time to fill every lineup slot. Raise some maximums.');
+  }
+
   const skills = players.map(p=>p.skill);
   const minSkill = Math.min(...skills), maxSkill = Math.max(...skills);
   const norm = p => maxSkill === minSkill ? 0.5 : (p.skill-minSkill)/(maxSkill-minSkill);
@@ -157,9 +196,40 @@ function buildRotation(players, blockMinutes, intensity, rng) {
 
   for (let b=0; b<blocks; b++) {
     const closing = b === blocks-1;
+    const remaining = blocks - b; // blocks left, including this one
+
+    // Hard max: once a player has hit their ceiling, they can't appear again.
+    const cappedOut = new Set(players.filter(p => playedBlocks[p.id] >= maxBlocks[p.id]).map(p => p.id));
+    const eligibleCount = players.length - cappedOut.size;
+    if (eligibleCount < 5) {
+      throw new Error(`Not enough eligible players for block ${b + 1} — too many players have reached their maximum minutes at the same time. Raise some maximums or relax the constraints.`);
+    }
+
+    // Hard min: if a player's remaining minimum equals the blocks left, they
+    // must play from now until the end of the game or they'll miss their floor.
+    const forced = players.filter(p => {
+      if (cappedOut.has(p.id)) return false;
+      const needed = minBlocks[p.id] - playedBlocks[p.id];
+      return needed > 0 && needed >= remaining;
+    });
+    if (forced.length > 5) {
+      throw new Error(`Minimum-minute requirements for ${forced.map(p => p.name).join(', ')} all come due in the same time block — lower some minimums or spread them out.`);
+    }
+
+    let eligibleCombos = combos.filter(lineup => lineup.every(p => !cappedOut.has(p.id)));
+    if (forced.length) {
+      eligibleCombos = eligibleCombos.filter(lineup => {
+        const ids = new Set(lineup.map(p => p.id));
+        return forced.every(p => ids.has(p.id));
+      });
+    }
+    if (!eligibleCombos.length) {
+      throw new Error(`Couldn't find a valid lineup for block ${b + 1} given the current minute limits — try relaxing them.`);
+    }
+
     const scored = [];
 
-    for (const lineup of combos) {
+    for (const lineup of eligibleCombos) {
       let score = 0;
       const ids = new Set(lineup.map(p=>p.id));
       const skillScore = lineup.reduce((s,p)=>s+p.skill,0);
@@ -417,7 +487,7 @@ function applySeed(seed, players) {
 }
 
 document.querySelector('#addPlayer').addEventListener('click', () => {
-  state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true });
+  state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true, minMinutes:null, maxMinutes:null });
   saveState(); renderRoster();
 });
 document.querySelector('#generate').addEventListener('click', generate);

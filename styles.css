@@ -38,6 +38,9 @@ button { border:0; border-radius:12px; padding:10px 14px; cursor:pointer; }
 .skill-wrap { display:grid; grid-template-columns:1fr 34px; gap:8px; align-items:center; }
 .skill { width:100%; }
 .skill-value { font-variant-numeric:tabular-nums; text-align:right; color:#fff; }
+.minutes-limits { grid-column:1 / -1; display:flex; gap:16px; flex-wrap:wrap; padding-top:2px; }
+.limit-field { display:flex; align-items:center; gap:6px; font-size:.82rem; color:var(--muted); }
+.limit-field input { width:64px; background:#0a1220; color:#fff; border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
 .icon-button { background:transparent; color:var(--muted); font-size:1.5rem; padding:0; }
 .icon-button:hover { color:var(--danger); }
 .settings-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; align-items:end; }
