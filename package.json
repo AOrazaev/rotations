@@ -1,0 +1,14 @@
+{
+  "name": "bask-rotations",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static basketball rotation planner (GitHub Pages). No runtime dependencies — the devDependencies below are test-only tooling and never ship to the site.",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0"
+  }
+}
