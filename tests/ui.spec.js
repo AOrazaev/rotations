@@ -131,11 +131,13 @@ test('Reset app restores the default roster and settings', async ({ page }) => {
   await page.locator('#addPlayer').click();
   const before = await page.locator('.player-row').count();
 
-  const [dialog] = await Promise.all([
-    page.waitForEvent('dialog'),
+  // confirm() blocks the page's JS thread until the dialog is dismissed, so
+  // the click() promise won't resolve until we accept it here - accept must
+  // happen as soon as the dialog appears, not after awaiting the click.
+  await Promise.all([
+    page.waitForEvent('dialog').then((dialog) => dialog.accept()),
     page.locator('#resetApp').click(),
   ]);
-  await dialog.accept();
 
   await expect(page.locator('.player-row')).toHaveCount(before - 1);
   await expect(page.locator('#rosterCompactTab')).toHaveClass(/active/);
