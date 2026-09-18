@@ -33,6 +33,9 @@ const timelineGrid = document.querySelector('#timelineGrid');
 const tabTable = document.querySelector('#tabTable');
 const tabTimeline = document.querySelector('#tabTimeline');
 const seedInput = document.querySelector('#regenerateSeed');
+const rosterCompactTab = document.querySelector('#rosterCompactTab');
+const rosterEditTab = document.querySelector('#rosterEditTab');
+const addPlayerBtn = document.querySelector('#addPlayer');
 
 function loadState() {
   try {
@@ -42,6 +45,7 @@ function loadState() {
         saved.intensity = LEGACY_MODE_INTENSITY[saved.mode] ?? 100;
       }
       delete saved.mode;
+      if (typeof saved.rosterCompact !== 'boolean') saved.rosterCompact = true;
       saved.players.forEach(p => {
         if (typeof p.number !== 'string') p.number = '';
         if (typeof p.minMinutes !== 'number') p.minMinutes = null;
@@ -50,7 +54,7 @@ function loadState() {
       return saved;
     }
   } catch (_) {}
-  return { players: defaultPlayers, blockMinutes: 4, intensity: 100 };
+  return { players: defaultPlayers, blockMinutes: 4, intensity: 100, rosterCompact: true };
 }
 
 function saveState() {
@@ -69,10 +73,15 @@ function renderRoster() {
     const posBoxes = [...node.querySelectorAll('.positions input')];
     const minMinutes = node.querySelector('.min-minutes');
     const maxMinutes = node.querySelector('.max-minutes');
+    const compactJersey = node.querySelector('.compact-jersey');
+    const nameText = node.querySelector('.name-text');
 
     present.checked = !!player.present;
+    node.classList.toggle('chip-off', !present.checked);
     jersey.value = player.number || '';
     name.value = player.name;
+    nameText.textContent = player.name;
+    compactJersey.textContent = player.number || '';
     skill.value = player.skill;
     skillValue.textContent = player.skill;
     posBoxes.forEach(box => box.checked = player.positions.includes(box.value));
@@ -81,9 +90,12 @@ function renderRoster() {
 
     const update = () => {
       player.present = present.checked;
+      node.classList.toggle('chip-off', !present.checked);
       player.number = jersey.value.replace(/[^0-9]/g, '').slice(0, 3);
       jersey.value = player.number;
+      compactJersey.textContent = player.number;
       player.name = name.value.trim() || 'Unnamed';
+      nameText.textContent = player.name;
       player.skill = Number(skill.value);
       player.positions = posBoxes.filter(x => x.checked).map(x => x.value);
       skillValue.textContent = player.skill;
@@ -103,6 +115,21 @@ function renderRoster() {
       state.players = state.players.filter(p => p.id !== player.id);
       saveState();
       renderRoster();
+    });
+
+    node.tabIndex = 0;
+    node.addEventListener('click', (e) => {
+      if (!state.rosterCompact) return;
+      present.checked = !present.checked;
+      update();
+    });
+    node.addEventListener('keydown', (e) => {
+      if (!state.rosterCompact) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        present.checked = !present.checked;
+        update();
+      }
     });
 
     rosterEl.appendChild(node);
@@ -424,6 +451,20 @@ function setActiveView(view) {
 tabTable.addEventListener('click', () => setActiveView('table'));
 tabTimeline.addEventListener('click', () => setActiveView('timeline'));
 
+function setRosterMode(compact) {
+  state.rosterCompact = compact;
+  saveState();
+  rosterEl.classList.toggle('compact', compact);
+  addPlayerBtn.classList.toggle('hidden', compact);
+  rosterCompactTab.classList.toggle('active', compact);
+  rosterEditTab.classList.toggle('active', !compact);
+  rosterCompactTab.setAttribute('aria-selected', String(compact));
+  rosterEditTab.setAttribute('aria-selected', String(!compact));
+}
+
+rosterCompactTab.addEventListener('click', () => setRosterMode(true));
+rosterEditTab.addEventListener('click', () => setRosterMode(false));
+
 function intensityLabel(v) {
   if (v <= 10) return 'Equal minutes';
   if (v >= 90) return 'Competitive';
@@ -501,7 +542,7 @@ intensityInput.addEventListener('input', () => {
 });
 document.querySelector('#resetApp').addEventListener('click', () => {
   if (!confirm('Reset roster and settings to defaults?')) return;
-  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, intensity:100 }; saveState(); renderRoster();
+  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, intensity:100, rosterCompact:true }; saveState(); renderRoster(); setRosterMode(true);
   intensityInput.value = '100'; intensityValueEl.textContent = intensityLabel(100);
   rotationCard.classList.add('hidden'); seedInput.value = '';
 });
@@ -896,3 +937,4 @@ document.querySelector('#copyRotationImage').addEventListener('click', async () 
 });
 
 renderRoster();
+setRosterMode(state.rosterCompact !== false);

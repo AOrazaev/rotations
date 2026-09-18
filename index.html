@@ -24,7 +24,13 @@
           <h2>Roster</h2>
           <p>Check players who are available today.</p>
         </div>
-        <button id="addPlayer" class="primary">+ Add player</button>
+        <div class="roster-controls">
+          <div class="view-tabs" role="tablist" aria-label="Roster view">
+            <button id="rosterCompactTab" class="view-tab" type="button" role="tab" aria-selected="false">Compact</button>
+            <button id="rosterEditTab" class="view-tab" type="button" role="tab" aria-selected="false">Edit details</button>
+          </div>
+          <button id="addPlayer" class="primary">+ Add player</button>
+        </div>
       </div>
       <div id="roster" class="roster"></div>
     </section>
@@ -106,19 +112,22 @@
         <input class="present" type="checkbox" />
         <span class="checkmark"></span>
       </label>
-      <input class="jersey" type="text" inputmode="numeric" maxlength="3" placeholder="#" aria-label="Jersey number (optional)" />
-      <input class="name" type="text" aria-label="Player name" />
-      <div class="positions" aria-label="Positions">
+      <input class="jersey edit-only" type="text" inputmode="numeric" maxlength="3" placeholder="#" aria-label="Jersey number (optional)" />
+      <div class="name-cell">
+        <input class="name edit-only" type="text" aria-label="Player name" />
+        <span class="name-display"><span class="name-text"></span><sup class="jersey-sup compact-jersey"></sup></span>
+      </div>
+      <div class="positions edit-only" aria-label="Positions">
         <label><input type="checkbox" value="G" />G</label>
         <label><input type="checkbox" value="F" />F</label>
         <label><input type="checkbox" value="C" />C</label>
       </div>
-      <div class="skill-wrap">
+      <div class="skill-wrap edit-only">
         <input class="skill" type="range" min="1" max="100" step="1" />
         <span class="skill-value"></span>
       </div>
-      <button class="delete icon-button" aria-label="Delete player">×</button>
-      <div class="minutes-limits">
+      <button class="delete icon-button edit-only" aria-label="Delete player">×</button>
+      <div class="minutes-limits edit-only">
         <label class="limit-field"><span>Min</span><input class="min-minutes" type="number" min="0" step="1" placeholder="—" aria-label="Minimum minutes (optional)" /></label>
         <label class="limit-field"><span>Max</span><input class="max-minutes" type="number" min="0" step="1" placeholder="—" aria-label="Maximum minutes (optional)" /></label>
       </div>

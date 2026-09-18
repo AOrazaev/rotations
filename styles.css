@@ -18,7 +18,9 @@ button,input,select { font:inherit; }
 h1 { font-size:clamp(2rem,6vw,3.6rem); line-height:1; margin:0; max-width:780px; }
 .subtitle { color:var(--muted); max-width:760px; font-size:1.05rem; line-height:1.5; }
 .card { background:rgba(18,26,43,.94); border:1px solid var(--line); border-radius:18px; padding:18px; margin:16px 0; box-shadow:0 18px 50px rgba(0,0,0,.18); }
-.section-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:14px; }
+.section-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.roster-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.roster-controls .view-tabs { margin-bottom:0; }
 h2 { margin:0 0 4px; font-size:1.2rem; }
 .section-head p { margin:0; color:var(--muted); }
 button { border:0; border-radius:12px; padding:10px 14px; cursor:pointer; }
@@ -39,6 +41,11 @@ button { border:0; border-radius:12px; padding:10px 14px; cursor:pointer; }
 .skill { width:100%; }
 .skill-value { font-variant-numeric:tabular-nums; text-align:right; color:#fff; }
 .minutes-limits { grid-column:1 / -1; display:flex; gap:16px; flex-wrap:wrap; padding-top:2px; }
+.name-cell { display:flex; align-items:center; gap:2px; min-width:0; }
+.name-cell input.name { flex:1; min-width:0; }
+.name-display { display:none; align-items:center; gap:2px; color:#fff; font-weight:600; padding:9px 2px; min-width:0; }
+.name-display .name-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.compact-jersey { display:none; }
 .limit-field { display:flex; align-items:center; gap:6px; font-size:.82rem; color:var(--muted); }
 .limit-field input { width:64px; background:#0a1220; color:#fff; border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
 .icon-button { background:transparent; color:var(--muted); font-size:1.5rem; padding:0; }
@@ -100,3 +107,31 @@ footer { color:var(--muted); text-align:center; padding-top:10px; font-size:.9re
   .skill-wrap { grid-column:2/4; }
   .delete { grid-column:4; grid-row:1; }
 }
+
+/* Compact roster mode: render each player as a wrapped toggle chip
+   (checkbox + name + jersey superscript), hiding the rarely-touched
+   setup fields (jersey input, positions, skill, min/max, delete).
+   Placed after the mobile media query so it wins the cascade at any width. */
+.roster.compact { display:flex; flex-wrap:wrap; gap:8px; }
+.roster.compact .player-row {
+  display:inline-flex;
+  width:auto;
+  align-items:center;
+  gap:4px;
+  padding:8px 14px;
+  cursor:pointer;
+  user-select:none;
+  background:rgba(109,124,255,.14);
+  border-color:var(--accent);
+  transition:background .12s ease, border-color .12s ease, opacity .12s ease;
+}
+.roster.compact .player-row.chip-off {
+  background:#0f1727;
+  border-color:#202c43;
+  border-style:dashed;
+  opacity:.55;
+}
+.roster.compact .check-wrap { display:none; }
+.roster.compact .edit-only { display:none; }
+.roster.compact .compact-jersey { display:inline; }
+.roster.compact .name-display { display:inline-flex; }
