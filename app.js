@@ -54,7 +54,7 @@ function loadState() {
       return saved;
     }
   } catch (_) {}
-  return { players: defaultPlayers, blockMinutes: 4, intensity: 100, rosterCompact: true };
+  return { players: defaultPlayers.map(p => ({ ...p, id: crypto.randomUUID() })), blockMinutes: 4, intensity: 100, rosterCompact: true };
 }
 
 function saveState() {
