@@ -3,9 +3,10 @@
 const { test, expect } = require('@playwright/test');
 
 test.beforeEach(async ({ page }) => {
-  // Each test starts from a clean localStorage so the default roster/settings
-  // are predictable (11 seeded players, blockMinutes=4, intensity=100).
-  await page.addInitScript(() => window.localStorage.clear());
+  // Playwright gives every test a fresh, isolated browser context, so
+  // localStorage already starts empty here - no explicit clearing needed.
+  // (An addInitScript-based clear would also re-run on any page.reload()
+  // within a test, wiping state the test just saved.)
   await page.goto('/');
 });
 
@@ -130,8 +131,11 @@ test('Reset app restores the default roster and settings', async ({ page }) => {
   await page.locator('#addPlayer').click();
   const before = await page.locator('.player-row').count();
 
-  page.once('dialog', dialog => dialog.accept());
-  await page.locator('#resetApp').click();
+  const [dialog] = await Promise.all([
+    page.waitForEvent('dialog'),
+    page.locator('#resetApp').click(),
+  ]);
+  await dialog.accept();
 
   await expect(page.locator('.player-row')).toHaveCount(before - 1);
   await expect(page.locator('#rosterCompactTab')).toHaveClass(/active/);
