@@ -936,5 +936,10 @@ document.querySelector('#copyRotationImage').addEventListener('click', async () 
   }
 });
 
+document.querySelector('#printRotation').addEventListener('click', () => {
+  if (!lastRotation) return;
+  window.print();
+});
+
 renderRoster();
 setRosterMode(state.rosterCompact !== false);

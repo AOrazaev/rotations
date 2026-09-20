@@ -135,3 +135,40 @@ footer { color:var(--muted); text-align:center; padding-top:10px; font-size:.9re
 .roster.compact .edit-only { display:none; }
 .roster.compact .compact-jersey { display:inline; }
 .roster.compact .name-display { display:inline-flex; }
+
+/* Print: show only the generated rotation, on a plain white page -
+   no dark backgrounds, gradients, or interactive controls. Colors that
+   only carry meaning via hue (sub in/out, on/bench) get a black/gray
+   fallback since most printers are grayscale. */
+@media print {
+  body { background:#fff; color:#000; }
+  .container { width:auto; padding:0; }
+  .hero, footer, .card:not(#rotationCard) { display:none !important; }
+  #rotationCard {
+    display:block !important;
+    background:#fff; color:#000;
+    border:1px solid #000; box-shadow:none; border-radius:0; margin:0;
+  }
+  #rotationCard h2, #rotationCard p, #rotationCard .section-head p { color:#000; }
+  #rotationCard .view-tabs, #rotationCard .rotation-actions { display:none !important; }
+  table { min-width:0; }
+  th, td { border-bottom:1px solid #000; color:#000; }
+  th { color:#333; }
+  .lineup { color:#000; }
+  .bench { color:#333; }
+  .sub-row td { background:#f2f2f2; border-bottom:1px dashed #999; color:#000; }
+  .sub-out, .sub-in { color:#000; }
+  .view-tab.active { background:#fff; }
+  .timeline-legend { color:#333; }
+  .swatch-on { background:#333; }
+  .swatch-off { background:#fff; border:1px solid #000; }
+  .timeline-header-cell, .tl-minutes { color:#333; border-color:#000; }
+  .timeline-cell { background:#eee; border:1px solid #ccc; }
+  .timeline-cell.on { background:#ccc; border:1px solid #333; }
+  .sub-label { background:#fff; color:#000; border:1px solid #000; }
+  .minute-card { background:#fff; border:1px solid #000; }
+  .minute-card span { color:#333; }
+  .jersey-badge { background:#fff; color:#000; border:1px solid #000; }
+  .jersey-sup { color:#000; }
+  tr, .minute-card, .timeline-row-label { break-inside:avoid; }
+}
