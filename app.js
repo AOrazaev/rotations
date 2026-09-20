@@ -19,6 +19,7 @@ const LEGACY_MODE_INTENSITY = { equal: 0, balanced: 50, competitive: 100 };
 let state = loadState();
 let lastRotation = null;
 let lastPlayers = null;
+let lastSeed = null;
 let activeView = 'timeline';
 
 const rosterEl = document.querySelector('#roster');
@@ -59,6 +60,44 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// Persist just enough to reconstruct the currently-displayed rotation on
+// reload: buildRotation() is a pure function of (players, blockMinutes,
+// intensity, rng), so we only need the player snapshot it was built from,
+// the settings, the seed (if any), and which tab was active — not the
+// rendered result itself.
+function persistRotation() {
+  if (lastRotation && lastPlayers) {
+    state.rotation = {
+      players: lastPlayers,
+      blockMinutes: lastRotation.blockMinutes,
+      intensity: state.intensity,
+      seed: lastSeed,
+      view: activeView,
+    };
+  } else {
+    delete state.rotation;
+  }
+  saveState();
+}
+
+function restoreRotation() {
+  const saved = state.rotation;
+  if (!saved || !Array.isArray(saved.players) || saved.players.length < 5) return;
+  try {
+    const rng = saved.seed != null ? createSeededRng(saved.seed) : undefined;
+    lastRotation = buildRotation(saved.players, saved.blockMinutes, saved.intensity, rng);
+    lastSeed = saved.seed ?? null;
+    renderRotation(lastRotation, saved.players);
+    setActiveView(saved.view === 'table' ? 'table' : 'timeline');
+    seedInput.value = lastSeed != null ? String(lastSeed) : '';
+  } catch (_) {
+    // Stale/incompatible saved rotation (e.g. algorithm changed) - drop it
+    // rather than fail silently on every future load.
+    delete state.rotation;
+    saveState();
+  }
 }
 
 function renderRoster() {
@@ -448,8 +487,8 @@ function setActiveView(view) {
   timelineView.classList.toggle('hidden', view !== 'timeline');
 }
 
-tabTable.addEventListener('click', () => setActiveView('table'));
-tabTimeline.addEventListener('click', () => setActiveView('timeline'));
+tabTable.addEventListener('click', () => { setActiveView('table'); persistRotation(); });
+tabTimeline.addEventListener('click', () => { setActiveView('timeline'); persistRotation(); });
 
 function setRosterMode(compact) {
   state.rosterCompact = compact;
@@ -516,6 +555,8 @@ function generate() {
     renderRotation(lastRotation, players);
     setActiveView('timeline');
     seedInput.value = '';
+    lastSeed = null;
+    persistRotation();
     rotationCard.scrollIntoView({behavior:'smooth', block:'start'});
   } catch (e) { alert(e.message); }
 }
@@ -525,6 +566,8 @@ function applySeed(seed, players) {
   lastRotation = buildRotation(players, state.blockMinutes, state.intensity, rng);
   renderRotation(lastRotation, players);
   seedInput.value = String(seed);
+  lastSeed = seed;
+  persistRotation();
 }
 
 document.querySelector('#addPlayer').addEventListener('click', () => {
@@ -544,6 +587,7 @@ document.querySelector('#resetApp').addEventListener('click', () => {
   if (!confirm('Reset roster and settings to defaults?')) return;
   localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, intensity:100, rosterCompact:true }; saveState(); renderRoster(); setRosterMode(true);
   intensityInput.value = '100'; intensityValueEl.textContent = intensityLabel(100);
+  lastRotation = null; lastPlayers = null; lastSeed = null;
   rotationCard.classList.add('hidden'); seedInput.value = '';
 });
 document.querySelector('#regenerateRotation').addEventListener('click', () => {
@@ -943,3 +987,4 @@ document.querySelector('#printRotation').addEventListener('click', () => {
 
 renderRoster();
 setRosterMode(state.rosterCompact !== false);
+restoreRotation();

@@ -68,6 +68,23 @@ test('Generate rotation produces one lineup row per time block and switches to t
   await expect(page.locator('#minutesGrid .minute-card')).toHaveCount(presentCount);
 });
 
+test('A generated rotation, its seed, and its view survive a reload', async ({ page }) => {
+  await page.locator('#generate').click();
+  await page.locator('#regenerateRotation').click();
+  const seed = await page.locator('#regenerateSeed').inputValue();
+  await page.locator('#tabTable').click();
+  const bodyBefore = await page.locator('#rotationBody').innerHTML();
+
+  await page.reload();
+
+  await expect(page.locator('#rotationCard')).toBeVisible();
+  await expect(page.locator('#tabTable')).toHaveClass(/active/);
+  await expect(page.locator('#tableView')).toBeVisible();
+  await expect(page.locator('#regenerateSeed')).toHaveValue(seed);
+  const bodyAfter = await page.locator('#rotationBody').innerHTML();
+  expect(bodyAfter).toBe(bodyBefore);
+});
+
 test('Table tab shows the table and hides the timeline', async ({ page }) => {
   await page.locator('#generate').click();
   await page.locator('#tabTable').click();
