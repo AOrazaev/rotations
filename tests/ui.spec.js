@@ -187,3 +187,61 @@ test('Reset app restores the default roster and settings', async ({ page }) => {
   await expect(page.locator('#rosterCompactTab')).toHaveClass(/active/);
   await expect(page.locator('#blockMinutes')).toHaveValue('4');
 });
+
+test('a manual swap can be undone and redone', async ({ page }) => {
+  await page.locator('#generate').click();
+  await page.locator('#swapMode').click();
+
+  const onCell = page.locator('.timeline-cell[data-block="0"][data-status="on"]').first();
+  const offCell = page.locator('.timeline-cell[data-block="0"][data-status="off"]').first();
+  const onId = await onCell.getAttribute('data-player');
+  const offId = await offCell.getAttribute('data-player');
+
+  await expect(page.locator('#undoSwap')).toBeDisabled();
+  await expect(page.locator('#redoSwap')).toBeDisabled();
+
+  await onCell.click();
+  await offCell.click();
+
+  await expect(page.locator(`.timeline-cell[data-block="0"][data-player="${offId}"]`)).toHaveAttribute('data-status', 'on');
+  await expect(page.locator(`.timeline-cell[data-block="0"][data-player="${onId}"]`)).toHaveAttribute('data-status', 'off');
+  await expect(page.locator('#undoSwap')).toBeEnabled();
+  await expect(page.locator('#redoSwap')).toBeDisabled();
+
+  await page.locator('#undoSwap').click();
+  await expect(page.locator(`.timeline-cell[data-block="0"][data-player="${onId}"]`)).toHaveAttribute('data-status', 'on');
+  await expect(page.locator(`.timeline-cell[data-block="0"][data-player="${offId}"]`)).toHaveAttribute('data-status', 'off');
+  await expect(page.locator('#undoSwap')).toBeDisabled();
+  await expect(page.locator('#redoSwap')).toBeEnabled();
+
+  await page.locator('#redoSwap').click();
+  await expect(page.locator(`.timeline-cell[data-block="0"][data-player="${offId}"]`)).toHaveAttribute('data-status', 'on');
+  await expect(page.locator(`.timeline-cell[data-block="0"][data-player="${onId}"]`)).toHaveAttribute('data-status', 'off');
+  await expect(page.locator('#undoSwap')).toBeEnabled();
+  await expect(page.locator('#redoSwap')).toBeDisabled();
+});
+
+test('generating a new rotation clears swap undo/redo history', async ({ page }) => {
+  await page.locator('#generate').click();
+  await page.locator('#swapMode').click();
+  await page.locator('.timeline-cell[data-block="0"][data-status="on"]').first().click();
+  await page.locator('.timeline-cell[data-block="0"][data-status="off"]').first().click();
+  await expect(page.locator('#undoSwap')).toBeEnabled();
+
+  await page.locator('#regenerateRotation').click();
+  await expect(page.locator('#undoSwap')).toBeDisabled();
+  await expect(page.locator('#redoSwap')).toBeDisabled();
+});
+
+test('swap undo/redo history does not persist across a reload', async ({ page }) => {
+  await page.locator('#generate').click();
+  await page.locator('#swapMode').click();
+  await page.locator('.timeline-cell[data-block="0"][data-status="on"]').first().click();
+  await page.locator('.timeline-cell[data-block="0"][data-status="off"]').first().click();
+  await expect(page.locator('#undoSwap')).toBeEnabled();
+
+  await page.reload();
+
+  await expect(page.locator('#undoSwap')).toBeDisabled();
+  await expect(page.locator('#redoSwap')).toBeDisabled();
+});
