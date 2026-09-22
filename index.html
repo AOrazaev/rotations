@@ -78,6 +78,7 @@
             <input id="regenerateSeed" type="number" inputmode="numeric" placeholder="—" />
           </label>
           <button id="regenerateRotation" class="secondary" title="Get a different rotation using the same players and settings">Regenerate</button>
+          <button id="swapMode" class="secondary" aria-pressed="false" title="Swap two players for a single time block">Swap players</button>
         </div>
         <div class="action-group">
           <span class="action-group-label">Export</span>
@@ -86,6 +87,7 @@
           <button id="printRotation" class="secondary">Print</button>
         </div>
       </div>
+      <p id="swapHint" class="swap-hint hidden">Swap mode: click a player on court, then a benched player in the same column, to trade that time block between them. Click "Swap players" again to stop.</p>
       <div class="view-tabs" role="tablist">
         <button id="tabTable" class="view-tab active" role="tab" aria-selected="true">Table</button>
         <button id="tabTimeline" class="view-tab" role="tab" aria-selected="false">Timeline</button>
