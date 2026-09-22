@@ -81,6 +81,44 @@ test('A generated rotation and its seed survive a reload', async ({ page }) => {
   expect(gridAfter).toBe(gridBefore);
 });
 
+test('a corrupted saved rotation (a player duplicated across lineup/bench in one block) is dropped instead of rendered as-is', async ({ page }) => {
+  // Regression test for a real corrupted-localStorage report: one block's
+  // "blocks" snapshot had the same player id in both lineup and bench while
+  // another player was missing entirely (the shared-array-reference bug -
+  // now fixed in buildRotation - used to let a swap in one block silently
+  // mutate another block sharing the same lineup). restoreRotation() must
+  // detect this and fall back to a freshly-built rotation rather than
+  // trusting/rendering the broken snapshot.
+  await page.locator('#generate').click();
+  const corrupted = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('basketball-rotation-planner-v1'));
+    const players = saved.rotation.players;
+    // Duplicate players[0] into block 0's bench and drop players[-1] (the
+    // last bench player) to simulate the exact corruption pattern seen.
+    const block0 = saved.rotation.blocks[0];
+    const droppedId = block0.bench[block0.bench.length - 1];
+    block0.bench = block0.bench.slice(0, -1).concat(players[0].id);
+    localStorage.setItem('basketball-rotation-planner-v1', JSON.stringify(saved));
+    return { droppedId, dupId: players[0].id };
+  });
+
+  await page.reload();
+
+  await expect(page.locator('#rotationCard')).toBeVisible();
+  await expect(page.locator('#timelineView')).toBeVisible();
+  // The app must still produce a fully valid rotation (every present player
+  // accounted for exactly once per block) rather than perpetuating the
+  // corrupted snapshot.
+  const isValid = await page.evaluate(() => {
+    const presentCount = state.players.filter(p => p.present).length;
+    return lastRotation.result.every(b => {
+      const ids = [...b.lineup, ...b.bench].map(p => p.id);
+      return ids.length === presentCount && new Set(ids).size === presentCount;
+    });
+  });
+  expect(isValid).toBe(true);
+});
+
 test('Regenerate assigns a random seed and still produces a full, valid rotation', async ({ page }) => {
   await page.locator('#generate').click();
   await expect(page.locator('#regenerateSeed')).toHaveValue('');
@@ -93,6 +131,7 @@ test('Regenerate assigns a random seed and still produces a full, valid rotation
   const expectedBlocks = Math.ceil(40 / blockMinutes);
   await expect(page.locator('.timeline-header-cell')).toHaveCount(expectedBlocks + 1);
 });
+
 
 test('Re-entering a previous seed reproduces the same rotation', async ({ page }) => {
   await page.locator('#generate').click();

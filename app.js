@@ -110,10 +110,15 @@ function restoreRotation() {
         lineup: (b.lineup || []).map(id => byId[id]),
         bench: (b.bench || []).map(id => byId[id]),
       }));
-      const valid = rebuilt.every(b =>
-        b.lineup.length === expectedLineupSize &&
-        b.lineup.every(Boolean) &&
-        b.bench.every(Boolean));
+      // Every player must appear in exactly one of lineup/bench per block -
+      // guards against corrupted snapshots (e.g. a player duplicated across
+      // both, or missing entirely) that would otherwise be trusted as-is.
+      const valid = rebuilt.every(b => {
+        if (b.lineup.length !== expectedLineupSize) return false;
+        if (!b.lineup.every(Boolean) || !b.bench.every(Boolean)) return false;
+        const ids = [...b.lineup, ...b.bench].map(p => p.id);
+        return ids.length === saved.players.length && new Set(ids).size === ids.length;
+      });
       if (valid) {
         rotation.result = rebuilt;
         rotation.minutes = computeMinutes(rotation.result, saved.players, saved.blockMinutes);
@@ -399,7 +404,12 @@ function buildRotation(players, blockMinutes, intensity, rng) {
         lastPlayed[p.id] = b;
       } else consecutive[p.id] = 0;
     });
-    result.push({ lineup: best, bench: players.filter(p=>!ids.has(p.id)) });
+    // Clone: `best` is a reference into the shared `combos` list, so if the
+    // same 5-player combination wins in more than one block (common), every
+    // block that picked it would otherwise share the exact same array -
+    // mutating one block's lineup (e.g. via a manual swap) would silently
+    // corrupt every other block with that same lineup too.
+    result.push({ lineup: [...best], bench: players.filter(p=>!ids.has(p.id)) });
   }
 
   const minutes = Object.fromEntries(players.map(p => [p.id, playedBlocks[p.id]*blockMinutes]));
