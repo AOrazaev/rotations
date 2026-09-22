@@ -86,6 +86,11 @@ th { color:var(--muted); font-weight:600; font-size:.85rem; }
   background:rgba(0,0,0,.35); padding:2px 5px; border-radius:6px;
   z-index:3; pointer-events:none;
 }
+#swapMode.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.swap-hint { color:var(--muted); font-size:.85rem; margin:0 0 12px; }
+.timeline-grid.swap-active .timeline-cell { cursor:pointer; }
+.timeline-grid.swap-active .timeline-cell:hover { outline:2px solid var(--accent2); outline-offset:-2px; }
+.timeline-cell.swap-selected { outline:2px solid #fff; outline-offset:-2px; }
 .rotation-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .seed-picker { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:.85rem; }
 .seed-picker input { width:110px; background:#0a1220; color:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
@@ -150,7 +155,7 @@ footer { color:var(--muted); text-align:center; padding-top:10px; font-size:.9re
     border:1px solid #000; box-shadow:none; border-radius:0; margin:0;
   }
   #rotationCard h2, #rotationCard p, #rotationCard .section-head p { color:#000; }
-  #rotationCard .view-tabs, #rotationCard .rotation-actions { display:none !important; }
+  #rotationCard .view-tabs, #rotationCard .rotation-actions, #swapHint { display:none !important; }
   table { min-width:0; }
   th, td { border-bottom:1px solid #000; color:#000; }
   th { color:#333; }

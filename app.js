@@ -37,6 +37,11 @@ const seedInput = document.querySelector('#regenerateSeed');
 const rosterCompactTab = document.querySelector('#rosterCompactTab');
 const rosterEditTab = document.querySelector('#rosterEditTab');
 const addPlayerBtn = document.querySelector('#addPlayer');
+const swapModeBtn = document.querySelector('#swapMode');
+const swapHint = document.querySelector('#swapHint');
+
+let swapModeActive = false;
+let swapSelection = null; // { blockIndex, playerId, status: 'on' | 'off' }
 
 function loadState() {
   try {
@@ -65,8 +70,10 @@ function saveState() {
 // Persist just enough to reconstruct the currently-displayed rotation on
 // reload: buildRotation() is a pure function of (players, blockMinutes,
 // intensity, rng), so we only need the player snapshot it was built from,
-// the settings, the seed (if any), and which tab was active — not the
-// rendered result itself.
+// the settings, the seed (if any), and which tab was active. We additionally
+// snapshot the actual per-block lineup/bench (as player ids) so that manual
+// swaps - which make the rendered rotation diverge from what buildRotation()
+// would produce - also survive a reload.
 function persistRotation() {
   if (lastRotation && lastPlayers) {
     state.rotation = {
@@ -75,6 +82,10 @@ function persistRotation() {
       intensity: state.intensity,
       seed: lastSeed,
       view: activeView,
+      blocks: lastRotation.result.map(b => ({
+        lineup: b.lineup.map(p => p.id),
+        bench: b.bench.map(p => p.id),
+      })),
     };
   } else {
     delete state.rotation;
@@ -82,12 +93,41 @@ function persistRotation() {
   saveState();
 }
 
+function computeMinutes(resultBlocks, players, blockMinutes) {
+  const counts = Object.fromEntries(players.map(p => [p.id, 0]));
+  resultBlocks.forEach(block => block.lineup.forEach(p => { counts[p.id]++; }));
+  return Object.fromEntries(players.map(p => [p.id, counts[p.id] * blockMinutes]));
+}
+
 function restoreRotation() {
   const saved = state.rotation;
   if (!saved || !Array.isArray(saved.players) || saved.players.length < 5) return;
   try {
     const rng = saved.seed != null ? createSeededRng(saved.seed) : undefined;
-    lastRotation = buildRotation(saved.players, saved.blockMinutes, saved.intensity, rng);
+    const rotation = buildRotation(saved.players, saved.blockMinutes, saved.intensity, rng);
+
+    // If we have a saved per-block snapshot that still matches this
+    // rotation's shape (same block count, all player ids resolvable —
+    // i.e. the roster used to build it hasn't changed), prefer it: it
+    // carries any manual swaps the algorithm alone wouldn't reproduce.
+    if (Array.isArray(saved.blocks) && saved.blocks.length === rotation.result.length) {
+      const byId = Object.fromEntries(saved.players.map(p => [p.id, p]));
+      const expectedLineupSize = rotation.result[0] ? rotation.result[0].lineup.length : 5;
+      const rebuilt = saved.blocks.map(b => ({
+        lineup: (b.lineup || []).map(id => byId[id]),
+        bench: (b.bench || []).map(id => byId[id]),
+      }));
+      const valid = rebuilt.every(b =>
+        b.lineup.length === expectedLineupSize &&
+        b.lineup.every(Boolean) &&
+        b.bench.every(Boolean));
+      if (valid) {
+        rotation.result = rebuilt;
+        rotation.minutes = computeMinutes(rotation.result, saved.players, saved.blockMinutes);
+      }
+    }
+
+    lastRotation = rotation;
     lastSeed = saved.seed ?? null;
     renderRotation(lastRotation, saved.players);
     setActiveView(saved.view === 'table' ? 'table' : 'timeline');
@@ -98,6 +138,24 @@ function restoreRotation() {
     delete state.rotation;
     saveState();
   }
+}
+
+// Trades a single time block between an on-court player and a benched
+// player, mutating the rotation in place. Returns false (no-op) if either
+// player can't be found in the expected role for that block.
+function applySwap(rotation, blockIndex, onCourtId, benchId) {
+  const block = rotation.result[blockIndex];
+  if (!block) return false;
+  const lineupIdx = block.lineup.findIndex(p => p.id === onCourtId);
+  const benchIdx = block.bench.findIndex(p => p.id === benchId);
+  if (lineupIdx === -1 || benchIdx === -1) return false;
+  const onPlayer = block.lineup[lineupIdx];
+  const benchPlayer = block.bench[benchIdx];
+  block.lineup[lineupIdx] = benchPlayer;
+  block.bench[benchIdx] = onPlayer;
+  rotation.minutes[onPlayer.id] -= rotation.blockMinutes;
+  rotation.minutes[benchPlayer.id] += rotation.blockMinutes;
+  return true;
 }
 
 function renderRoster() {
@@ -470,7 +528,7 @@ function renderTimeline(rotation, players) {
       if (i > 0 && half !== prevHalf) cls += ' timeline-half-divider';
       const subOutPlayerForTitle = on && !prevOn && i > 0 ? subLookup.get(`${i}:${p.id}`) : null;
       const titleText = `${playerLabel(p)} — ${blockLabel(i, rotation.blockMinutes)} — ${on ? 'On court' : 'Bench'}${subOutPlayerForTitle ? ` (in for ${playerLabel(subOutPlayerForTitle)})` : ''}`;
-      html += `<div class="${cls}" title="${escapeHtml(titleText)}">${label}</div>`;
+      html += `<div class="${cls}" title="${escapeHtml(titleText)}" data-block="${i}" data-player="${p.id}" data-status="${on ? 'on' : 'off'}">${label}</div>`;
     }
   });
 
@@ -489,6 +547,65 @@ function setActiveView(view) {
 
 tabTable.addEventListener('click', () => { setActiveView('table'); persistRotation(); });
 tabTimeline.addEventListener('click', () => { setActiveView('timeline'); persistRotation(); });
+
+function setSwapMode(active) {
+  swapModeActive = active;
+  swapSelection = null;
+  swapModeBtn.classList.toggle('active', active);
+  swapModeBtn.setAttribute('aria-pressed', String(active));
+  swapHint.classList.toggle('hidden', !active);
+  timelineGrid.classList.toggle('swap-active', active);
+}
+
+swapModeBtn.addEventListener('click', () => {
+  if (!lastRotation) return;
+  const next = !swapModeActive;
+  if (next && activeView !== 'timeline') { setActiveView('timeline'); persistRotation(); }
+  setSwapMode(next);
+});
+
+timelineGrid.addEventListener('click', (e) => {
+  if (!swapModeActive) return;
+  const cell = e.target.closest('.timeline-cell');
+  if (!cell || !cell.dataset.player) return;
+  const blockIndex = Number(cell.dataset.block);
+  const playerId = cell.dataset.player;
+  const status = cell.dataset.status;
+
+  if (swapSelection && swapSelection.blockIndex === blockIndex && swapSelection.playerId === playerId) {
+    // Clicking the same cell again just deselects it.
+    swapSelection = null;
+    highlightSwapSelection();
+    return;
+  }
+
+  if (swapSelection && swapSelection.blockIndex === blockIndex && swapSelection.status !== status) {
+    const onCourtId = status === 'on' ? playerId : swapSelection.playerId;
+    const benchId = status === 'off' ? playerId : swapSelection.playerId;
+    const swapped = applySwap(lastRotation, blockIndex, onCourtId, benchId);
+    swapSelection = null;
+    if (swapped) {
+      renderRotation(lastRotation, lastPlayers);
+      setSwapMode(true); // renderRotation rebuilds the grid; keep swap mode visibly on
+      persistRotation();
+    } else {
+      highlightSwapSelection();
+    }
+    return;
+  }
+
+  // Different block, or same status as the current selection — restart the
+  // selection with the newly clicked cell instead of leaving the user stuck.
+  swapSelection = { blockIndex, playerId, status };
+  highlightSwapSelection();
+});
+
+function highlightSwapSelection() {
+  timelineGrid.querySelectorAll('.timeline-cell.swap-selected').forEach(el => el.classList.remove('swap-selected'));
+  if (!swapSelection) return;
+  const sel = timelineGrid.querySelector(`.timeline-cell[data-block="${swapSelection.blockIndex}"][data-player="${swapSelection.playerId}"]`);
+  if (sel) sel.classList.add('swap-selected');
+}
 
 function setRosterMode(compact) {
   state.rosterCompact = compact;
@@ -554,6 +671,7 @@ function generate() {
     lastRotation = buildRotation(players, state.blockMinutes, state.intensity);
     renderRotation(lastRotation, players);
     setActiveView('timeline');
+    setSwapMode(false);
     seedInput.value = '';
     lastSeed = null;
     persistRotation();
@@ -565,6 +683,7 @@ function applySeed(seed, players) {
   const rng = createSeededRng(seed);
   lastRotation = buildRotation(players, state.blockMinutes, state.intensity, rng);
   renderRotation(lastRotation, players);
+  setSwapMode(false);
   seedInput.value = String(seed);
   lastSeed = seed;
   persistRotation();
@@ -588,6 +707,7 @@ document.querySelector('#resetApp').addEventListener('click', () => {
   localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, intensity:100, rosterCompact:true }; saveState(); renderRoster(); setRosterMode(true);
   intensityInput.value = '100'; intensityValueEl.textContent = intensityLabel(100);
   lastRotation = null; lastPlayers = null; lastSeed = null;
+  setSwapMode(false);
   rotationCard.classList.add('hidden'); seedInput.value = '';
 });
 document.querySelector('#regenerateRotation').addEventListener('click', () => {
