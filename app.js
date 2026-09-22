@@ -848,7 +848,10 @@ function downloadBlob(blob, filename) {
 document.querySelector('#copyRotationImage').addEventListener('click', async () => {
   if (!lastRotation) return;
   const btn = document.querySelector('#copyRotationImage');
-  const old = btn.textContent;
+  // Preserve the icon-only look: swap in a checkmark + updated sr-only
+  // label instead of textContent (which would flatten the hidden sr-only
+  // span into plain visible text once restored).
+  const old = btn.innerHTML;
   const players = state.players.filter(p => p.present);
   const renderCanvas = () => renderTimelineCanvas(lastRotation, players);
   try {
@@ -857,23 +860,23 @@ document.querySelector('#copyRotationImage').addEventListener('click', async () 
     if (!blob) throw new Error('Could not create image.');
     if (navigator.clipboard && window.ClipboardItem) {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      btn.textContent = 'Copied!';
+      btn.innerHTML = '✅<span class="sr-only">Copied!</span>';
     } else {
       downloadBlob(blob, 'rotation.png');
-      btn.textContent = 'Downloaded';
+      btn.innerHTML = '✅<span class="sr-only">Downloaded</span>';
     }
   } catch (e) {
     try {
       const canvas = renderCanvas();
       const blob = await canvasToBlob(canvas);
-      if (blob) { downloadBlob(blob, 'rotation.png'); btn.textContent = 'Downloaded'; }
+      if (blob) { downloadBlob(blob, 'rotation.png'); btn.innerHTML = '✅<span class="sr-only">Downloaded</span>'; }
       else throw e;
     } catch (e2) {
       alert('Could not copy or download the image.');
       return;
     }
   } finally {
-    setTimeout(() => { btn.textContent = old; }, 1400);
+    setTimeout(() => { btn.innerHTML = old; }, 1400);
   }
 });
 
