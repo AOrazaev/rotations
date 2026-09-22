@@ -559,9 +559,7 @@ function setSwapMode(active) {
 
 swapModeBtn.addEventListener('click', () => {
   if (!lastRotation) return;
-  const next = !swapModeActive;
-  if (next && activeView !== 'timeline') { setActiveView('timeline'); persistRotation(); }
-  setSwapMode(next);
+  setSwapMode(!swapModeActive);
 });
 
 timelineGrid.addEventListener('click', (e) => {
