@@ -81,24 +81,11 @@
         </div>
         <div class="action-group">
           <span class="action-group-label">Export</span>
-          <button id="copyRotation" class="secondary icon-btn" title="Copy rotation as text">📋<span class="sr-only">Copy</span></button>
           <button id="copyRotationImage" class="secondary icon-btn" title="Copy rotation as image">🖼️<span class="sr-only">Copy image</span></button>
           <button id="printRotation" class="secondary icon-btn" title="Print rotation">🖨️<span class="sr-only">Print</span></button>
         </div>
       </div>
-      <div class="view-tabs" role="tablist">
-        <button id="tabTable" class="view-tab active" role="tab" aria-selected="true">Table</button>
-        <button id="tabTimeline" class="view-tab" role="tab" aria-selected="false">Timeline</button>
-      </div>
-      <div id="tableView" class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Block</th><th>Lineup</th><th>Bench</th></tr>
-          </thead>
-          <tbody id="rotationBody"></tbody>
-        </table>
-      </div>
-      <div id="timelineView" class="timeline-wrap hidden">
+      <div id="timelineView" class="timeline-wrap">
         <div class="timeline-legend">
           <span><i class="swatch swatch-on"></i>On court</span>
           <span><i class="swatch swatch-off"></i>Bench</span>

@@ -52,45 +52,33 @@ test('Delete removes a roster row', async ({ page }) => {
   await expect(page.locator('.player-row')).toHaveCount(before - 1);
 });
 
-test('Generate rotation produces one lineup row per time block and switches to the Timeline view', async ({ page }) => {
+test('Generate rotation produces one timeline column per time block', async ({ page }) => {
   await page.locator('#generate').click();
   await expect(page.locator('#rotationCard')).toBeVisible();
   await expect(page.locator('#timelineView')).toBeVisible();
-  await expect(page.locator('#tableView')).toBeHidden();
-  await expect(page.locator('#tabTimeline')).toHaveClass(/active/);
 
   const blockMinutes = Number(await page.locator('#blockMinutes').inputValue());
   const expectedBlocks = Math.ceil(40 / blockMinutes);
-  // Rows without the "sub-row" class are the actual lineup rows (one per block).
-  await expect(page.locator('#rotationBody tr:not(.sub-row)')).toHaveCount(expectedBlocks);
+  // One header cell per block, plus the leading empty corner cell.
+  await expect(page.locator('.timeline-header-cell')).toHaveCount(expectedBlocks + 1);
 
   const presentCount = await page.evaluate(() => state.players.filter(p => p.present).length);
   await expect(page.locator('#minutesGrid .minute-card')).toHaveCount(presentCount);
 });
 
-test('A generated rotation, its seed, and its view survive a reload', async ({ page }) => {
+test('A generated rotation and its seed survive a reload', async ({ page }) => {
   await page.locator('#generate').click();
   await page.locator('#regenerateRotation').click();
   const seed = await page.locator('#regenerateSeed').inputValue();
-  await page.locator('#tabTable').click();
-  const bodyBefore = await page.locator('#rotationBody').innerHTML();
+  const gridBefore = await page.locator('#timelineGrid').innerHTML();
 
   await page.reload();
 
   await expect(page.locator('#rotationCard')).toBeVisible();
-  await expect(page.locator('#tabTable')).toHaveClass(/active/);
-  await expect(page.locator('#tableView')).toBeVisible();
+  await expect(page.locator('#timelineView')).toBeVisible();
   await expect(page.locator('#regenerateSeed')).toHaveValue(seed);
-  const bodyAfter = await page.locator('#rotationBody').innerHTML();
-  expect(bodyAfter).toBe(bodyBefore);
-});
-
-test('Table tab shows the table and hides the timeline', async ({ page }) => {
-  await page.locator('#generate').click();
-  await page.locator('#tabTable').click();
-  await expect(page.locator('#tableView')).toBeVisible();
-  await expect(page.locator('#timelineView')).toBeHidden();
-  await expect(page.locator('#tabTable')).toHaveClass(/active/);
+  const gridAfter = await page.locator('#timelineGrid').innerHTML();
+  expect(gridAfter).toBe(gridBefore);
 });
 
 test('Regenerate assigns a random seed and still produces a full, valid rotation', async ({ page }) => {
@@ -103,24 +91,24 @@ test('Regenerate assigns a random seed and still produces a full, valid rotation
 
   const blockMinutes = Number(await page.locator('#blockMinutes').inputValue());
   const expectedBlocks = Math.ceil(40 / blockMinutes);
-  await expect(page.locator('#rotationBody tr:not(.sub-row)')).toHaveCount(expectedBlocks);
+  await expect(page.locator('.timeline-header-cell')).toHaveCount(expectedBlocks + 1);
 });
 
 test('Re-entering a previous seed reproduces the same rotation', async ({ page }) => {
   await page.locator('#generate').click();
   await page.locator('#regenerateRotation').click();
   const seed = await page.locator('#regenerateSeed').inputValue();
-  const firstLineup = await page.locator('#rotationBody').innerHTML();
+  const firstLineup = await page.locator('#timelineGrid').innerHTML();
 
   await page.locator('#regenerateRotation').click(); // scramble it
-  await expect(page.locator('#rotationBody')).not.toHaveText(''); // sanity: still rendered
+  await expect(page.locator('#timelineGrid')).not.toHaveText(''); // sanity: still rendered
 
   await page.locator('#regenerateSeed').fill(seed);
   // The seed input commits on blur (native "change" event) — tabbing away
   // mirrors typing a seed and moving on, same as a user would do.
   await page.locator('#regenerateSeed').press('Tab');
   await expect(page.locator('#regenerateSeed')).toHaveValue(seed);
-  const reproducedLineup = await page.locator('#rotationBody').innerHTML();
+  const reproducedLineup = await page.locator('#timelineGrid').innerHTML();
   expect(reproducedLineup).toBe(firstLineup);
 });
 

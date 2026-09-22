@@ -20,19 +20,13 @@ let state = loadState();
 let lastRotation = null;
 let lastPlayers = null;
 let lastSeed = null;
-let activeView = 'timeline';
 
 const rosterEl = document.querySelector('#roster');
 const playerTemplate = document.querySelector('#playerTemplate');
 const rotationCard = document.querySelector('#rotationCard');
-const rotationBody = document.querySelector('#rotationBody');
 const minutesGrid = document.querySelector('#minutesGrid');
 const summary = document.querySelector('#rotationSummary');
-const tableView = document.querySelector('#tableView');
-const timelineView = document.querySelector('#timelineView');
 const timelineGrid = document.querySelector('#timelineGrid');
-const tabTable = document.querySelector('#tabTable');
-const tabTimeline = document.querySelector('#tabTimeline');
 const seedInput = document.querySelector('#regenerateSeed');
 const rosterCompactTab = document.querySelector('#rosterCompactTab');
 const rosterEditTab = document.querySelector('#rosterEditTab');
@@ -81,7 +75,6 @@ function persistRotation() {
       blockMinutes: lastRotation.blockMinutes,
       intensity: state.intensity,
       seed: lastSeed,
-      view: activeView,
       blocks: lastRotation.result.map(b => ({
         lineup: b.lineup.map(p => p.id),
         bench: b.bench.map(p => p.id),
@@ -130,7 +123,6 @@ function restoreRotation() {
     lastRotation = rotation;
     lastSeed = saved.seed ?? null;
     renderRotation(lastRotation, saved.players);
-    setActiveView(saved.view === 'table' ? 'table' : 'timeline');
     seedInput.value = lastSeed != null ? String(lastSeed) : '';
   } catch (_) {
     // Stale/incompatible saved rotation (e.g. algorithm changed) - drop it
@@ -447,29 +439,6 @@ function buildSubLookup(rotation) {
 }
 
 function renderRotation(rotation, players) {
-  rotationBody.innerHTML = '';
-  rotation.result.forEach((block, i) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${blockLabel(i, rotation.blockMinutes)}</td>
-      <td class="lineup">${block.lineup.map(p=>playerLabelHtml(p)).join(' · ')}</td>
-      <td class="bench">${block.bench.length ? block.bench.map(p=>playerLabelHtml(p)).join(', ') : '—'}</td>`;
-    rotationBody.appendChild(tr);
-
-    if (i < rotation.result.length - 1) {
-      const { out, inn } = computeSubs(block, rotation.result[i + 1]);
-      if (out.length || inn.length) {
-        const subTr = document.createElement('tr');
-        subTr.className = 'sub-row';
-        const parts = [];
-        if (out.length) parts.push(`<span class="sub-out">OUT: ${out.map(p=>playerLabelHtml(p)).join(', ')}</span>`);
-        if (inn.length) parts.push(`<span class="sub-in">IN: ${inn.map(p=>playerLabelHtml(p)).join(', ')}</span>`);
-        subTr.innerHTML = `<td colspan="3">${parts.join(' · ')}</td>`;
-        rotationBody.appendChild(subTr);
-      }
-    }
-  });
-
   const sorted = [...players].sort((a,b)=>rotation.minutes[b.id]-rotation.minutes[a.id] || b.skill-a.skill);
   minutesGrid.innerHTML = sorted.map(p => `<div class="minute-card"><strong>${playerLabelHtml(p)}</strong><span>${rotation.minutes[p.id]} min</span></div>`).join('');
   summary.textContent = `${players.length} players · ${rotation.blockMinutes}-minute blocks · ${intensityLabel(state.intensity)}`;
@@ -534,19 +503,6 @@ function renderTimeline(rotation, players) {
 
   timelineGrid.innerHTML = html;
 }
-
-function setActiveView(view) {
-  activeView = view;
-  tabTable.classList.toggle('active', view === 'table');
-  tabTimeline.classList.toggle('active', view === 'timeline');
-  tabTable.setAttribute('aria-selected', String(view === 'table'));
-  tabTimeline.setAttribute('aria-selected', String(view === 'timeline'));
-  tableView.classList.toggle('hidden', view !== 'table');
-  timelineView.classList.toggle('hidden', view !== 'timeline');
-}
-
-tabTable.addEventListener('click', () => { setActiveView('table'); persistRotation(); });
-tabTimeline.addEventListener('click', () => { setActiveView('timeline'); persistRotation(); });
 
 function setSwapMode(active) {
   swapModeActive = active;
@@ -668,7 +624,6 @@ function generate() {
   try {
     lastRotation = buildRotation(players, state.blockMinutes, state.intensity);
     renderRotation(lastRotation, players);
-    setActiveView('timeline');
     setSwapMode(false);
     seedInput.value = '';
     lastSeed = null;
@@ -721,37 +676,11 @@ seedInput.addEventListener('change', () => {
   const players = state.players.filter(p=>p.present);
   try { applySeed(value, players); } catch (e) { alert(e.message); }
 });
-document.querySelector('#copyRotation').addEventListener('click', async () => {
-  if (!lastRotation) return;
-  const players = state.players.filter(p=>p.present);
-  const lines = lastRotation.result.map((b,i)=>`${blockLabel(i,lastRotation.blockMinutes)}: ${b.lineup.map(p=>playerLabel(p)).join(', ')}`);
-  lines.push('', 'Minutes:');
-  players.sort((a,b)=>lastRotation.minutes[b.id]-lastRotation.minutes[a.id]).forEach(p=>lines.push(`${playerLabel(p)}: ${lastRotation.minutes[p.id]} min`));
-  await navigator.clipboard.writeText(lines.join('\n'));
-  const btn = document.querySelector('#copyRotation'); const old = btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=old,1200);
-});
 
 // --- Rotation-as-image export -----------------------------------------
-// Draws the rotation table + minutes grid onto a plain <canvas> using the
+// Draws the rotation timeline + minutes grid onto a plain <canvas> using the
 // in-memory rotation data (no DOM screenshot library needed), then either
 // copies the resulting PNG to the clipboard or falls back to a download.
-
-function wrapText(ctx, text, maxWidth) {
-  const words = String(text).split(' ');
-  const lines = [];
-  let current = '';
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (current && ctx.measureText(test).width > maxWidth) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = test;
-    }
-  }
-  if (current) lines.push(current);
-  return lines.length ? lines : [''];
-}
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -761,164 +690,6 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
-}
-
-function renderRotationCanvas(rotation, players) {
-  const theme = {
-    bg: '#0b1020', card: '#121a2b', line: '#26324b',
-    text: '#f6f7fb', muted: '#91a0b8', rowAlt: '#0f1727',
-  };
-  const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
-  const titleFont = `700 22px ${fontFamily}`;
-  const subFont = `400 13px ${fontFamily}`;
-  const headFont = `600 12px ${fontFamily}`;
-  const cellFont = `500 14px ${fontFamily}`;
-  const cardNameFont = `700 15px ${fontFamily}`;
-
-  const scale = 2;
-  const width = 860;
-  const padding = 28;
-  const contentWidth = width - padding * 2;
-  const blockColWidth = 110;
-  const gapCol = 20;
-  const listColWidth = (contentWidth - blockColWidth - gapCol) / 2;
-  const lineHeight = 18;
-  const rowVPad = 16;
-
-  const measure = document.createElement('canvas').getContext('2d');
-  measure.font = cellFont;
-  const subFontCanvas = `600 12.5px ${fontFamily}`;
-  const rows = [];
-  rotation.result.forEach((block, i) => {
-    const label = blockLabel(i, rotation.blockMinutes);
-    const lineupText = block.lineup.map(p => playerLabel(p)).join(' · ');
-    const benchText = block.bench.length ? block.bench.map(p => playerLabel(p)).join(', ') : '—';
-    const lineupLines = wrapText(measure, lineupText, listColWidth - 16);
-    const benchLines = wrapText(measure, benchText, listColWidth - 16);
-    const lineCount = Math.max(lineupLines.length, benchLines.length, 1);
-    rows.push({ type: 'block', label, lineupLines, benchLines, height: lineCount * lineHeight + rowVPad });
-
-    if (i < rotation.result.length - 1) {
-      const { out, inn } = computeSubs(block, rotation.result[i + 1]);
-      if (out.length || inn.length) {
-        measure.font = subFontCanvas;
-        const outText = out.length ? `OUT: ${out.map(p => playerLabel(p)).join(', ')}` : '';
-        const inText = inn.length ? `IN: ${inn.map(p => playerLabel(p)).join(', ')}` : '';
-        const outLines = outText ? wrapText(measure, outText, contentWidth - 16) : [];
-        const inLines = inText ? wrapText(measure, inText, contentWidth - 16) : [];
-        measure.font = cellFont;
-        const totalLines = outLines.length + inLines.length;
-        rows.push({ type: 'sub', outLines, inLines, height: totalLines * 16 + 12 });
-      }
-    }
-  });
-
-  const titleTop = padding;
-  const tableTop = titleTop + 54;
-  const tableHeaderHeight = 30;
-  const tableHeight = tableHeaderHeight + rows.reduce((s, r) => s + r.height, 0);
-
-  const sorted = [...players].sort((a, b) => rotation.minutes[b.id] - rotation.minutes[a.id] || b.skill - a.skill);
-  const cardGap = 10;
-  const cardW = 150;
-  const cardH = 46;
-  const cols = Math.max(1, Math.floor((contentWidth + cardGap) / (cardW + cardGap)));
-  const minuteRows = sorted.length ? Math.ceil(sorted.length / cols) : 0;
-  const minutesTop = tableTop + tableHeight + 34;
-  const minutesLabelHeight = sorted.length ? 24 : 0;
-  const minutesHeight = minuteRows ? minuteRows * cardH + (minuteRows - 1) * cardGap : 0;
-
-  const totalHeight = minutesTop + minutesLabelHeight + minutesHeight + padding;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(width * scale);
-  canvas.height = Math.ceil(totalHeight * scale);
-  const ctx = canvas.getContext('2d');
-  ctx.scale(scale, scale);
-  ctx.textBaseline = 'top';
-
-  ctx.fillStyle = theme.bg;
-  ctx.fillRect(0, 0, width, totalHeight);
-  roundRect(ctx, 6, 6, width - 12, totalHeight - 12, 16);
-  ctx.fillStyle = theme.card;
-  ctx.fill();
-
-  ctx.fillStyle = theme.text;
-  ctx.font = titleFont;
-  ctx.fillText('Rotation', padding, titleTop);
-  ctx.font = subFont;
-  ctx.fillStyle = theme.muted;
-  ctx.fillText(summary.textContent || '', padding, titleTop + 30);
-
-  let y = tableTop;
-  ctx.font = headFont;
-  ctx.fillStyle = theme.muted;
-  ctx.fillText('BLOCK', padding, y);
-  ctx.fillText('LINEUP', padding + blockColWidth, y);
-  ctx.fillText('BENCH', padding + blockColWidth + listColWidth + gapCol, y);
-  y += tableHeaderHeight;
-  ctx.strokeStyle = theme.line;
-  ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
-
-  let blockIdx = 0;
-  rows.forEach((row) => {
-    if (row.type === 'sub') {
-      ctx.fillStyle = '#0a1220';
-      ctx.fillRect(padding, y, width - padding * 2, row.height);
-      ctx.font = subFontCanvas;
-      let lineY = y + 6;
-      ctx.fillStyle = '#ff8a8a';
-      row.outLines.forEach(line => { ctx.fillText(line, padding, lineY); lineY += 16; });
-      ctx.fillStyle = '#6bdc9c';
-      row.inLines.forEach(line => { ctx.fillText(line, padding, lineY); lineY += 16; });
-      y += row.height;
-      ctx.strokeStyle = theme.line;
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
-      ctx.setLineDash([]);
-      return;
-    }
-    if (blockIdx % 2 === 1) {
-      ctx.fillStyle = theme.rowAlt;
-      ctx.fillRect(padding, y, width - padding * 2, row.height);
-    }
-    blockIdx++;
-    const textY = y + rowVPad / 2;
-    ctx.font = cellFont;
-    ctx.fillStyle = theme.text;
-    ctx.fillText(row.label, padding, textY);
-    row.lineupLines.forEach((line, li) => ctx.fillText(line, padding + blockColWidth, textY + li * lineHeight));
-    ctx.fillStyle = theme.muted;
-    row.benchLines.forEach((line, li) => ctx.fillText(line, padding + blockColWidth + listColWidth + gapCol, textY + li * lineHeight));
-    y += row.height;
-    ctx.strokeStyle = theme.line;
-    ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke();
-  });
-
-  if (sorted.length) {
-    ctx.font = headFont;
-    ctx.fillStyle = theme.muted;
-    ctx.fillText('MINUTES', padding, minutesTop);
-    const gridTop = minutesTop + minutesLabelHeight;
-    sorted.forEach((p, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const cardWidth = cardW - cardGap;
-      const x = padding + col * (cardW + cardGap);
-      const cy = gridTop + row * (cardH + cardGap);
-      roundRect(ctx, x, cy, cardWidth, cardH, 10);
-      ctx.fillStyle = theme.rowAlt;
-      ctx.fill();
-      ctx.fillStyle = theme.text;
-      ctx.font = cardNameFont;
-      ctx.fillText(playerLabel(p), x + 12, cy + 10);
-      ctx.font = subFont;
-      ctx.fillStyle = theme.muted;
-      ctx.fillText(`${rotation.minutes[p.id]} min`, x + 12, cy + 28);
-    });
-  }
-
-  return canvas;
 }
 
 function renderTimelineCanvas(rotation, players) {
@@ -1069,9 +840,7 @@ document.querySelector('#copyRotationImage').addEventListener('click', async () 
   const btn = document.querySelector('#copyRotationImage');
   const old = btn.textContent;
   const players = state.players.filter(p => p.present);
-  const renderCanvas = () => activeView === 'timeline'
-    ? renderTimelineCanvas(lastRotation, players)
-    : renderRotationCanvas(lastRotation, players);
+  const renderCanvas = () => renderTimelineCanvas(lastRotation, players);
   try {
     const canvas = renderCanvas();
     const blob = await canvasToBlob(canvas);
