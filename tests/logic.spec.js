@@ -132,6 +132,35 @@ test('buildRotation() rejects infeasible totals (maximums leaving too little pla
   expect(message).toMatch(/maximum minute limits/i);
 });
 
+test("a manual swap in one block doesn't corrupt another block with the identical lineup", async ({ page }) => {
+  // Regression test: buildRotation() used to push the winning combo array
+  // by reference into `result`. When the identical 5-player lineup won in
+  // two different blocks, both blocks ended up pointing at the exact same
+  // array - mutating one via a manual swap silently corrupted the other
+  // (a player would end up duplicated in one block and missing in another).
+  // Forcing player 5's maxMinutes to 0 guarantees every block's only
+  // eligible combo is exactly players 0-4, so blocks 0 and 1 are certain
+  // to share the same winning lineup.
+  const players = makePlayers(6);
+  players[5].maxMinutes = 0;
+  const result = await page.evaluate(players => {
+    const rotation = buildRotation(players, 20, 50); // 40/20 = 2 blocks
+    const sameArrayBeforeSwap = rotation.result[0].lineup === rotation.result[1].lineup;
+    const swapped = applySwap(rotation, 0, players[0].id, players[5].id);
+    return {
+      sameArrayBeforeSwap,
+      swapped,
+      block0: rotation.result[0].lineup.map(p => p.id),
+      block1: rotation.result[1].lineup.map(p => p.id),
+    };
+  }, players);
+  expect(result.sameArrayBeforeSwap).toBe(false); // buildRotation() must clone, not alias
+  expect(result.swapped).toBe(true);
+  expect(result.block0).toEqual([players[5].id, players[1].id, players[2].id, players[3].id, players[4].id]);
+  // Block 1 must be untouched by the swap applied to block 0.
+  expect(result.block1).toEqual(players.slice(0, 5).map(p => p.id));
+});
+
 test('computeSubs() identifies who subs out and who subs in between two blocks', async ({ page }) => {
   const result = await page.evaluate(() => {
     const [a, b, c, d, e, f] = ['a', 'b', 'c', 'd', 'e', 'f'].map(id => ({ id }));
