@@ -86,7 +86,9 @@ th { color:var(--muted); font-weight:600; font-size:.85rem; }
   background:rgba(0,0,0,.35); padding:2px 5px; border-radius:6px;
   z-index:3; pointer-events:none;
 }
-.rotation-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.rotation-actions { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.action-group { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.action-group-label { color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-right:2px; }
 .seed-picker { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:.85rem; }
 .seed-picker input { width:110px; background:#0a1220; color:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
 input[type="range"] { width:100%; accent-color:var(--accent); }

@@ -69,12 +69,18 @@
           <h2>Rotation</h2>
           <p id="rotationSummary"></p>
         </div>
-        <div class="rotation-actions">
+      </div>
+      <div class="rotation-actions">
+        <div class="action-group">
+          <span class="action-group-label">Generate</span>
           <label class="seed-picker" title="Seed used to produce the current Regenerate result. Type a previous seed and press Enter to reproduce it.">
             Seed
             <input id="regenerateSeed" type="number" inputmode="numeric" placeholder="—" />
           </label>
           <button id="regenerateRotation" class="secondary" title="Get a different rotation using the same players and settings">Regenerate</button>
+        </div>
+        <div class="action-group">
+          <span class="action-group-label">Export</span>
           <button id="copyRotation" class="secondary">Copy</button>
           <button id="copyRotationImage" class="secondary">Copy image</button>
           <button id="printRotation" class="secondary">Print</button>
