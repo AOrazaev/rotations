@@ -66,6 +66,58 @@ test('Generate rotation produces one timeline column per time block', async ({ p
   await expect(page.locator('#minutesGrid .minute-card')).toHaveCount(presentCount);
 });
 
+test('editing a roster row\'s name/skill/position fields via the UI updates state', async ({ page }) => {
+  await page.locator('#rosterEditTab').click();
+  const row = page.locator('.player-row').nth(1);
+
+  await row.locator('.name').fill('Test Name');
+  await row.locator('.skill').fill('33');
+  await row.locator('.positions input[value="C"]').check();
+
+  const player = await page.evaluate(() => state.players[1]);
+  expect(player.name).toBe('Test Name');
+  expect(player.skill).toBe(33);
+  expect(player.positions).toContain('C');
+});
+
+test('setting a player\'s max minutes via the UI is enforced by a generated rotation', async ({ page }) => {
+  await page.locator('#rosterEditTab').click();
+  const firstRow = page.locator('.player-row').first();
+  await firstRow.locator('.max-minutes').fill('4');
+  await page.locator('#blockMinutes').selectOption('4');
+
+  await page.locator('#generate').click();
+
+  const minutes = await page.evaluate(() => {
+    const id = state.players[0].id;
+    return lastRotation.minutes[id];
+  });
+  expect(minutes).toBeLessThanOrEqual(4);
+});
+
+test('changing Block minutes via the UI changes the number of rendered timeline blocks', async ({ page }) => {
+  await page.locator('#blockMinutes').selectOption('5');
+  await page.locator('#generate').click();
+  // One header cell per block, plus the leading empty corner cell.
+  await expect(page.locator('.timeline-header-cell')).toHaveCount(Math.ceil(40 / 5) + 1);
+});
+
+test('setting rotation style to Equal minutes via the UI evens out playing time', async ({ page }) => {
+  await page.locator('#intensity').evaluate(el => {
+    el.value = '0';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#generate').click();
+
+  const { minutes, blockMinutes } = await page.evaluate(() => ({
+    minutes: Object.values(lastRotation.minutes),
+    blockMinutes: lastRotation.blockMinutes,
+  }));
+  const spread = Math.max(...minutes) - Math.min(...minutes);
+  // "Equal minutes" should keep everyone within about a block of each other.
+  expect(spread).toBeLessThanOrEqual(blockMinutes * 2);
+});
+
 test('A generated rotation and its seed survive a reload', async ({ page }) => {
   await page.locator('#generate').click();
   await page.locator('#regenerateRotation').click();
@@ -244,4 +296,44 @@ test('swap undo/redo history does not persist across a reload', async ({ page })
 
   await expect(page.locator('#undoSwap')).toBeDisabled();
   await expect(page.locator('#redoSwap')).toBeDisabled();
+});
+
+test('Copy image writes a PNG to the clipboard and shows "Copied" feedback', async ({ page }) => {
+  // Headless Chromium's real clipboard/ClipboardItem support is unreliable
+  // under Playwright, so we stub them to capture what the app tries to
+  // write instead of asserting on the OS clipboard itself.
+  await page.addInitScript(() => {
+    window.__clipboardWrites = [];
+    window.ClipboardItem = function (items) { this.items = items; };
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { write: async (items) => { window.__clipboardWrites.push(items); } },
+    });
+  });
+  await page.reload();
+
+  await page.locator('#generate').click();
+  const originalLabel = await page.locator('#copyRotationImage').textContent();
+
+  await page.locator('#copyRotationImage').click();
+  await expect(page.locator('#copyRotationImage')).toHaveText(/Copied/);
+
+  const writeTypes = await page.evaluate(() => Object.keys(window.__clipboardWrites[0][0].items));
+  expect(writeTypes).toEqual(['image/png']);
+
+  // The button label reverts back after the feedback window elapses.
+  await expect(page.locator('#copyRotationImage')).toHaveText(originalLabel, { timeout: 3000 });
+});
+
+test('Print button triggers window.print() for the current rotation', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__printCalls = 0;
+    window.print = () => { window.__printCalls++; };
+  });
+  await page.reload();
+
+  await page.locator('#generate').click();
+  await page.locator('#printRotation').click();
+
+  expect(await page.evaluate(() => window.__printCalls)).toBe(1);
 });
