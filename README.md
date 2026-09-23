@@ -23,7 +23,7 @@ Then open http://localhost:8000
 
 ## Deploy to GitHub Pages
 1. Create a new GitHub repository.
-2. Upload `index.html`, `styles.css`, `app.js`, and this README to the repository root.
+2. Upload `index.html`, `styles.css`, the `js/` directory, and this README to the repository root.
 3. In GitHub, open **Settings → Pages**.
 4. Under **Build and deployment**, choose **Deploy from a branch**.
 5. Select `main` and `/ (root)`, then save.
