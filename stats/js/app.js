@@ -3,6 +3,8 @@ import {
   formatVideoTime,
   parseYouTubeVideoId
 } from './youtube-player.js';
+import { GameStore } from './game-store.js';
+import { createGameSetupController } from './game-setup.js';
 
 const PREVIEW_SECONDS = 3;
 
@@ -162,4 +164,23 @@ export function createStatsSpikeApp({
 }
 
 const playerFactory = window.__STATS_PLAYER_FACTORY__ || createYouTubePlayer;
-createStatsSpikeApp({ playerFactory });
+const videoController = createStatsSpikeApp({ playerFactory });
+const store = new GameStore({
+  databaseName: window.__STATS_DATABASE_NAME__ || 'basketball-stats'
+});
+const setupController = createGameSetupController({
+  store,
+  onGameOpened(game) {
+    document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
+    document.querySelector('#videoUrl').value = game.video.sourceUrl;
+  }
+});
+window.__statsApp = {
+  videoController,
+  setupController,
+  store,
+  destroy() {
+    videoController.destroy();
+    store.close();
+  }
+};

@@ -37,6 +37,27 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
 .section-head p, .message { margin: 0; }
 .video-form label { display: block; margin-bottom: 7px; color: var(--muted); font-size: .9rem; }
+.setup-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.setup-fields label { display: grid; gap: 7px; color: var(--muted); font-size: .9rem; }
+.setup-fields input, .setup-player input {
+  width: 100%;
+  padding: 10px 11px;
+  background: #0a1220;
+  color: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.wide-field { grid-column: 1 / -1; }
+.roster-heading { margin-top: 20px; }
+.roster-heading h3 { margin: 0 0 4px; }
+.setup-roster, .games-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.setup-player { display: grid; grid-template-columns: 88px 64px minmax(140px, 1fr) auto; align-items: center; gap: 9px; padding: 9px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
+.starter-toggle { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .85rem; }
+.form-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+.games-list { margin-top: 10px; }
+.game-list-item { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
+.game-list-item > div:first-child { display: grid; gap: 3px; }
+.game-list-detail { color: var(--muted); font-size: .85rem; }
 .input-row { display: flex; gap: 10px; }
 .input-row input {
   flex: 1;
@@ -82,4 +103,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
   .hero, .input-row { flex-direction: column; }
   .nav-link, .input-row button { width: 100%; text-align: center; }
   .marker-actions button { flex: 1 1 auto; }
+  .setup-fields { grid-template-columns: 1fr; }
+  .wide-field { grid-column: auto; }
+  .setup-player { grid-template-columns: 1fr 64px; }
+  .setup-player .setup-name { grid-column: 1 / -1; grid-row: 1; }
+  .game-list-item { align-items: stretch; flex-direction: column; }
 }

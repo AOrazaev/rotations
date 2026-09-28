@@ -34,6 +34,35 @@ document.querySelector('#addPlayer').addEventListener('click', () => {
   state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true, minMinutes:null, maxMinutes:null, maxConsecutiveBlocks:null });
   saveState(); renderRoster();
 });
+document.querySelector('#startStatsReview').addEventListener('click', () => {
+  const players = state.players.filter(player => player.present).map(player => ({
+    id: player.id,
+    name: player.name,
+    number: player.number || '',
+    positions: [...player.positions],
+    skill: player.skill,
+  }));
+  if (players.length < 5) {
+    alert('Select at least 5 available players before starting a stats review.');
+    return;
+  }
+  const playerIds = new Set(players.map(player => player.id));
+  const plannedRotation = lastRotation && lastRotation.result.every(block =>
+    block.lineup.length === 5 && block.lineup.every(player => playerIds.has(player.id))
+  ) ? {
+    blockMinutes: lastRotation.blockMinutes,
+    blocks: lastRotation.result.map(block => ({
+      lineupIds: block.lineup.map(player => player.id),
+    })),
+  } : null;
+  localStorage.setItem('basketball-stats-handoff-v1', JSON.stringify({
+    version: 1,
+    createdAt: new Date().toISOString(),
+    players,
+    plannedRotation,
+  }));
+  window.location.href = 'stats/?import=planner';
+});
 document.querySelector('#generate').addEventListener('click', generate);
 document.querySelector('#blockMinutes').value = String(state.blockMinutes || 4);
 const intensityInput = document.querySelector('#intensity');

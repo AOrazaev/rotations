@@ -13,7 +13,7 @@
       <div>
         <p class="eyebrow">Basketball Tools</p>
         <h1>Stats &amp; Video Review</h1>
-        <p class="subtitle">Milestone 1 validates timestamp capture and navigation against an embedded YouTube recording.</p>
+        <p class="subtitle">Create a game, preserve its roster, and review the recording with timestamp-linked statistics.</p>
       </div>
       <a class="nav-link" href="../">Rotation Planner</a>
     </header>
@@ -21,8 +21,52 @@
     <section class="card">
       <div class="section-head">
         <div>
-          <h2>Load a recording</h2>
-          <p>Paste a standard YouTube, short, embed, or youtu.be URL.</p>
+          <h2>Games</h2>
+          <p>Games are saved only in this browser.</p>
+        </div>
+        <div class="playback-actions">
+          <button id="importPlannerRoster" class="secondary" type="button">Import planner roster</button>
+          <button id="newStandaloneGame" class="primary" type="button">New standalone game</button>
+        </div>
+      </div>
+      <p id="gamesStatus" class="message" aria-live="polite"></p>
+      <div id="emptyGames" class="empty-state">No saved games yet.</div>
+      <ul id="gamesList" class="games-list"></ul>
+    </section>
+
+    <section id="gameSetupCard" class="card">
+      <div class="section-head">
+        <div>
+          <h2 id="gameSetupTitle">New game</h2>
+          <p>Choose the roster, recording, and exactly five starters.</p>
+        </div>
+      </div>
+      <form id="gameSetupForm">
+        <div class="setup-fields">
+          <label>Game title<input id="gameTitle" type="text" required /></label>
+          <label>Opponent<input id="opponentName" type="text" /></label>
+          <label class="wide-field">YouTube URL<input id="gameVideoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." /></label>
+        </div>
+        <div class="section-head roster-heading">
+          <div>
+            <h3>Roster</h3>
+            <p><span id="starterCount">5</span>/5 starters selected</p>
+          </div>
+          <button id="addSetupPlayer" class="secondary small" type="button">+ Add player</button>
+        </div>
+        <div id="setupRoster" class="setup-roster"></div>
+        <p id="setupError" class="message error hidden" role="alert"></p>
+        <div class="form-actions">
+          <button id="saveGame" class="primary" type="submit">Save game</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>Recording preview</h2>
+          <p>Load the current game URL, capture timestamps, and verify navigation.</p>
         </div>
       </div>
       <form id="videoForm" class="video-form">
@@ -81,6 +125,28 @@
         <button class="secondary small" type="button" data-action="adjust" data-delta="5">+5s</button>
         <button class="secondary small" type="button" data-action="use-current">Use current time</button>
         <button class="danger small" type="button" data-action="delete">Delete</button>
+      </div>
+    </li>
+  </template>
+
+  <template id="setupPlayerTemplate">
+    <div class="setup-player">
+      <label class="starter-toggle"><input class="setup-starter" type="checkbox" />Starter</label>
+      <input class="setup-number" type="text" maxlength="3" inputmode="numeric" placeholder="#" aria-label="Jersey number" />
+      <input class="setup-name" type="text" required aria-label="Player name" />
+      <button class="danger small setup-delete" type="button">Remove</button>
+    </div>
+  </template>
+
+  <template id="gameListItemTemplate">
+    <li class="game-list-item">
+      <div>
+        <strong class="game-list-title"></strong>
+        <span class="game-list-detail"></span>
+      </div>
+      <div class="marker-actions">
+        <button class="secondary small" type="button" data-action="open-game">Open</button>
+        <button class="danger small" type="button" data-action="delete-game">Delete</button>
       </div>
     </li>
   </template>

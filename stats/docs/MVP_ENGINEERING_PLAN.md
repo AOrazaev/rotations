@@ -270,6 +270,8 @@ This milestone is first because YouTube is the largest external dependency.
 
 ### Milestone 2: Event and statistics engine
 
+**Status: complete.** Implemented by `stats/js/game-model.js`, `stats/js/event-reducer.js`, and `tests/stats-logic.spec.js`.
+
 Deliver a pure reducer:
 
 ```text
@@ -290,6 +292,8 @@ Verification:
 
 ### Milestone 3: Local persistence
 
+**Status: complete.** Implemented by `stats/js/game-store.js` and `tests/stats-store.spec.js`.
+
 Deliver:
 
 - IndexedDB game storage
@@ -304,6 +308,8 @@ Verification:
 - Corrupted records produce an actionable error and are not rendered as valid games.
 
 ### Milestone 4: Game setup workflow
+
+**Status: complete.** Implemented by `stats/js/game-setup.js`, `stats/js/roster-transfer.js`, the planner handoff action, and `tests/stats-setup.spec.js`.
 
 Deliver:
 
