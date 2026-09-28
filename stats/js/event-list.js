@@ -75,12 +75,25 @@ export function createEventListController({
   const commentError = documentObject.querySelector('#coachCommentError');
   const cancelComment = documentObject.querySelector('#cancelCoachComment');
   const removeComment = documentObject.querySelector('#removeCoachComment');
+  const filterButton = documentObject.querySelector('#openEventFilters');
+  const filterCount = documentObject.querySelector('#eventFilterCount');
+  const filterDialog = documentObject.querySelector('#eventFilterDialog');
+  const filterForm = documentObject.querySelector('#eventFilterForm');
+  const filterPlayers = documentObject.querySelector('#eventFilterPlayers');
+  const cancelFilters = documentObject.querySelector('#cancelEventFilters');
+  const clearFilters = documentObject.querySelector('#clearEventFilters');
 
   let game = null;
   let editingEventId = null;
   let commentEventId = null;
   let editingSeconds = 0;
   let busy = false;
+  let filters = {
+    sides: new Set(),
+    types: new Set(),
+    players: new Set(),
+    comment: 'any'
+  };
 
   function setEditError(message = '') {
     editError.textContent = message;
@@ -111,6 +124,72 @@ export function createEventListController({
 
   function playerLabel(player) {
     return player.number ? `#${player.number} ${player.name}` : player.name;
+  }
+
+  function checkedValues(name) {
+    return new Set(
+      [...filterForm.querySelectorAll(`input[name="${name}"]:checked`)].map(input => input.value)
+    );
+  }
+
+  function setCheckedValues(name, values) {
+    filterForm.querySelectorAll(`input[name="${name}"]`).forEach(input => {
+      input.checked = values.has(input.value);
+    });
+  }
+
+  function activeFilterCount() {
+    return Number(filters.sides.size > 0)
+      + Number(filters.types.size > 0)
+      + Number(filters.players.size > 0)
+      + Number(filters.comment !== 'any');
+  }
+
+  function updateFilterButton() {
+    const count = activeFilterCount();
+    filterButton.classList.toggle('active', count > 0);
+    filterCount.textContent = String(count);
+    filterCount.classList.toggle('hidden', count === 0);
+    const label = count ? `Filter timeline, ${count} active` : 'Filter timeline';
+    filterButton.setAttribute('aria-label', label);
+    filterButton.title = label;
+  }
+
+  function populateFilterPlayers() {
+    filterPlayers.innerHTML = '';
+    const validPlayerIds = new Set((game?.players || []).map(player => player.id));
+    filters.players = new Set([...filters.players].filter(playerId => validPlayerIds.has(playerId)));
+    for (const player of game?.players || []) {
+      const label = documentObject.createElement('label');
+      const input = documentObject.createElement('input');
+      input.type = 'checkbox';
+      input.name = 'filterPlayer';
+      input.value = player.id;
+      input.checked = filters.players.has(player.id);
+      label.append(input, documentObject.createTextNode(` ${playerLabel(player)}`));
+      filterPlayers.appendChild(label);
+    }
+  }
+
+  function syncFilterForm() {
+    setCheckedValues('filterSide', filters.sides);
+    setCheckedValues('filterType', filters.types);
+    populateFilterPlayers();
+    const comment = filterForm.querySelector(`input[name="filterComment"][value="${filters.comment}"]`);
+    if (comment) comment.checked = true;
+  }
+
+  function eventMatchesFilters(event) {
+    if (filters.sides.size && !filters.sides.has(event.side)) return false;
+    if (filters.types.size && !filters.types.has(event.type)) return false;
+    if (filters.players.size) {
+      const eventPlayerIds = [event.playerId, event.playerInId, event.playerOutId].filter(Boolean);
+      if (!eventPlayerIds.some(playerId => filters.players.has(playerId))) return false;
+    }
+    const hasComment = Boolean(String(event.coachComment || '').trim());
+    if (filters.comment === 'with' && !hasComment) return false;
+    if (filters.comment === 'without' && hasComment) return false;
+    return true;
   }
 
   function addPlayerOption(select, player) {
@@ -190,12 +269,18 @@ export function createEventListController({
   function render(nextGame) {
     game = nextGame;
     eventList.innerHTML = '';
+    populateFilterPlayers();
+    updateFilterButton();
     if (!game) {
+      emptyEvents.textContent = 'No events recorded.';
       emptyEvents.classList.remove('hidden');
       return;
     }
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
-    const events = orderGameEvents(game.events).reverse();
+    const events = orderGameEvents(game.events).reverse().filter(eventMatchesFilters);
+    emptyEvents.textContent = game.events.length && !events.length
+      ? 'No events match the current filters.'
+      : 'No events recorded.';
     emptyEvents.classList.toggle('hidden', events.length > 0);
     for (const event of events) {
       const item = eventTemplate.content.firstElementChild.cloneNode(true);
@@ -257,6 +342,32 @@ export function createEventListController({
   });
   typeInput.addEventListener('change', updateDependentFields);
   cancelButton.addEventListener('click', () => dialog.close());
+  filterButton.addEventListener('click', () => {
+    syncFilterForm();
+    filterDialog.showModal();
+  });
+  cancelFilters.addEventListener('click', () => filterDialog.close());
+  clearFilters.addEventListener('click', () => {
+    filters = {
+      sides: new Set(),
+      types: new Set(),
+      players: new Set(),
+      comment: 'any'
+    };
+    syncFilterForm();
+    render(game);
+  });
+  filterForm.addEventListener('submit', event => {
+    event.preventDefault();
+    filters = {
+      sides: checkedValues('filterSide'),
+      types: checkedValues('filterType'),
+      players: checkedValues('filterPlayer'),
+      comment: filterForm.querySelector('input[name="filterComment"]:checked')?.value || 'any'
+    };
+    filterDialog.close();
+    render(game);
+  });
   cancelComment.addEventListener('click', () => commentDialog.close());
   commentForm.addEventListener('submit', async event => {
     event.preventDefault();

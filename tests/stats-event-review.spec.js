@@ -262,3 +262,38 @@ test('coach comments can be added, edited, displayed as quotes, and removed', as
   event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
   expect(event).not.toHaveProperty('coachComment');
 });
+
+test('timeline filters combine side, type, player, and coach comment selections', async ({ page }) => {
+  await openReview(page);
+  const playerId = await addTeamEvent(page, '[data-event-type="steal"]', 20);
+
+  await page.locator('[data-action="comment-event"]').click();
+  await page.locator('#coachCommentText').fill('Strong defensive read.');
+  await page.locator('#coachCommentForm button[type="submit"]').click();
+
+  await page.locator('[data-event-side="opponent"]').click();
+  await page.locator('[data-event-type="turnover"]').click();
+  await page.locator('#openNote').click();
+  await page.locator('#noteText').fill('Review transition spacing');
+  await page.locator('#noteForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(3);
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('input[name="filterSide"][value="team"]').check();
+  await page.locator('input[name="filterType"][value="steal"]').check();
+  await page.locator(`input[name="filterPlayer"][value="${playerId}"]`).check();
+  await page.locator('input[name="filterComment"][value="with"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await expect(page.locator('.event-description')).toContainText('steal');
+  await expect(page.locator('#openEventFilters')).toHaveAttribute('aria-label', 'Filter timeline, 4 active');
+  await expect(page.locator('#eventFilterCount')).toHaveText('4');
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('#clearEventFilters').click();
+  await expect(page.locator('#eventFilterDialog')).toHaveAttribute('open', '');
+  await expect(page.locator('.event-list-item')).toHaveCount(3);
+  await expect(page.locator('#eventFilterCount')).toBeHidden();
+  await page.locator('#cancelEventFilters').click();
+});

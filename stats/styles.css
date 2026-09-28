@@ -208,8 +208,12 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-time { color: var(--accent2); font-variant-numeric: tabular-nums; }
 .link-button { padding: 4px 0; background: transparent; color: var(--accent2); text-align: left; }
 .event-row-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.timeline-actions { display: flex; align-items: center; gap: 8px; }
 .icon-button { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; padding: 0; border-radius: 8px; }
 .icon-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.filter-button { position: relative; }
+.filter-button.active { color: var(--accent2); border-color: var(--accent2); }
+.filter-count { position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; color: #fff; background: var(--accent); border: 2px solid var(--card); border-radius: 999px; font-size: .65rem; font-weight: 700; line-height: 13px; text-align: center; }
 .coach-comment { grid-column: 1 / -1; margin: 2px 4px 2px 58px; padding: 8px 10px; color: #dce2ff; background: rgba(109, 124, 255, .08); border-left: 3px solid var(--accent2); border-radius: 0 8px 8px 0; font-size: .85rem; line-height: 1.4; white-space: pre-wrap; }
 .event-list-item.has-comment [data-action="comment-event"] { color: var(--accent2); border-color: var(--accent2); }
 .event-dialog { width: min(620px, calc(100% - 28px)); padding: 18px; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 18px; }
@@ -220,6 +224,11 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .edit-event-grid select, .edit-event-grid input, .dialog-field input, .dialog-field textarea { width: 100%; padding: 9px 10px; background: #0a1220; color: #fff; border: 1px solid var(--line); border-radius: 10px; }
 .dialog-field textarea { min-height: 110px; resize: vertical; }
 .dialog-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
+.filter-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.filter-groups fieldset { display: grid; align-content: start; gap: 7px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.filter-groups legend { padding: 0 5px; font-weight: 700; }
+.filter-groups label, .filter-options label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .85rem; }
+.filter-options { display: grid; gap: 7px; }
 .edit-dependent-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; grid-column: 1 / -1; }
 .dialog-field { display: grid; gap: 7px; color: var(--muted); font-size: .85rem; }
 .timestamp-editor { display: grid; gap: 9px; margin-top: 16px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
@@ -250,6 +259,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
   .game-list-item { align-items: stretch; flex-direction: column; }
   .event-list-item { grid-template-columns: 58px minmax(0, 1fr) auto; }
   .edit-event-grid { grid-template-columns: 1fr; }
+  .filter-groups { grid-template-columns: 1fr; }
   .edit-dependent-fields { grid-column: auto; }
   .lineup-heading { align-items: stretch; flex-direction: column; }
 }

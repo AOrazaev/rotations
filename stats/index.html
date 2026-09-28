@@ -184,7 +184,15 @@
               <h2>Event timeline</h2>
               <p>Newest first. Play, correct, or remove recorded events.</p>
             </div>
-            <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
+            <div class="timeline-actions">
+              <button id="openEventFilters" class="secondary icon-button filter-button" type="button" aria-label="Filter timeline" title="Filter timeline">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 5h16l-6 7v5l-4 2v-7L4 5Z" />
+                </svg>
+                <span id="eventFilterCount" class="filter-count hidden" aria-hidden="true"></span>
+              </button>
+              <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
+            </div>
           </div>
           <div id="emptyEvents" class="empty-state">No events recorded.</div>
           <ol id="eventList" class="event-list"></ol>
@@ -277,6 +285,54 @@
       <blockquote class="coach-comment hidden"></blockquote>
     </li>
   </template>
+
+  <dialog id="eventFilterDialog" class="event-dialog">
+    <form id="eventFilterForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Filter timeline</h2>
+          <p>Selections across groups combine. An empty group includes all.</p>
+        </div>
+        <button id="cancelEventFilters" class="secondary small" type="button">Close</button>
+      </div>
+      <div class="filter-groups">
+        <fieldset>
+          <legend>Side</legend>
+          <label><input type="checkbox" name="filterSide" value="team" /> Our team</label>
+          <label><input type="checkbox" name="filterSide" value="opponent" /> Opponent</label>
+          <label><input type="checkbox" name="filterSide" value="system" /> System</label>
+        </fieldset>
+        <fieldset>
+          <legend>Event type</legend>
+          <label><input type="checkbox" name="filterType" value="shot" /> Shot</label>
+          <label><input type="checkbox" name="filterType" value="rebound" /> Rebound</label>
+          <label><input type="checkbox" name="filterType" value="assist" /> Assist</label>
+          <label><input type="checkbox" name="filterType" value="steal" /> Steal</label>
+          <label><input type="checkbox" name="filterType" value="block" /> Block</label>
+          <label><input type="checkbox" name="filterType" value="turnover" /> Turnover</label>
+          <label><input type="checkbox" name="filterType" value="foul" /> Foul</label>
+          <label><input type="checkbox" name="filterType" value="substitution" /> Substitution</label>
+          <label><input type="checkbox" name="filterType" value="timeout" /> Timeout</label>
+          <label><input type="checkbox" name="filterType" value="period_end" /> Period end</label>
+          <label><input type="checkbox" name="filterType" value="note" /> Note</label>
+        </fieldset>
+        <fieldset>
+          <legend>Our player</legend>
+          <div id="eventFilterPlayers" class="filter-options"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Coach comment</legend>
+          <label><input type="radio" name="filterComment" value="any" checked /> Any</label>
+          <label><input type="radio" name="filterComment" value="with" /> With comment</label>
+          <label><input type="radio" name="filterComment" value="without" /> Without comment</label>
+        </fieldset>
+      </div>
+      <div class="dialog-actions">
+        <button id="clearEventFilters" class="secondary" type="button">Clear filters</button>
+        <button class="primary" type="submit">Apply filters</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="coachCommentDialog" class="event-dialog">
     <form id="coachCommentForm" method="dialog">
