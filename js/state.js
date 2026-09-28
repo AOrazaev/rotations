@@ -5,17 +5,17 @@
 const STORAGE_KEY = 'basketball-rotation-planner-v1';
 
 const defaultPlayers = [
-  { id: crypto.randomUUID(), name: 'Dmytro', number: '13', positions: ['F','G'], skill: 80, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Aman', number: '7', positions: ['F','G'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Bohdan', number: '27', positions: ['C','F'], skill: 90, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Denis', number: '50', positions: ['F'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Anatoly', number: '3', positions: ['G'], skill: 50, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Bek', number: '40', positions: ['G'], skill: 50, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Vlad', number: '5', positions: ['C','F','G'], skill: 75, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Valya', number: '60', positions: ['F','G'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Yedil', number: '70', positions: ['C'], skill: 70, present: true, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Nikita', number: '', positions: ['F','G'], skill: 95, present: false, minMinutes: null, maxMinutes: null },
-  { id: crypto.randomUUID(), name: 'Anton', number: '1', positions: ['C'], skill: 70, present: false, minMinutes: null, maxMinutes: null },
+  { id: crypto.randomUUID(), name: 'Dmytro', number: '13', positions: ['F','G'], skill: 80, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Aman', number: '7', positions: ['F','G'], skill: 70, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Bohdan', number: '27', positions: ['C','F'], skill: 90, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Denis', number: '50', positions: ['F'], skill: 70, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Anatoly', number: '3', positions: ['G'], skill: 50, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Bek', number: '40', positions: ['G'], skill: 50, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Vlad', number: '5', positions: ['C','F','G'], skill: 75, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Valya', number: '60', positions: ['F','G'], skill: 70, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Yedil', number: '70', positions: ['C'], skill: 70, present: true, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Nikita', number: '', positions: ['F','G'], skill: 95, present: false, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
+  { id: crypto.randomUUID(), name: 'Anton', number: '1', positions: ['C'], skill: 70, present: false, minMinutes: null, maxMinutes: null, maxConsecutiveBlocks: null },
 ];
 
 const LEGACY_MODE_INTENSITY = { equal: 0, balanced: 50, competitive: 100 };
@@ -38,6 +38,7 @@ function loadState() {
         if (typeof p.number !== 'string') p.number = '';
         if (typeof p.minMinutes !== 'number') p.minMinutes = null;
         if (typeof p.maxMinutes !== 'number') p.maxMinutes = null;
+        if (typeof p.maxConsecutiveBlocks !== 'number') p.maxConsecutiveBlocks = null;
       });
       return saved;
     }

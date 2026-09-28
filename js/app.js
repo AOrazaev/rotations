@@ -31,7 +31,7 @@ function applySeed(seed, players) {
 }
 
 document.querySelector('#addPlayer').addEventListener('click', () => {
-  state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true, minMinutes:null, maxMinutes:null });
+  state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true, minMinutes:null, maxMinutes:null, maxConsecutiveBlocks:null });
   saveState(); renderRoster();
 });
 document.querySelector('#generate').addEventListener('click', generate);

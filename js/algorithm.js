@@ -17,6 +17,27 @@ function combinations(arr, k) {
 function hasRole(lineup, role) { return lineup.some(p => p.positions.includes(role)); }
 function avgSkill(lineup) { return lineup.reduce((s,p)=>s+p.skill,0)/lineup.length; }
 
+function maxConsecutiveBlocksFor(player) {
+  const value = Number(player.maxConsecutiveBlocks);
+  return player.maxConsecutiveBlocks != null && player.maxConsecutiveBlocks !== '' && Number.isFinite(value)
+    ? Math.max(1, Math.floor(value))
+    : Infinity;
+}
+
+function exceedsConsecutiveLimit(result, player, blockIndex, playsTargetBlock = true) {
+  let run = 0;
+  const limit = maxConsecutiveBlocksFor(player);
+  if (!Number.isFinite(limit)) return false;
+  for (let i = 0; i < result.length; i++) {
+    const plays = i === blockIndex
+      ? playsTargetBlock
+      : result[i].lineup.some(p => p.id === player.id);
+    run = plays ? run + 1 : 0;
+    if (run > limit) return true;
+  }
+  return false;
+}
+
 function createSeededRng(seed) {
   // mulberry32 — small, fast, deterministic PRNG so a given seed always
   // reproduces the exact same "randomized" rotation.
@@ -93,15 +114,17 @@ function buildRotation(players, blockMinutes, intensity, rng) {
 
     // Hard max: once a player has hit their ceiling, they can't appear again.
     const cappedOut = new Set(players.filter(p => playedBlocks[p.id] >= maxBlocks[p.id]).map(p => p.id));
-    const eligibleCount = players.length - cappedOut.size;
+    const resting = new Set(players.filter(p => consecutive[p.id] >= maxConsecutiveBlocksFor(p)).map(p => p.id));
+    const unavailable = new Set([...cappedOut, ...resting]);
+    const eligibleCount = players.length - unavailable.size;
     if (eligibleCount < 5) {
-      throw new Error(`Not enough eligible players for block ${b + 1} — too many players have reached their maximum minutes at the same time. Raise some maximums or relax the constraints.`);
+      throw new Error(`Not enough eligible players for block ${b + 1} — minute or consecutive-block limits require too many players to sit. Relax the constraints or make more players available.`);
     }
 
     // Hard min: if a player's remaining minimum equals the blocks left, they
     // must play from now until the end of the game or they'll miss their floor.
     const forced = players.filter(p => {
-      if (cappedOut.has(p.id)) return false;
+      if (unavailable.has(p.id)) return false;
       const needed = minBlocks[p.id] - playedBlocks[p.id];
       return needed > 0 && needed >= remaining;
     });
@@ -109,15 +132,27 @@ function buildRotation(players, blockMinutes, intensity, rng) {
       throw new Error(`Minimum-minute requirements for ${forced.map(p => p.name).join(', ')} all come due in the same time block — lower some minimums or spread them out.`);
     }
 
-    let eligibleCombos = combos.filter(lineup => lineup.every(p => !cappedOut.has(p.id)));
+    let eligibleCombos = combos.filter(lineup => lineup.every(p => !unavailable.has(p.id)));
     if (forced.length) {
       eligibleCombos = eligibleCombos.filter(lineup => {
         const ids = new Set(lineup.map(p => p.id));
         return forced.every(p => ids.has(p.id));
       });
     }
+    if (!closing) {
+      eligibleCombos = eligibleCombos.filter(lineup => {
+        const ids = new Set(lineup.map(p => p.id));
+        const nextEligibleCount = players.filter(p => {
+          const nextPlayedBlocks = playedBlocks[p.id] + (ids.has(p.id) ? 1 : 0);
+          const nextConsecutive = ids.has(p.id) ? consecutive[p.id] + 1 : 0;
+          return nextPlayedBlocks < maxBlocks[p.id]
+            && nextConsecutive < maxConsecutiveBlocksFor(p);
+        }).length;
+        return nextEligibleCount >= 5;
+      });
+    }
     if (!eligibleCombos.length) {
-      throw new Error(`Couldn't find a valid lineup for block ${b + 1} given the current minute limits — try relaxing them.`);
+      throw new Error(`Couldn't find a valid lineup for block ${b + 1} without violating minute or consecutive-block limits — relax the constraints or make more players available.`);
     }
 
     const scored = [];

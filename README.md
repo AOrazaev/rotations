@@ -6,6 +6,7 @@ A static basketball rotation planner for GitHub Pages.
 - Add/edit/remove players
 - Multiple positions (G/F/C)
 - Skill rating 1-100
+- Optional per-player minimum/maximum minutes and maximum consecutive blocks
 - Toggle game attendance
 - Rotation style slider (equal minutes ↔ fully competitive) instead of fixed presets
 - 4- or 5-minute blocks
@@ -45,4 +46,3 @@ npm test
 - `tests/ui.spec.js` — end-to-end flows: roster compact/edit toggle, generate/regenerate, seed reproduction, validation alerts, add/delete/reset.
 
 Tests also run automatically on every push/PR via GitHub Actions (`.github/workflows/tests.yml`).
-
