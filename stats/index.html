@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <title>Stats & Video Review</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Basketball Tools</p>
+        <h1>Stats &amp; Video Review</h1>
+        <p class="subtitle">Milestone 1 validates timestamp capture and navigation against an embedded YouTube recording.</p>
+      </div>
+      <a class="nav-link" href="../">Rotation Planner</a>
+    </header>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <h2>Load a recording</h2>
+          <p>Paste a standard YouTube, short, embed, or youtu.be URL.</p>
+        </div>
+      </div>
+      <form id="videoForm" class="video-form">
+        <label for="videoUrl">YouTube URL</label>
+        <div class="input-row">
+          <input id="videoUrl" name="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" />
+          <button id="loadVideo" class="primary" type="submit">Load video</button>
+        </div>
+      </form>
+      <p id="videoError" class="message error hidden" role="alert"></p>
+      <p id="videoStatus" class="message" aria-live="polite">No video loaded.</p>
+    </section>
+
+    <section id="workspace" class="workspace hidden">
+      <section class="card video-card">
+        <div class="section-head">
+          <div>
+            <h2>Recording</h2>
+            <p>Current position: <strong id="currentTime">0:00.0</strong></p>
+          </div>
+          <div class="playback-actions">
+            <button id="playVideo" class="secondary" type="button">Play</button>
+            <button id="pauseVideo" class="secondary" type="button">Pause</button>
+            <button id="captureMarker" class="primary" type="button">Capture timestamp</button>
+          </div>
+        </div>
+        <div id="playerFrame" class="player-frame">
+          <div id="youtubePlayer"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>Timestamp markers</h2>
+            <p>Temporary markers prove the navigation workflow before game events are introduced.</p>
+          </div>
+        </div>
+        <div id="emptyMarkers" class="empty-state">Capture a timestamp to create the first marker.</div>
+        <ol id="markerList" class="marker-list"></ol>
+      </section>
+    </section>
+  </main>
+
+  <template id="markerTemplate">
+    <li class="marker">
+      <div>
+        <strong class="marker-name"></strong>
+        <button class="marker-time link-button" type="button" data-action="seek"></button>
+      </div>
+      <div class="marker-actions">
+        <button class="secondary small" type="button" data-action="adjust" data-delta="-5">−5s</button>
+        <button class="secondary small" type="button" data-action="adjust" data-delta="-1">−1s</button>
+        <button class="secondary small" type="button" data-action="preview">Preview</button>
+        <button class="secondary small" type="button" data-action="adjust" data-delta="1">+1s</button>
+        <button class="secondary small" type="button" data-action="adjust" data-delta="5">+5s</button>
+        <button class="secondary small" type="button" data-action="use-current">Use current time</button>
+        <button class="danger small" type="button" data-action="delete">Delete</button>
+      </div>
+    </li>
+  </template>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

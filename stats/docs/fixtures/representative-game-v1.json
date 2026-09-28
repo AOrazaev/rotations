@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "id": "game-representative-v1",
+  "title": "MVP contract verification game",
+  "opponentName": "Falcons",
+  "createdAt": "2026-09-28T07:00:00Z",
+  "updatedAt": "2026-09-28T07:10:00Z",
+  "source": "planner",
+  "video": {
+    "provider": "youtube",
+    "videoId": "exampleVideoId",
+    "sourceUrl": "https://www.youtube.com/watch?v=exampleVideoId",
+    "startSeconds": 100,
+    "endSeconds": 200
+  },
+  "players": [
+    {
+      "id": "p1",
+      "name": "Alex",
+      "number": "1",
+      "positions": ["G"],
+      "skill": 80
+    },
+    {
+      "id": "p2",
+      "name": "Blake",
+      "number": "2",
+      "positions": ["F"],
+      "skill": 75
+    },
+    {
+      "id": "p3",
+      "name": "Casey",
+      "number": "3",
+      "positions": ["G", "F"],
+      "skill": 70
+    },
+    {
+      "id": "p4",
+      "name": "Drew",
+      "number": "4",
+      "positions": ["C"],
+      "skill": 85
+    },
+    {
+      "id": "p5",
+      "name": "Emery",
+      "number": "5",
+      "positions": ["F"],
+      "skill": 65
+    },
+    {
+      "id": "p6",
+      "name": "Flynn",
+      "number": "6",
+      "positions": ["G"],
+      "skill": 78
+    }
+  ],
+  "startingLineupIds": ["p1", "p2", "p3", "p4", "p5"],
+  "plannedRotation": {
+    "blockMinutes": 4,
+    "blocks": [
+      {
+        "lineupIds": ["p1", "p2", "p3", "p4", "p5"]
+      },
+      {
+        "lineupIds": ["p1", "p2", "p3", "p4", "p6"]
+      }
+    ]
+  },
+  "events": [
+    {
+      "id": "e1",
+      "sequence": 1,
+      "videoSeconds": 110,
+      "side": "team",
+      "type": "shot",
+      "playerId": "p1",
+      "shotValue": 2,
+      "made": true,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-28T07:01:00Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e2",
+      "sequence": 2,
+      "videoSeconds": 115,
+      "side": "opponent",
+      "type": "shot",
+      "playerId": null,
+      "shotValue": 3,
+      "made": false,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-28T07:01:10Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e3",
+      "sequence": 3,
+      "videoSeconds": 117,
+      "side": "team",
+      "type": "rebound",
+      "playerId": "p2",
+      "reboundKind": "defensive",
+      "relatedEventId": "e2",
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-28T07:01:15Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e4",
+      "sequence": 4,
+      "videoSeconds": 125,
+      "side": "opponent",
+      "type": "shot",
+      "playerId": null,
+      "shotValue": 2,
+      "made": true,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-28T07:01:25Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e5",
+      "sequence": 5,
+      "videoSeconds": 130,
+      "side": "team",
+      "type": "shot",
+      "playerId": "p3",
+      "shotValue": 3,
+      "made": false,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-28T07:01:35Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e6",
+      "sequence": 6,
+      "videoSeconds": 132,
+      "side": "opponent",
+      "type": "rebound",
+      "playerId": null,
+      "reboundKind": "defensive",
+      "relatedEventId": "e5",
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-28T07:01:40Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e7",
+      "sequence": 7,
+      "videoSeconds": 140,
+      "side": "team",
+      "type": "substitution",
+      "playerId": null,
+      "playerOutId": "p5",
+      "playerInId": "p6",
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:01:50Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e8",
+      "sequence": 8,
+      "videoSeconds": 150,
+      "side": "team",
+      "type": "shot",
+      "playerId": "p6",
+      "shotValue": 3,
+      "made": true,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:02:00Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e9",
+      "sequence": 9,
+      "videoSeconds": 150,
+      "side": "team",
+      "type": "assist",
+      "playerId": "p1",
+      "relatedEventId": "e8",
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:02:05Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e10",
+      "sequence": 10,
+      "videoSeconds": 165,
+      "side": "opponent",
+      "type": "turnover",
+      "playerId": null,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:02:15Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e11",
+      "sequence": 11,
+      "videoSeconds": 170,
+      "side": "team",
+      "type": "steal",
+      "playerId": "p4",
+      "relatedEventId": "e10",
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:02:20Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e12",
+      "sequence": 12,
+      "videoSeconds": 180,
+      "side": "opponent",
+      "type": "shot",
+      "playerId": null,
+      "shotValue": 1,
+      "made": true,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:02:30Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e13",
+      "sequence": 13,
+      "videoSeconds": 190,
+      "side": "team",
+      "type": "foul",
+      "playerId": "p2",
+      "relatedEventId": "e12",
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:02:40Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e14",
+      "sequence": 14,
+      "videoSeconds": 195,
+      "side": "system",
+      "type": "note",
+      "playerId": null,
+      "relatedEventId": null,
+      "note": "Representative fixture review complete.",
+      "lineupIds": ["p1", "p2", "p3", "p4", "p6"],
+      "createdAt": "2026-09-28T07:02:50Z",
+      "updatedAt": null
+    }
+  ]
+}
