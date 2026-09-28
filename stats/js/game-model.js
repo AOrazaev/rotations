@@ -144,7 +144,7 @@ export function collectGameValidationIssues(game) {
     if (!['team', 'opponent', 'system'].includes(event.side)) {
       issues.push(`${label} has an invalid side.`);
     }
-    if (!['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul', 'substitution', 'note'].includes(event.type)) {
+    if (!['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul', 'substitution', 'timeout', 'period_end', 'note'].includes(event.type)) {
       issues.push(`${label} has an invalid type.`);
     }
 
@@ -175,6 +175,14 @@ export function collectGameValidationIssues(game) {
     }
     if (event.type === 'note' && (event.side !== 'system' || !isNonEmptyString(event.note))) {
       issues.push(`${label} note must be a non-empty system event.`);
+    }
+    if (event.type === 'timeout'
+      && (!['team', 'opponent'].includes(event.side) || event.playerId !== null)) {
+      issues.push(`${label} timeout must belong to the team or opponent without a player.`);
+    }
+    if (event.type === 'period_end'
+      && (event.side !== 'system' || event.playerId !== null || !isNonEmptyString(event.periodLabel))) {
+      issues.push(`${label} period end must be a labeled system event.`);
     }
 
     if (event.type === 'substitution') {

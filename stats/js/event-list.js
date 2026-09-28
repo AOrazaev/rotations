@@ -5,7 +5,18 @@ import {
 import { formatVideoTime } from './youtube-player.js';
 
 const PREVIEW_SECONDS = 3;
-const EDITABLE_TYPES = new Set(['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul', 'substitution']);
+const EDITABLE_TYPES = new Set([
+  'shot',
+  'rebound',
+  'assist',
+  'steal',
+  'block',
+  'turnover',
+  'foul',
+  'substitution',
+  'timeout',
+  'period_end'
+]);
 
 export function describeEvent(event, playersById) {
   const subject = event.side === 'opponent'
@@ -19,6 +30,8 @@ export function describeEvent(event, playersById) {
   if (event.type === 'substitution') {
     return `${playersById[event.playerInId]?.name || 'Player'} in for ${playersById[event.playerOutId]?.name || 'player'}`;
   }
+  if (event.type === 'timeout') return `${event.side === 'opponent' ? 'Opponent' : 'Our team'} timeout`;
+  if (event.type === 'period_end') return event.periodLabel;
   if (event.type === 'note') return event.note;
   return `${subject} ${event.type}`;
 }
@@ -48,6 +61,8 @@ export function createEventListController({
   const substitutionFields = documentObject.querySelector('#editSubstitutionFields');
   const playerOutInput = documentObject.querySelector('#editPlayerOut');
   const playerInInput = documentObject.querySelector('#editPlayerIn');
+  const periodEndFields = documentObject.querySelector('#editPeriodEndFields');
+  const periodLabelInput = documentObject.querySelector('#editPeriodLabel');
   const timestampDisplay = documentObject.querySelector('#editEventTimestamp');
   const useCurrentButton = documentObject.querySelector('#useCurrentEventTime');
   const editError = documentObject.querySelector('#eventEditError');
@@ -66,6 +81,7 @@ export function createEventListController({
     shotFields.classList.toggle('hidden', typeInput.value !== 'shot');
     reboundFields.classList.toggle('hidden', typeInput.value !== 'rebound');
     substitutionFields.classList.toggle('hidden', typeInput.value !== 'substitution');
+    periodEndFields.classList.toggle('hidden', typeInput.value !== 'period_end');
   }
 
   function playerLabel(player) {
@@ -109,7 +125,7 @@ export function createEventListController({
     if (!event) return;
     if (event.type === 'substitution') {
       populateSubstitutionPlayers(event, playerOutInput.value || event.playerOutId, playerInInput.value || event.playerInId);
-    } else {
+    } else if (!['timeout', 'period_end'].includes(event.type)) {
       populatePlayers(event, playerInput.value || event.playerId);
     }
   }
@@ -121,15 +137,23 @@ export function createEventListController({
     sideInput.value = event.side;
     typeInput.value = event.type;
     const isSubstitution = event.type === 'substitution';
-    typeInput.disabled = isSubstitution;
-    typeInput.querySelector('option[value="substitution"]').disabled = !isSubstitution;
-    sideInput.disabled = isSubstitution;
-    playerInput.disabled = isSubstitution || event.side === 'opponent';
+    const isTimeout = event.type === 'timeout';
+    const isPeriodEnd = event.type === 'period_end';
+    const isSpecial = isSubstitution || isTimeout || isPeriodEnd;
+    typeInput.disabled = isSpecial;
+    for (const option of typeInput.options) {
+      option.disabled = ['substitution', 'timeout', 'period_end'].includes(option.value)
+        && option.value !== event.type;
+    }
+    sideInput.disabled = isSubstitution || isPeriodEnd;
+    playerInput.disabled = isSpecial || event.side === 'opponent';
     if (isSubstitution) populateSubstitutionPlayers(event);
-    else populatePlayers(event);
+    else if (!isSpecial) populatePlayers(event);
+    else playerInput.innerHTML = '<option value="">Not applicable</option>';
     shotValueInput.value = String(event.shotValue || 2);
     shotMadeInput.value = String(event.made ?? true);
     reboundKindInput.value = event.reboundKind || 'defensive';
+    periodLabelInput.value = event.periodLabel || '';
     timestampDisplay.textContent = formatVideoTime(editingSeconds);
     updateDependentFields();
     setEditError();
@@ -226,6 +250,7 @@ export function createEventListController({
       delete edited.reboundKind;
       delete edited.playerOutId;
       delete edited.playerInId;
+      delete edited.periodLabel;
       if (typeInput.value === 'substitution') {
         edited.side = 'team';
         edited.type = 'substitution';
@@ -235,6 +260,16 @@ export function createEventListController({
         if (!edited.playerOutId || !edited.playerInId) {
           throw new Error('Select one on-court player and one bench player.');
         }
+      } else if (typeInput.value === 'timeout') {
+        edited.side = sideInput.value;
+        edited.type = 'timeout';
+        edited.playerId = null;
+      } else if (typeInput.value === 'period_end') {
+        edited.side = 'system';
+        edited.type = 'period_end';
+        edited.playerId = null;
+        edited.periodLabel = periodLabelInput.value.trim();
+        if (!edited.periodLabel) throw new Error('Enter a period label.');
       } else {
         edited.side = sideInput.value;
         edited.playerId = edited.side === 'team' ? playerInput.value : null;

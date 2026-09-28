@@ -56,6 +56,7 @@ test('records a valid substitution and attributes later events to the new lineup
   await page.locator('#substitutionPlayerOut').selectOption(before.active[0]);
   await page.locator('#substitutionPlayerIn').selectOption(before.bench[0]);
   await page.locator('#substitutionForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
 
   const after = await currentAndBenchIds(page);
   expect(after.active).toContain(before.bench[0]);
@@ -100,6 +101,10 @@ test('editing and deleting an earlier substitution rebuilds every later lineup s
   await page.locator('#editPlayerOut').selectOption(before.active[1]);
   await page.locator('#editPlayerIn').selectOption(before.bench[0]);
   await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect.poll(async () => {
+    const current = await page.evaluate(() => window.__statsApp.eventController.getGame());
+    return current.events.find(event => event.type === 'substitution')?.playerOutId;
+  }).toBe(before.active[1]);
 
   let game = await page.evaluate(() => window.__statsApp.eventController.getGame());
   const laterEvent = game.events.find(event => event.type === 'shot');
@@ -109,6 +114,7 @@ test('editing and deleting an earlier substitution rebuilds every later lineup s
 
   page.once('dialog', dialog => dialog.accept());
   await page.locator('.event-list-item').first().locator('[data-action="delete-event"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
   game = await page.evaluate(() => window.__statsApp.eventController.getGame());
   expect(game.events).toHaveLength(1);
   expect(game.events[0].lineupIds).toEqual(game.startingLineupIds);
@@ -117,10 +123,11 @@ test('editing and deleting an earlier substitution rebuilds every later lineup s
   await page.reload();
   await page.evaluate(() => window.__statsApp.setupController.ready);
   await page.locator('[data-action="open-game"]').click();
+  await expect(page.locator('#currentLineup .player-chip')).toHaveCount(5);
   expect((await currentAndBenchIds(page)).active).toEqual(game.startingLineupIds);
 });
 
-test('planner imports show their planned lineups as a non-authoritative reference', async ({ page }) => {
+test('planner imports preserve planned rotation without crowding event entry', async ({ page }) => {
   const databaseName = `basketball-stats-planned-${Date.now()}-${Math.random()}`;
   await page.addInitScript(name => { window.__STATS_DATABASE_NAME__ = name; }, databaseName);
   await page.goto('/');
@@ -132,7 +139,7 @@ test('planner imports show their planned lineups as a non-authoritative referenc
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
 
-  await expect(page.locator('#plannedLineupReference')).toBeVisible();
-  await expect(page.locator('#plannedLineupReference')).toContainText('Planned reference');
-  await expect(page.locator('#plannedLineupReference .planned-blocks span')).toHaveCount(10);
+  await expect(page.getByText('Planned reference')).toHaveCount(0);
+  const saved = await page.evaluate(async () => (await window.__statsApp.store.listGames())[0]);
+  expect(saved.plannedRotation.blocks).toHaveLength(10);
 });

@@ -99,8 +99,6 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .bench-label { margin-top: 10px; margin-bottom: 5px; }
 .player-chips { display: flex; gap: 6px; flex-wrap: wrap; min-height: 27px; }
 .player-chip { padding: 5px 8px; color: #dce2ff; background: #1b2540; border: 1px solid var(--line); border-radius: 999px; font-size: .8rem; }
-.planned-reference { display: grid; gap: 7px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
-.planned-blocks { display: grid; gap: 4px; }
 .report-final-score { font-size: 2rem; font-variant-numeric: tabular-nums; }
 .report-section { margin-top: 20px; }
 .report-section > h3 { margin: 0 0 9px; font-size: 1rem; }
@@ -142,8 +140,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-dialog form { margin: 0; }
 .edit-event-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .edit-event-grid > label, .edit-dependent-fields label { display: grid; gap: 6px; color: var(--muted); font-size: .85rem; }
-.edit-event-grid select { width: 100%; padding: 9px 10px; background: #0a1220; color: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.edit-event-grid select, .edit-event-grid input, .dialog-field input { width: 100%; padding: 9px 10px; background: #0a1220; color: #fff; border: 1px solid var(--line); border-radius: 10px; }
 .edit-dependent-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; grid-column: 1 / -1; }
+.dialog-field { display: grid; gap: 7px; color: var(--muted); font-size: .85rem; }
 .timestamp-editor { display: grid; gap: 9px; margin-top: 16px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
 .invalid-count { color: var(--danger) !important; }
 .hidden { display: none; }

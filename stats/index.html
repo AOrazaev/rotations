@@ -121,7 +121,6 @@
           <div id="currentLineup" class="player-chips" aria-label="Current lineup"></div>
           <p class="bench-label">Bench</p>
           <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
-          <div id="plannedLineupReference" class="planned-reference hidden"></div>
         </div>
         <div class="event-side" role="group" aria-label="Event side">
           <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
@@ -145,6 +144,8 @@
           <button class="event-action" type="button" data-event-type="block">Block</button>
           <button class="event-action" type="button" data-event-type="turnover">Turnover</button>
           <button class="event-action" type="button" data-event-type="foul">Foul</button>
+          <button class="event-action" type="button" data-event-type="timeout">Timeout</button>
+          <button id="openPeriodEnd" class="event-action" type="button">Period end</button>
         </div>
         <p id="eventError" class="message error hidden" role="alert"></p>
         <div class="quick-totals">
@@ -258,6 +259,8 @@
             <option value="turnover">Turnover</option>
             <option value="foul">Foul</option>
             <option value="substitution">Substitution</option>
+            <option value="timeout">Timeout</option>
+            <option value="period_end">Period end</option>
           </select>
         </label>
         <div id="editShotFields" class="edit-dependent-fields">
@@ -289,6 +292,11 @@
           </label>
           <label>Player in
             <select id="editPlayerIn"></select>
+          </label>
+        </div>
+        <div id="editPeriodEndFields" class="edit-dependent-fields hidden">
+          <label>Label
+            <input id="editPeriodLabel" type="text" maxlength="80" placeholder="End of Q1" />
           </label>
         </div>
       </div>
@@ -329,6 +337,25 @@
       <p id="substitutionError" class="message error hidden" role="alert"></p>
       <div class="form-actions">
         <button class="primary" type="submit">Save substitution</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="periodEndDialog" class="event-dialog">
+    <form id="periodEndForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Add period end</h2>
+          <p>At <strong id="periodEndTimestamp">0:00.0</strong> in the recording.</p>
+        </div>
+        <button id="cancelPeriodEnd" class="secondary small" type="button">Close</button>
+      </div>
+      <label class="dialog-field">Label
+        <input id="periodEndLabel" type="text" required maxlength="80" placeholder="End of Q1, Halftime, End of overtime…" />
+      </label>
+      <p id="periodEndError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Save period end</button>
       </div>
     </form>
   </dialog>

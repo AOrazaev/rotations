@@ -27,7 +27,6 @@ export function createEventEntryController({
   const undoButton = documentObject.querySelector('#undoEvent');
   const currentLineup = documentObject.querySelector('#currentLineup');
   const benchPlayers = documentObject.querySelector('#benchPlayers');
-  const plannedReference = documentObject.querySelector('#plannedLineupReference');
   const openSubstitutionButton = documentObject.querySelector('#openSubstitution');
   const substitutionDialog = documentObject.querySelector('#substitutionDialog');
   const substitutionForm = documentObject.querySelector('#substitutionForm');
@@ -36,12 +35,20 @@ export function createEventEntryController({
   const substitutionPlayerIn = documentObject.querySelector('#substitutionPlayerIn');
   const substitutionError = documentObject.querySelector('#substitutionError');
   const cancelSubstitution = documentObject.querySelector('#cancelSubstitution');
+  const openPeriodEndButton = documentObject.querySelector('#openPeriodEnd');
+  const periodEndDialog = documentObject.querySelector('#periodEndDialog');
+  const periodEndForm = documentObject.querySelector('#periodEndForm');
+  const periodEndTimestamp = documentObject.querySelector('#periodEndTimestamp');
+  const periodEndLabel = documentObject.querySelector('#periodEndLabel');
+  const periodEndError = documentObject.querySelector('#periodEndError');
+  const cancelPeriodEnd = documentObject.querySelector('#cancelPeriodEnd');
 
   let game = null;
   let side = 'team';
   let busy = false;
   let eventListController;
   let substitutionSeconds = 0;
+  let periodEndSeconds = 0;
   const reportController = createReportController({ documentObject, videoController });
 
   function playerLabel(player) {
@@ -57,6 +64,7 @@ export function createEventEntryController({
     eventButtons.querySelectorAll('button').forEach(button => { button.disabled = !enabled; });
     undoButton.disabled = !game?.events.length;
     openSubstitutionButton.disabled = !enabled || !game || game.players.length <= 5;
+    openPeriodEndButton.disabled = !enabled;
   }
 
   function renderPlayerOptions(lineupIds = []) {
@@ -88,22 +96,6 @@ export function createEventEntryController({
       chip.dataset.playerId = player.id;
       chip.textContent = playerLabel(player);
       (activeIds.has(player.id) ? currentLineup : benchPlayers).appendChild(chip);
-    }
-    plannedReference.innerHTML = '';
-    const planned = game?.plannedRotation;
-    plannedReference.classList.toggle('hidden', !planned);
-    if (planned) {
-      const heading = documentObject.createElement('strong');
-      heading.textContent = `Planned reference · ${planned.blockMinutes}-minute blocks`;
-      const blocks = documentObject.createElement('div');
-      blocks.className = 'planned-blocks';
-      const byId = Object.fromEntries(game.players.map(player => [player.id, player]));
-      planned.blocks.forEach((block, index) => {
-        const item = documentObject.createElement('span');
-        item.textContent = `B${index + 1}: ${block.lineupIds.map(id => byId[id]?.name || id).join(', ')}`;
-        blocks.appendChild(item);
-      });
-      plannedReference.append(heading, blocks);
     }
   }
 
@@ -167,8 +159,10 @@ export function createEventEntryController({
     busy = true;
     try {
       const videoSeconds = videoController.getCurrentSeconds();
-      const playerId = side === 'team' ? playerSelect.value : null;
-      if (side === 'team' && !playerId) throw new Error('Select one of our on-court players.');
+      const type = button.dataset.eventType;
+      const requiresPlayer = side === 'team' && type !== 'timeout';
+      const playerId = requiresPlayer ? playerSelect.value : null;
+      if (requiresPlayer && !playerId) throw new Error('Select one of our on-court players.');
 
       const next = structuredClone(game);
       const event = {
@@ -176,7 +170,7 @@ export function createEventEntryController({
         sequence: Math.max(0, ...next.events.map(item => item.sequence)) + 1,
         videoSeconds,
         side,
-        type: button.dataset.eventType,
+        type,
         playerId,
         relatedEventId: null,
         lineupIds: getLineupAtEventPosition(next, videoSeconds),
@@ -199,75 +193,126 @@ export function createEventEntryController({
     }
   }
 
+  function setSubstitutionError(message = '') {
+    substitutionError.textContent = message;
+    substitutionError.classList.toggle('hidden', !message);
+  }
+
+  function populateSubstitutionOptions(lineupIds) {
+    const active = new Set(lineupIds);
+    substitutionPlayerOut.innerHTML = '';
+    substitutionPlayerIn.innerHTML = '';
+    for (const player of game.players) {
+      const option = documentObject.createElement('option');
+      option.value = player.id;
+      option.textContent = playerLabel(player);
+      (active.has(player.id) ? substitutionPlayerOut : substitutionPlayerIn).appendChild(option);
+    }
+  }
+
+  openSubstitutionButton.addEventListener('click', () => {
+    if (!game || busy) return;
+    try {
+      substitutionSeconds = videoController.getCurrentSeconds();
+      const sequence = Math.max(0, ...game.events.map(event => event.sequence)) + 1;
+      const lineupIds = getLineupAtEventPosition(game, substitutionSeconds, sequence);
+      populateSubstitutionOptions(lineupIds);
+      substitutionTimestamp.textContent = formatVideoTime(substitutionSeconds);
+      setSubstitutionError();
+      substitutionDialog.showModal();
+    } catch (error) {
+      setError(error.message || 'Could not prepare the substitution.');
+    }
+  });
+  cancelSubstitution.addEventListener('click', () => substitutionDialog.close());
+  substitutionForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!game || busy) return;
+    setSubstitutionError();
+    busy = true;
+    try {
+      const next = structuredClone(game);
+      next.events.push({
+        id: crypto.randomUUID(),
+        sequence: Math.max(0, ...next.events.map(item => item.sequence)) + 1,
+        videoSeconds: substitutionSeconds,
+        side: 'team',
+        type: 'substitution',
+        playerId: null,
+        playerOutId: substitutionPlayerOut.value,
+        playerInId: substitutionPlayerIn.value,
+        relatedEventId: null,
+        lineupIds: [],
+        createdAt: now(),
+        updatedAt: null,
+      });
+      next.updatedAt = now();
+      await persist(next);
+      substitutionDialog.close();
+    } catch (error) {
+      setSubstitutionError(error.message || 'Could not save the substitution.');
+    } finally {
+      busy = false;
+    }
+  });
+
+  function setPeriodEndError(message = '') {
+    periodEndError.textContent = message;
+    periodEndError.classList.toggle('hidden', !message);
+  }
+
+  openPeriodEndButton.addEventListener('click', () => {
+    if (!game || busy) return;
+    try {
+      periodEndSeconds = videoController.getCurrentSeconds();
+      periodEndTimestamp.textContent = formatVideoTime(periodEndSeconds);
+      periodEndLabel.value = '';
+      setPeriodEndError();
+      periodEndDialog.showModal();
+      periodEndLabel.focus();
+    } catch (error) {
+      setError(error.message || 'Could not prepare the period marker.');
+    }
+  });
+  cancelPeriodEnd.addEventListener('click', () => periodEndDialog.close());
+  periodEndForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!game || busy) return;
+    setPeriodEndError();
+    busy = true;
+    try {
+      const label = periodEndLabel.value.trim();
+      if (!label) throw new Error('Enter a period label.');
+      const next = structuredClone(game);
+      next.events.push({
+        id: crypto.randomUUID(),
+        sequence: Math.max(0, ...next.events.map(item => item.sequence)) + 1,
+        videoSeconds: periodEndSeconds,
+        side: 'system',
+        type: 'period_end',
+        playerId: null,
+        periodLabel: label,
+        relatedEventId: null,
+        lineupIds: getLineupAtEventPosition(next, periodEndSeconds),
+        createdAt: now(),
+        updatedAt: null,
+      });
+      next.updatedAt = now();
+      await persist(next);
+      periodEndDialog.close();
+    } catch (error) {
+      setPeriodEndError(error.message || 'Could not save the period marker.');
+    } finally {
+      busy = false;
+    }
+  });
+
   sideButtons.forEach(button => button.addEventListener('click', () => {
     side = button.dataset.eventSide;
     sideButtons.forEach(candidate => {
       const active = candidate === button;
       candidate.classList.toggle('active', active);
       candidate.setAttribute('aria-pressed', String(active));
-    });
-
-    function setSubstitutionError(message = '') {
-      substitutionError.textContent = message;
-      substitutionError.classList.toggle('hidden', !message);
-    }
-
-    function populateSubstitutionOptions(lineupIds) {
-      const active = new Set(lineupIds);
-      substitutionPlayerOut.innerHTML = '';
-      substitutionPlayerIn.innerHTML = '';
-      for (const player of game.players) {
-        const option = documentObject.createElement('option');
-        option.value = player.id;
-        option.textContent = playerLabel(player);
-        (active.has(player.id) ? substitutionPlayerOut : substitutionPlayerIn).appendChild(option);
-      }
-    }
-
-    openSubstitutionButton.addEventListener('click', () => {
-      if (!game || busy) return;
-      try {
-        substitutionSeconds = videoController.getCurrentSeconds();
-        const sequence = Math.max(0, ...game.events.map(event => event.sequence)) + 1;
-        const lineupIds = getLineupAtEventPosition(game, substitutionSeconds, sequence);
-        populateSubstitutionOptions(lineupIds);
-        substitutionTimestamp.textContent = formatVideoTime(substitutionSeconds);
-        setSubstitutionError();
-        substitutionDialog.showModal();
-      } catch (error) {
-        setError(error.message || 'Could not prepare the substitution.');
-      }
-    });
-    cancelSubstitution.addEventListener('click', () => substitutionDialog.close());
-    substitutionForm.addEventListener('submit', async event => {
-      event.preventDefault();
-      if (!game || busy) return;
-      setSubstitutionError();
-      busy = true;
-      try {
-        const next = structuredClone(game);
-        next.events.push({
-          id: crypto.randomUUID(),
-          sequence: Math.max(0, ...next.events.map(item => item.sequence)) + 1,
-          videoSeconds: substitutionSeconds,
-          side: 'team',
-          type: 'substitution',
-          playerId: null,
-          playerOutId: substitutionPlayerOut.value,
-          playerInId: substitutionPlayerIn.value,
-          relatedEventId: null,
-          lineupIds: [],
-          createdAt: now(),
-          updatedAt: null,
-        });
-        next.updatedAt = now();
-        await persist(next);
-        substitutionDialog.close();
-      } catch (error) {
-        setSubstitutionError(error.message || 'Could not save the substitution.');
-      } finally {
-        busy = false;
-      }
     });
     playerSelect.disabled = side === 'opponent' || !game;
     if (side === 'opponent') playerSelect.value = '';

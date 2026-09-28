@@ -136,3 +136,39 @@ test('player load failures cannot create partial events', async ({ page }) => {
   const stored = await page.evaluate(async () => (await window.__statsApp.store.listGames())[0]);
   expect(stored.events).toHaveLength(0);
 });
+
+test('timeouts and labeled period ends are timestamped timeline events without statistical impact', async ({ page }) => {
+  await openEventEntry(page);
+
+  await page.locator('[data-event-type="timeout"]').click();
+  await page.locator('[data-event-side="opponent"]').click();
+  await page.evaluate(() => { window.__statsFakePlayer.current = 90; });
+  await page.locator('[data-event-type="timeout"]').click();
+  await page.evaluate(() => { window.__statsFakePlayer.current = 120; });
+  await page.locator('#openPeriodEnd').click();
+  await expect(page.locator('#periodEndTimestamp')).toHaveText('2:00.0');
+  await page.locator('#periodEndLabel').fill('Halftime');
+  await page.locator('#periodEndForm button[type="submit"]').click();
+
+  await expect(page.locator('.event-list-item')).toHaveCount(3);
+  await expect(page.locator('.event-description')).toHaveText([
+    'Our team timeout',
+    'Opponent timeout',
+    'Halftime'
+  ]);
+  await expect(page.locator('#teamScore')).toHaveText('0');
+  await expect(page.locator('#opponentScore')).toHaveText('0');
+
+  const game = await page.evaluate(() => window.__statsApp.eventController.getGame());
+  expect(game.events.map(event => ({
+    type: event.type,
+    side: event.side,
+    playerId: event.playerId,
+    videoSeconds: event.videoSeconds,
+    periodLabel: event.periodLabel
+  }))).toEqual([
+    { type: 'timeout', side: 'team', playerId: null, videoSeconds: 42.4, periodLabel: undefined },
+    { type: 'timeout', side: 'opponent', playerId: null, videoSeconds: 90, periodLabel: undefined },
+    { type: 'period_end', side: 'system', playerId: null, videoSeconds: 120, periodLabel: 'Halftime' }
+  ]);
+});

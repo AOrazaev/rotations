@@ -204,3 +204,47 @@ test('validation rejects team statistics attributed to a bench player', async ({
 
   expect(issues).toContain('Event e1 team statistic player must be on court.');
 });
+
+test('validation accepts timeouts and labeled period boundaries but rejects invalid attribution', async ({ page }) => {
+  const { game } = await loadFixture(page);
+  game.events.push(
+    {
+      id: 'e15',
+      sequence: 15,
+      videoSeconds: 196,
+      side: 'team',
+      type: 'timeout',
+      playerId: null,
+      relatedEventId: null,
+      lineupIds: ['p1', 'p2', 'p3', 'p4', 'p6'],
+      createdAt: '2026-09-28T07:03:00Z',
+      updatedAt: null
+    },
+    {
+      id: 'e16',
+      sequence: 16,
+      videoSeconds: 197,
+      side: 'system',
+      type: 'period_end',
+      playerId: null,
+      periodLabel: 'Halftime',
+      relatedEventId: null,
+      lineupIds: ['p1', 'p2', 'p3', 'p4', 'p6'],
+      createdAt: '2026-09-28T07:03:10Z',
+      updatedAt: null
+    }
+  );
+
+  const result = await page.evaluate(async gameData => {
+    const { collectGameValidationIssues } = await import('/stats/js/game-model.js');
+    const valid = collectGameValidationIssues(gameData);
+    const invalid = structuredClone(gameData);
+    invalid.events.at(-2).playerId = 'p1';
+    invalid.events.at(-1).periodLabel = '';
+    return { valid, invalid: collectGameValidationIssues(invalid) };
+  }, game);
+
+  expect(result.valid).toEqual([]);
+  expect(result.invalid).toContain('Event e15 timeout must belong to the team or opponent without a player.');
+  expect(result.invalid).toContain('Event e16 period end must be a labeled system event.');
+});

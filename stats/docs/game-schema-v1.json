@@ -242,6 +242,8 @@
             "turnover",
             "foul",
             "substitution",
+            "timeout",
+            "period_end",
             "note"
           ]
         },
@@ -285,6 +287,10 @@
           "type": "string",
           "minLength": 1
         },
+        "periodLabel": {
+          "type": "string",
+          "minLength": 1
+        },
         "lineupIds": {
           "$ref": "#/$defs/lineup"
         },
@@ -303,6 +309,56 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "timeout"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "side": {
+                "enum": [
+                  "team",
+                  "opponent"
+                ]
+              },
+              "playerId": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "period_end"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "periodLabel"
+            ],
+            "properties": {
+              "side": {
+                "const": "system"
+              },
+              "playerId": {
+                "type": "null"
+              }
+            }
+          }
+        },
         {
           "if": {
             "properties": {

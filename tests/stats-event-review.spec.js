@@ -191,3 +191,27 @@ test('locked state explains whether a game or recording is required', async ({ p
   await expect(page.locator('#eventLockMessage')).toContainText('Load this game’s recording');
   await expect(page.locator('.event-action').first()).toBeDisabled();
 });
+
+test('timeout ownership and period labels can be corrected from the timeline', async ({ page }) => {
+  await openReview(page);
+  await page.locator('[data-event-type="timeout"]').click();
+  await page.locator('#openPeriodEnd').click();
+  await page.locator('#periodEndLabel').fill('End of Q1');
+  await page.locator('#periodEndForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(2);
+
+  await page.locator('.event-list-item').first().locator('[data-action="edit-event"]').click();
+  await expect(page.locator('#editEventType')).toBeDisabled();
+  await page.locator('#editEventSide').selectOption('opponent');
+  await page.locator('#eventEditForm button[type="submit"]').click();
+
+  await page.locator('.event-list-item').nth(1).locator('[data-action="edit-event"]').click();
+  await expect(page.locator('#editPeriodEndFields')).toBeVisible();
+  await page.locator('#editPeriodLabel').fill('Halftime');
+  await page.locator('#eventEditForm button[type="submit"]').click();
+
+  await expect(page.locator('.event-description')).toHaveText(['Opponent timeout', 'Halftime']);
+  const events = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events;
+  expect(events[0]).toMatchObject({ type: 'timeout', side: 'opponent', playerId: null });
+  expect(events[1]).toMatchObject({ type: 'period_end', side: 'system', periodLabel: 'Halftime' });
+});

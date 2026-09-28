@@ -146,6 +146,14 @@ Related facts remain separate events. For example, a team turnover and opponent 
 - `lineupIds` is the lineup immediately after the substitution.
 - A substitution exchanges exactly one player and preserves a five-player lineup.
 
+### Timeout
+
+Timeouts use `type: "timeout"`, belong to `side: "team"` or `side: "opponent"`, and use `playerId: null`.
+
+### Period end
+
+Period boundaries use `side: "system"`, `type: "period_end"`, `playerId: null`, and a non-empty freeform `periodLabel`, such as `End of Q1`, `Halftime`, or `End of overtime`.
+
 ### Note
 
 Notes use `side: "system"`, `type: "note"`, `playerId: null`, and a non-empty `note`.
