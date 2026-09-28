@@ -46,6 +46,18 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   expect(workspaceBoxes[0].x).toBeLessThan(workspaceBoxes[1].x);
   expect(workspaceBoxes[0].width).toBeGreaterThan(workspaceBoxes[1].width);
   expect(workspaceBoxes[0].width).toBeGreaterThanOrEqual(600);
+
+  const expandedVideoWidth = workspaceBoxes[0].width;
+  await page.locator('#hideGamePanel').click();
+  await expect(page.locator('#gamePanel')).toBeHidden();
+  await expect(page.locator('#showGamePanel')).toBeVisible();
+  await expect(page.locator('#showGamePanel')).toBeFocused();
+  const collapsedVideoWidth = await page.locator('.video-card').evaluate(element => element.getBoundingClientRect().width);
+  expect(collapsedVideoWidth).toBeGreaterThan(expandedVideoWidth);
+
+  await page.locator('#showGamePanel').click();
+  await expect(page.locator('#gamePanel')).toBeVisible();
+  await expect(page.locator('#hideGamePanel')).toBeFocused();
 });
 
 test('game editor collapses and reopens for a new game', async ({ page }) => {
@@ -56,6 +68,17 @@ test('game editor collapses and reopens for a new game', async ({ page }) => {
   await expect(editor).not.toHaveAttribute('open', '');
   await page.locator('#newStandaloneGame').click();
   await expect(editor).toHaveAttribute('open', '');
+});
+
+test('hidden games panel stays collapsed after reload', async ({ page }) => {
+  await openLayout(page);
+  await page.locator('#hideGamePanel').click();
+  await page.reload();
+  await page.evaluate(() => window.__statsApp.setupController.ready);
+
+  await expect(page.locator('#gamePanel')).toBeHidden();
+  await expect(page.locator('#showGamePanel')).toBeVisible();
+  await expect(page.locator('#showGamePanel')).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('mobile stacks games, center workflow and event timeline in order', async ({ page }) => {

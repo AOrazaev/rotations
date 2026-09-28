@@ -144,6 +144,26 @@ export function createStatsSpikeApp({
 
 const playerFactory = window.__STATS_PLAYER_FACTORY__ || createYouTubePlayer;
 const videoController = createStatsSpikeApp({ playerFactory });
+const statsShell = document.querySelector('#statsShell');
+const gamePanel = document.querySelector('#gamePanel');
+const hideGamePanelButton = document.querySelector('#hideGamePanel');
+const showGamePanelButton = document.querySelector('#showGamePanel');
+const gamePanelStorageKey = 'basketball-stats-game-panel-collapsed';
+
+function setGamePanelCollapsed(collapsed, { moveFocus = false } = {}) {
+  statsShell.classList.toggle('game-panel-collapsed', collapsed);
+  gamePanel.classList.toggle('hidden', collapsed);
+  showGamePanelButton.classList.toggle('hidden', !collapsed);
+  hideGamePanelButton.setAttribute('aria-expanded', String(!collapsed));
+  showGamePanelButton.setAttribute('aria-expanded', String(!collapsed));
+  localStorage.setItem(gamePanelStorageKey, String(collapsed));
+  if (moveFocus) (collapsed ? showGamePanelButton : hideGamePanelButton).focus();
+}
+
+hideGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(true, { moveFocus: true }));
+showGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(false, { moveFocus: true }));
+setGamePanelCollapsed(localStorage.getItem(gamePanelStorageKey) === 'true');
+
 const store = new GameStore({
   databaseName: window.__STATS_DATABASE_NAME__ || 'basketball-stats'
 });

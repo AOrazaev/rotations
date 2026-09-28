@@ -18,14 +18,16 @@
       <a class="nav-link" href="../">Rotation Planner</a>
     </header>
 
-    <div class="app-shell">
-      <aside class="panel-stack side-panel game-panel">
+    <div id="statsShell" class="app-shell">
+      <button id="showGamePanel" class="sidebar-reopen hidden" type="button" aria-controls="gamePanel" aria-expanded="false">Games</button>
+      <aside id="gamePanel" class="panel-stack side-panel game-panel">
         <section class="card">
           <div class="section-head">
             <div>
               <h2>Games</h2>
               <p>Saved only in this browser.</p>
             </div>
+            <button id="hideGamePanel" class="secondary small" type="button" aria-controls="gamePanel" aria-expanded="true">Hide</button>
           </div>
           <div class="game-actions">
             <button id="importPlannerRoster" class="secondary small" type="button">Import planner roster</button>
