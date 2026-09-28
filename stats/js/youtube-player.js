@@ -98,6 +98,10 @@ export class YouTubePlayerAdapter {
     this.player.playVideo();
   }
 
+  isPlaying() {
+    return this.player.getPlayerState() === 1;
+  }
+
   pause() {
     this.player.pauseVideo();
   }

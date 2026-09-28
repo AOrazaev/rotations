@@ -52,11 +52,13 @@ test.describe('video controller workflow', () => {
     await page.addInitScript(() => {
       window.__statsFakePlayer = {
         current: 42.4,
+        playing: false,
         calls: [],
         getCurrentSeconds() { return this.current; },
         seekTo(seconds) { this.current = seconds; this.calls.push(['seek', seconds]); },
-        play() { this.calls.push(['play']); },
-        pause() { this.calls.push(['pause']); },
+        play() { this.playing = true; this.calls.push(['play']); },
+        isPlaying() { return this.playing; },
+        pause() { this.playing = false; this.calls.push(['pause']); },
         destroy() { this.calls.push(['destroy']); }
       };
       window.__statsLoadedVideoIds = [];
@@ -88,6 +90,50 @@ test.describe('video controller workflow', () => {
   test('play and pause controls use the player adapter', async ({ page }) => {
     await page.locator('#playVideo').click();
     await page.locator('#pauseVideo').click();
+    expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+      ['play'],
+      ['pause']
+    ]);
+  });
+
+  test('left and right arrow keys seek three seconds without intercepting form editing', async ({ page }) => {
+    await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowRight');
+    expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+      ['seek', 39.4],
+      ['seek', 42.4]
+    ]);
+    await expect(page.locator('#currentTime')).toHaveText('0:42.4');
+
+    await page.evaluate(() => {
+      window.__statsFakePlayer.current = 1;
+      window.__statsFakePlayer.calls = [];
+    });
+    await page.keyboard.press('ArrowLeft');
+    expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([['seek', 0]]);
+
+    await page.locator('#gameTitle').focus();
+    await page.keyboard.press('ArrowRight');
+    expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([['seek', 0]]);
+  });
+
+  test('space toggles playback without intercepting form editing', async ({ page }) => {
+    await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+
+    await expect(page.locator('.video-shortcuts')).toContainText('Space');
+    await expect(page.locator('.video-shortcuts')).toContainText('−3s');
+    await expect(page.locator('.video-shortcuts')).toContainText('+3s');
+    await page.keyboard.press('Space');
+    await page.keyboard.press('Space');
+    expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+      ['play'],
+      ['pause']
+    ]);
+
+    await page.locator('#gameTitle').focus();
+    await page.keyboard.press('Space');
     expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
       ['play'],
       ['pause']

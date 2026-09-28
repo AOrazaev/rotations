@@ -26,6 +26,7 @@ export function createStatsSpikeApp({
   let timer = null;
   let sourceUrl = '';
   let loadSequence = 0;
+  let playbackActive = false;
   const readyListeners = new Set();
 
   function notifyReady() {
@@ -67,6 +68,7 @@ export function createStatsSpikeApp({
       if (timer) clearIntervalFn(timer);
       if (player?.destroy) player.destroy();
       player = null;
+      playbackActive = false;
       notifyReady();
       workspace.classList.remove('hidden');
       setError(error.message);
@@ -112,8 +114,44 @@ export function createStatsSpikeApp({
   }
 
   retryVideoButton.addEventListener('click', () => loadVideo());
-  playButton.addEventListener('click', () => player?.play());
-  pauseButton.addEventListener('click', () => player?.pause());
+  playButton.addEventListener('click', () => {
+    player?.play();
+    playbackActive = Boolean(player);
+  });
+  pauseButton.addEventListener('click', () => {
+    player?.pause();
+    playbackActive = false;
+  });
+
+  function handleSeekShortcut(event) {
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    if (event.key === ' ' || event.code === 'Space') {
+      if (!player) return;
+      if (event.repeat) {
+        event.preventDefault();
+        return;
+      }
+      const isPlaying = typeof player.isPlaying === 'function' ? player.isPlaying() : playbackActive;
+      if (isPlaying) {
+        player.pause();
+        playbackActive = false;
+      } else {
+        player.play();
+        playbackActive = true;
+      }
+      event.preventDefault();
+      return;
+    }
+    const adjustment = event.key === 'ArrowLeft' ? -3 : event.key === 'ArrowRight' ? 3 : 0;
+    if (!adjustment || !player) return;
+    player.seekTo(Math.max(0, player.getCurrentSeconds() + adjustment));
+    refreshCurrentTime();
+    event.preventDefault();
+  }
+
+  documentObject.addEventListener('keydown', handleSeekShortcut);
 
   return {
     loadVideo,
@@ -133,11 +171,13 @@ export function createStatsSpikeApp({
     play() {
       if (!player) throw new Error('The game recording is unavailable for playback.');
       player.play();
+      playbackActive = true;
     },
     destroy() {
       loadSequence += 1;
       if (timer) clearIntervalFn(timer);
       if (player?.destroy) player.destroy();
+      documentObject.removeEventListener('keydown', handleSeekShortcut);
     }
   };
 }
