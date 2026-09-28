@@ -13,11 +13,9 @@ export function createStatsSpikeApp({
   setIntervalFn = setInterval,
   clearIntervalFn = clearInterval
 } = {}) {
-  const videoForm = documentObject.querySelector('#videoForm');
-  const videoUrl = documentObject.querySelector('#videoUrl');
-  const loadVideoButton = documentObject.querySelector('#loadVideo');
   const videoError = documentObject.querySelector('#videoError');
   const videoStatus = documentObject.querySelector('#videoStatus');
+  const retryVideoButton = documentObject.querySelector('#retryVideo');
   const workspace = documentObject.querySelector('#workspace');
   const playerFrame = documentObject.querySelector('#playerFrame');
   const currentTime = documentObject.querySelector('#currentTime');
@@ -26,6 +24,8 @@ export function createStatsSpikeApp({
 
   let player = null;
   let timer = null;
+  let sourceUrl = '';
+  let loadSequence = 0;
   const readyListeners = new Set();
 
   function notifyReady() {
@@ -55,76 +55,87 @@ export function createStatsSpikeApp({
     return element;
   }
 
-  async function loadVideo() {
+  async function loadVideo(nextSourceUrl) {
+    sourceUrl = String(nextSourceUrl || sourceUrl).trim();
+    const sequence = ++loadSequence;
     setError();
+    retryVideoButton.classList.add('hidden');
     let videoId;
     try {
-      videoId = parseYouTubeVideoId(videoUrl.value);
+      videoId = parseYouTubeVideoId(sourceUrl);
     } catch (error) {
+      if (timer) clearIntervalFn(timer);
+      if (player?.destroy) player.destroy();
+      player = null;
+      notifyReady();
+      workspace.classList.remove('hidden');
       setError(error.message);
+      videoStatus.textContent = 'Video failed to load.';
+      retryVideoButton.classList.remove('hidden');
       return;
     }
 
-    loadVideoButton.disabled = true;
     videoStatus.textContent = 'Loading YouTube player…';
     if (timer) clearIntervalFn(timer);
     if (player?.destroy) player.destroy();
     player = null;
     notifyReady();
     const playerElement = createPlayerMount();
-    workspace.classList.add('hidden');
+    workspace.classList.remove('hidden');
 
     try {
-      player = await playerFactory(playerElement, videoId, {
+      const nextPlayer = await playerFactory(playerElement, videoId, {
         onError(error) {
+          if (sequence !== loadSequence) return;
           setError(error.message);
           videoStatus.textContent = 'Video cannot be played.';
+          retryVideoButton.classList.remove('hidden');
         }
       });
+      if (sequence !== loadSequence) {
+        nextPlayer?.destroy?.();
+        return;
+      }
+      player = nextPlayer;
       workspace.classList.remove('hidden');
       videoStatus.textContent = `Video ${videoId} is ready.`;
       startClock();
       notifyReady();
     } catch (error) {
+      if (sequence !== loadSequence) return;
       setError(error.message || 'Could not load the YouTube video.');
       videoStatus.textContent = 'Video failed to load.';
+      retryVideoButton.classList.remove('hidden');
       workspace.classList.remove('hidden');
       notifyReady();
-    } finally {
-      loadVideoButton.disabled = false;
     }
   }
 
-  videoForm.addEventListener('submit', event => {
-    event.preventDefault();
-    loadVideo();
-  });
+  retryVideoButton.addEventListener('click', () => loadVideo());
   playButton.addEventListener('click', () => player?.play());
   pauseButton.addEventListener('click', () => player?.pause());
 
   return {
     loadVideo,
     isReady: () => !!player,
-    showWorkspace() {
-      workspace.classList.remove('hidden');
-    },
     subscribeReady(listener) {
       readyListeners.add(listener);
       return () => readyListeners.delete(listener);
     },
     getCurrentSeconds() {
-      if (!player) throw new Error('Load the game recording before adding events.');
+      if (!player) throw new Error('The game recording is unavailable for adding events.');
       return player.getCurrentSeconds();
     },
     seekTo(seconds) {
-      if (!player) throw new Error('Load the game recording before seeking.');
+      if (!player) throw new Error('The game recording is unavailable for seeking.');
       player.seekTo(seconds);
     },
     play() {
-      if (!player) throw new Error('Load the game recording before playing.');
+      if (!player) throw new Error('The game recording is unavailable for playback.');
       player.play();
     },
     destroy() {
+      loadSequence += 1;
       if (timer) clearIntervalFn(timer);
       if (player?.destroy) player.destroy();
     }
@@ -151,8 +162,7 @@ setupController = createGameSetupController({
   store,
   onGameOpened(game) {
     document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
-    document.querySelector('#videoUrl').value = game.video.sourceUrl;
-    videoController.showWorkspace();
+    videoController.loadVideo(game.video.sourceUrl);
     eventController.setGame(game);
   }
 });

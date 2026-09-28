@@ -14,6 +14,7 @@ async function saveGame(page) {
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
   await expect(page.locator('#gamesStatus')).toContainText('Saved Layout game');
+  await expect(page.locator('#eventEntryPanel')).toBeVisible();
   await expect(page.locator('#eventLogPanel')).toBeVisible();
 }
 
@@ -24,7 +25,7 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   await saveGame(page);
   await page.evaluate(() => scrollTo(0, 0));
 
-  const boxes = await page.locator('.game-panel, .center-panel, .event-log-panel').evaluateAll(elements =>
+  const boxes = await page.locator('.game-panel, .center-panel, .capture-panel').evaluateAll(elements =>
     elements.map(element => {
       const box = element.getBoundingClientRect();
       return { x: box.x, y: box.y, width: box.width };
@@ -43,8 +44,8 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
     })
   );
   expect(workspaceBoxes[0].x).toBeLessThan(workspaceBoxes[1].x);
-  expect(Math.abs(workspaceBoxes[0].y - workspaceBoxes[1].y)).toBeLessThan(2);
-  expect(workspaceBoxes.every(box => box.width >= 280)).toBe(true);
+  expect(workspaceBoxes[0].width).toBeGreaterThan(workspaceBoxes[1].width);
+  expect(workspaceBoxes[0].width).toBeGreaterThanOrEqual(600);
 });
 
 test('game editor collapses and reopens for a new game', async ({ page }) => {
@@ -62,7 +63,7 @@ test('mobile stacks games, center workflow and event timeline in order', async (
   await openLayout(page);
   await saveGame(page);
 
-  const positions = await page.locator('.game-panel, .center-panel, .event-log-panel').evaluateAll(elements =>
+  const positions = await page.locator('.game-panel, .center-panel, .capture-panel').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().y)
   );
   expect(positions[0]).toBeLessThan(positions[1]);

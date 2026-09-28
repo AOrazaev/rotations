@@ -24,8 +24,7 @@ async function openEventEntry(page, { playerFails = false } = {}) {
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
   await expect(page.locator('#gamesStatus')).toContainText('Saved Event test');
-  await page.locator('#videoUrl').fill('https://youtu.be/M7lc1UVf-VE');
-  await page.locator('#loadVideo').click();
+  if (!playerFails) await expect(page.locator('#eventLockMessage')).toBeHidden();
   return databaseName;
 }
 
@@ -134,7 +133,7 @@ test('editing game setup after event entry preserves the event log', async ({ pa
 test('player load failures cannot create partial events', async ({ page }) => {
   await openEventEntry(page, { playerFails: true });
   await expect(page.locator('#videoError')).toContainText('Simulated player failure');
-  await expect(page.locator('#eventLockMessage')).toContainText('Load this game’s recording');
+  await expect(page.locator('#eventLockMessage')).toContainText('loading or unavailable');
   await expect(page.locator('[data-event-type="shot"]').first()).toBeDisabled();
   const stored = await page.evaluate(async () => (await window.__statsApp.store.listGames())[0]);
   expect(stored.events).toHaveLength(0);

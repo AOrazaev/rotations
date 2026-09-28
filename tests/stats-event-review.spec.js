@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-async function openReview(page, { loadVideo = true } = {}) {
+async function openReview(page) {
   const databaseName = `basketball-stats-review-${Date.now()}-${Math.random()}`;
   await page.addInitScript(name => {
     window.__STATS_DATABASE_NAME__ = name;
@@ -21,11 +21,7 @@ async function openReview(page, { loadVideo = true } = {}) {
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
   await expect(page.locator('#gamesStatus')).toContainText('Saved Review game');
-  if (loadVideo) {
-    await page.locator('#videoUrl').fill('https://youtu.be/M7lc1UVf-VE');
-    await page.locator('#loadVideo').click();
-    await expect(page.locator('#eventLockMessage')).toBeHidden();
-  }
+  await expect(page.locator('#eventLockMessage')).toBeHidden();
 }
 
 async function addTeamEvent(page, selector, seconds = null) {
@@ -179,17 +175,20 @@ test('locked state explains whether a game or recording is required', async ({ p
   const databaseName = `basketball-stats-lock-${Date.now()}-${Math.random()}`;
   await page.addInitScript(name => {
     window.__STATS_DATABASE_NAME__ = name;
+    window.__STATS_PLAYER_FACTORY__ = async () => {
+      throw new Error('Simulated unavailable recording.');
+    };
   }, databaseName);
   await page.goto('/stats/');
   await page.evaluate(() => window.__statsApp.setupController.ready);
-  await page.locator('#videoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await expect(page.locator('#workspace')).toBeHidden();
 
   await page.locator('#gameTitle').fill('Locked state');
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
   await expect(page.locator('#workspace')).toBeVisible();
-  await expect(page.locator('#eventLockMessage')).toContainText('Load this game’s recording');
+  await expect(page.locator('#eventLockMessage')).toContainText('loading or unavailable');
+  await expect(page.locator('#retryVideo')).toBeVisible();
   await expect(page.locator('.event-action').first()).toBeDisabled();
 });
 

@@ -69,24 +69,6 @@
       </aside>
 
       <div class="panel-stack center-panel">
-        <section class="card recording-loader">
-          <div class="section-head">
-            <div>
-              <h2>Recording preview</h2>
-              <p>Load the current game recording.</p>
-            </div>
-          </div>
-          <form id="videoForm" class="video-form">
-            <label for="videoUrl">YouTube URL</label>
-            <div class="input-row">
-              <input id="videoUrl" name="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" />
-              <button id="loadVideo" class="primary" type="submit">Load video</button>
-            </div>
-          </form>
-          <p id="videoError" class="message error hidden" role="alert"></p>
-          <p id="videoStatus" class="message" aria-live="polite">No video loaded.</p>
-        </section>
-
         <section id="workspace" class="workspace hidden">
           <section class="card video-card">
             <div class="section-head">
@@ -99,19 +81,28 @@
                 <button id="pauseVideo" class="secondary" type="button">Pause</button>
               </div>
             </div>
+            <div class="recording-status">
+              <p id="videoStatus" class="message" aria-live="polite">Open a game to load its recording.</p>
+              <button id="retryVideo" class="secondary small hidden" type="button">Retry video</button>
+            </div>
+            <p id="videoError" class="message error hidden" role="alert"></p>
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
             </div>
           </section>
 
-          <section class="card event-entry-card">
+        </section>
+      </div>
+
+      <aside class="panel-stack side-panel capture-panel">
+        <section id="eventEntryPanel" class="card event-entry-card hidden">
             <div class="section-head">
               <div>
                 <h2>Event entry</h2>
                 <p id="eventGameStatus">Save or open a game to record events.</p>
               </div>
             </div>
-            <div id="eventLockMessage" class="locked-message">Save or open a game, then load its recording.</div>
+            <div id="eventLockMessage" class="locked-message">Save or open a game to load its recording.</div>
             <div class="scoreboard">
               <div><span>Our team</span><strong id="teamScore">0</strong></div>
               <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
@@ -154,20 +145,19 @@
               <span>FG <strong id="teamFieldGoals">0/0</strong></span>
               <span>Opponent FG <strong id="opponentFieldGoals">0/0</strong></span>
             </div>
-          </section>
         </section>
-      </div>
 
-      <aside id="eventLogPanel" class="card side-panel event-log-panel hidden">
-        <div class="section-head">
-          <div>
-            <h2>Event timeline</h2>
-            <p>Seek, preview, correct, or remove recorded events.</p>
+        <section id="eventLogPanel" class="card event-log-panel hidden">
+          <div class="section-head">
+            <div>
+              <h2>Event timeline</h2>
+              <p>Seek, preview, correct, or remove recorded events.</p>
+            </div>
+            <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
           </div>
-          <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
-        </div>
-        <div id="emptyEvents" class="empty-state">No events recorded.</div>
-        <ol id="eventList" class="event-list"></ol>
+          <div id="emptyEvents" class="empty-state">No events recorded.</div>
+          <ol id="eventList" class="event-list"></ol>
+        </section>
       </aside>
     </div>
 

@@ -24,6 +24,7 @@ export function createEventEntryController({
   const eventButtons = documentObject.querySelector('#eventButtons');
   const eventError = documentObject.querySelector('#eventError');
   const undoButton = documentObject.querySelector('#undoEvent');
+  const eventEntryPanel = documentObject.querySelector('#eventEntryPanel');
   const eventLogPanel = documentObject.querySelector('#eventLogPanel');
   const currentLineup = documentObject.querySelector('#currentLineup');
   const benchPlayers = documentObject.querySelector('#benchPlayers');
@@ -108,6 +109,7 @@ export function createEventEntryController({
       opponentFieldGoals.textContent = '0/0';
       lockMessage.textContent = 'Save or open a game before recording statistics.';
       lockMessage.classList.remove('hidden');
+      eventEntryPanel.classList.add('hidden');
       eventLogPanel.classList.add('hidden');
       renderLineup(null);
       setControlsEnabled(false);
@@ -117,6 +119,7 @@ export function createEventEntryController({
     }
 
     const analysis = buildGameAnalysis(game);
+    eventEntryPanel.classList.remove('hidden');
     eventLogPanel.classList.remove('hidden');
     gameStatus.textContent = `${game.title} · ${game.startingLineupIds.length} players on court`;
     teamScore.textContent = String(analysis.report.score.team);
@@ -127,7 +130,7 @@ export function createEventEntryController({
     opponentFieldGoals.textContent = `${theirFg.made}/${theirFg.attempted}`;
     renderLineup(analysis);
     const videoReady = videoController.isReady();
-    lockMessage.textContent = videoReady ? '' : 'Load this game’s recording before adding a new event.';
+    lockMessage.textContent = videoReady ? '' : 'This game’s recording is loading or unavailable.';
     lockMessage.classList.toggle('hidden', videoReady);
     eventListController.render(game);
     reportController.render(game, analysis);

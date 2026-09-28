@@ -67,12 +67,15 @@ test.describe('video controller workflow', () => {
       };
     });
     await page.goto('/stats/');
-    await page.locator('#videoUrl').fill('https://youtu.be/M7lc1UVf-VE');
-    await page.locator('#loadVideo').click();
+    await page.evaluate(() => window.__statsApp.setupController.ready);
+    await page.locator('#gameTitle').fill('Video controller game');
+    await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
+    await page.locator('#saveGame').click();
     await expect(page.locator('#workspace')).toBeVisible();
+    await expect(page.locator('#videoStatus')).toContainText('is ready');
   });
 
-  test('exposes the current timestamp and seeking through the player adapter', async ({ page }) => {
+  test('automatically loads the saved game recording and exposes timestamp seeking', async ({ page }) => {
     expect(await page.evaluate(() => window.__statsLoadedVideoId)).toBe('M7lc1UVf-VE');
     await expect(page.locator('#currentTime')).toHaveText('0:42.4');
 
@@ -92,8 +95,9 @@ test.describe('video controller workflow', () => {
   });
 
   test('loading another video recreates the player mount', async ({ page }) => {
-    await page.locator('#videoUrl').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-    await page.locator('#loadVideo').click();
+    await page.locator('#gameVideoUrl').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await page.locator('#saveGame').click();
+    await expect(page.locator('#videoStatus')).toContainText('dQw4w9WgXcQ is ready');
 
     expect(await page.evaluate(() => window.__statsLoadedVideoIds)).toEqual([
       'M7lc1UVf-VE',
@@ -103,19 +107,21 @@ test.describe('video controller workflow', () => {
   });
 });
 
-test('invalid URL reports an actionable error without opening the workspace', async ({ page }) => {
+test('invalid URL reports an actionable error with a retry option', async ({ page }) => {
   await page.goto('/stats/');
-  await page.locator('#videoUrl').fill('https://example.com/video');
-  await page.locator('#loadVideo').click();
+  await page.evaluate(() => window.__statsApp.videoController.loadVideo('https://example.com/video'));
   await expect(page.locator('#videoError')).toContainText('valid YouTube video ID');
-  await expect(page.locator('#workspace')).toBeHidden();
+  await expect(page.locator('#workspace')).toBeVisible();
+  await expect(page.locator('#retryVideo')).toBeVisible();
 });
 
 if (process.env.YOUTUBE_SMOKE) {
   test('real YouTube player loads and supports timestamp capture', async ({ page }) => {
     await page.goto('/stats/');
-    await page.locator('#videoUrl').fill('https://www.youtube.com/watch?v=M7lc1UVf-VE');
-    await page.locator('#loadVideo').click();
+    await page.evaluate(() => window.__statsApp.setupController.ready);
+    await page.locator('#gameTitle').fill('YouTube smoke game');
+    await page.locator('#gameVideoUrl').fill('https://www.youtube.com/watch?v=M7lc1UVf-VE');
+    await page.locator('#saveGame').click();
 
     await expect(page.locator('#workspace')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('#videoStatus')).toContainText('is ready');

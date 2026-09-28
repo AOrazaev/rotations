@@ -1,8 +1,8 @@
 const { test, expect } = require('@playwright/test');
 
-async function openFixtureReport(page) {
+async function openFixtureReport(page, { playerFails = false } = {}) {
   const databaseName = `basketball-stats-reports-${Date.now()}-${Math.random()}`;
-  await page.addInitScript(name => {
+  await page.addInitScript(({ name, fails }) => {
     window.__STATS_DATABASE_NAME__ = name;
     window.__statsFakePlayer = {
       current: 0,
@@ -13,8 +13,11 @@ async function openFixtureReport(page) {
       pause() {},
       destroy() {}
     };
-    window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
-  }, databaseName);
+    window.__STATS_PLAYER_FACTORY__ = async () => {
+      if (fails) throw new Error('Simulated unavailable recording.');
+      return window.__statsFakePlayer;
+    };
+  }, { name: databaseName, fails: playerFails });
   await page.goto('/stats/');
   await page.evaluate(() => window.__statsApp.setupController.ready);
   await page.evaluate(async () => {
@@ -58,8 +61,7 @@ test('fixture report renders hand-calculated team, player, lineup, and progressi
 
 test('linked report values expose source events and seek to the expected play', async ({ page }) => {
   await openFixtureReport(page);
-  await page.locator('#videoUrl').fill('https://youtu.be/M7lc1UVf-VE');
-  await page.locator('#loadVideo').click();
+  await expect(page.locator('#eventLockMessage')).toBeHidden();
 
   await page.locator('#teamComparisonBody tr[data-metric="fieldGoals"] .team-report-value').click();
   await expect(page.locator('#reportSourceTitle')).toHaveText('3 source plays');
@@ -73,8 +75,8 @@ test('linked report values expose source events and seek to the expected play', 
   expect(await page.evaluate(() => window.__statsFakePlayer.calls.at(-1))).toEqual(['seek', 125]);
 });
 
-test('report navigation explains when the recording has not been loaded', async ({ page }) => {
-  await openFixtureReport(page);
+test('report navigation explains when the recording is unavailable', async ({ page }) => {
+  await openFixtureReport(page, { playerFails: true });
   await page.locator('#scoreProgression li').first().locator('[data-report-event-id]').click();
-  await expect(page.locator('#reportError')).toContainText('Load the game recording before seeking');
+  await expect(page.locator('#reportError')).toContainText('recording is unavailable for seeking');
 });

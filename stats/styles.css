@@ -52,7 +52,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .game-panel .marker-actions button { flex: 1; }
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
 .section-head p, .message { margin: 0; }
-.video-form label { display: block; margin-bottom: 7px; color: var(--muted); font-size: .9rem; }
+.recording-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .setup-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .setup-fields label { display: grid; gap: 7px; color: var(--muted); font-size: .9rem; }
 .setup-fields input, .setup-player input {
@@ -91,7 +91,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .small { padding: 7px 10px; font-size: .82rem; }
 .message { margin-top: 10px; min-height: 1.3em; }
 .message.error { color: #ffb4b4; }
-.workspace { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr); gap: 16px; align-items: start; }
+.workspace { display: grid; gap: 16px; }
 .workspace > .card { margin: 0; }
 .video-card { position: sticky; top: 16px; }
 .event-entry-card .section-head { margin-bottom: 10px; }
@@ -180,7 +180,6 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 }
 
 @media (max-width: 760px) {
-  .workspace { grid-template-columns: 1fr; }
   .video-card { position: static; }
   .event-entry-card .event-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -20,8 +20,6 @@ async function openLineupGame(page) {
   await page.locator('#gameTitle').fill('Lineup game');
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
-  await page.locator('#videoUrl').fill('https://youtu.be/M7lc1UVf-VE');
-  await page.locator('#loadVideo').click();
   await expect(page.locator('#eventLockMessage')).toBeHidden();
 }
 
