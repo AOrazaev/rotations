@@ -5,8 +5,7 @@ import {
 } from './youtube-player.js';
 import { GameStore } from './game-store.js';
 import { createGameSetupController } from './game-setup.js';
-
-const PREVIEW_SECONDS = 3;
+import { createEventEntryController } from './event-entry.js';
 
 export function createStatsSpikeApp({
   documentObject = document,
@@ -24,15 +23,9 @@ export function createStatsSpikeApp({
   const currentTime = documentObject.querySelector('#currentTime');
   const playButton = documentObject.querySelector('#playVideo');
   const pauseButton = documentObject.querySelector('#pauseVideo');
-  const captureButton = documentObject.querySelector('#captureMarker');
-  const markerList = documentObject.querySelector('#markerList');
-  const emptyMarkers = documentObject.querySelector('#emptyMarkers');
-  const markerTemplate = documentObject.querySelector('#markerTemplate');
 
   let player = null;
   let timer = null;
-  let nextSequence = 1;
-  let markers = [];
 
   function setError(message = '') {
     videoError.textContent = message;
@@ -48,28 +41,6 @@ export function createStatsSpikeApp({
     if (timer) clearIntervalFn(timer);
     refreshCurrentTime();
     timer = setIntervalFn(refreshCurrentTime, 250);
-  }
-
-  function renderMarkers() {
-    markerList.innerHTML = '';
-    emptyMarkers.classList.toggle('hidden', markers.length > 0);
-    for (const marker of markers) {
-      const node = markerTemplate.content.firstElementChild.cloneNode(true);
-      node.dataset.markerId = marker.id;
-      node.querySelector('.marker-name').textContent = `Marker ${marker.sequence}`;
-      node.querySelector('.marker-time').textContent = formatVideoTime(marker.videoSeconds);
-      markerList.appendChild(node);
-    }
-  }
-
-  function captureMarker() {
-    if (!player) return;
-    markers.push({
-      id: crypto.randomUUID(),
-      sequence: nextSequence++,
-      videoSeconds: player.getCurrentSeconds()
-    });
-    renderMarkers();
   }
 
   function createPlayerMount() {
@@ -104,15 +75,13 @@ export function createStatsSpikeApp({
           videoStatus.textContent = 'Video cannot be played.';
         }
       });
-      markers = [];
-      nextSequence = 1;
-      renderMarkers();
       workspace.classList.remove('hidden');
       videoStatus.textContent = `Video ${videoId} is ready.`;
       startClock();
     } catch (error) {
       setError(error.message || 'Could not load the YouTube video.');
       videoStatus.textContent = 'Video failed to load.';
+      workspace.classList.remove('hidden');
     } finally {
       loadVideoButton.disabled = false;
     }
@@ -124,38 +93,22 @@ export function createStatsSpikeApp({
   });
   playButton.addEventListener('click', () => player?.play());
   pauseButton.addEventListener('click', () => player?.pause());
-  captureButton.addEventListener('click', captureMarker);
-
-  markerList.addEventListener('click', event => {
-    const button = event.target.closest('button[data-action]');
-    const markerNode = event.target.closest('[data-marker-id]');
-    if (!button || !markerNode || !player) return;
-    const marker = markers.find(item => item.id === markerNode.dataset.markerId);
-    if (!marker) return;
-
-    const action = button.dataset.action;
-    if (action === 'seek') {
-      player.seekTo(marker.videoSeconds);
-    } else if (action === 'preview') {
-      player.seekTo(Math.max(0, marker.videoSeconds - PREVIEW_SECONDS));
-      player.play();
-    } else if (action === 'adjust') {
-      marker.videoSeconds = Math.max(0, marker.videoSeconds + Number(button.dataset.delta));
-      renderMarkers();
-    } else if (action === 'use-current') {
-      marker.videoSeconds = player.getCurrentSeconds();
-      renderMarkers();
-    } else if (action === 'delete') {
-      markers = markers.filter(item => item.id !== marker.id);
-      renderMarkers();
-    }
-  });
-
-  renderMarkers();
 
   return {
-    getMarkers: () => markers.map(marker => ({ ...marker })),
     loadVideo,
+    isReady: () => !!player,
+    getCurrentSeconds() {
+      if (!player) throw new Error('Load the game recording before adding events.');
+      return player.getCurrentSeconds();
+    },
+    seekTo(seconds) {
+      if (!player) throw new Error('Load the game recording before seeking.');
+      player.seekTo(seconds);
+    },
+    play() {
+      if (!player) throw new Error('Load the game recording before playing.');
+      player.play();
+    },
     destroy() {
       if (timer) clearIntervalFn(timer);
       if (player?.destroy) player.destroy();
@@ -168,16 +121,29 @@ const videoController = createStatsSpikeApp({ playerFactory });
 const store = new GameStore({
   databaseName: window.__STATS_DATABASE_NAME__ || 'basketball-stats'
 });
-const setupController = createGameSetupController({
+let setupController;
+const eventController = createEventEntryController({
+  store,
+  videoController,
+  onGameChanged: async game => {
+    if (setupController) {
+      setupController.syncGame(game);
+      await setupController.refreshGames();
+    }
+  }
+});
+setupController = createGameSetupController({
   store,
   onGameOpened(game) {
     document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
     document.querySelector('#videoUrl').value = game.video.sourceUrl;
+    eventController.setGame(game);
   }
 });
 window.__statsApp = {
   videoController,
   setupController,
+  eventController,
   store,
   destroy() {
     videoController.destroy();

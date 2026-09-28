@@ -47,7 +47,7 @@ test('YouTube player errors are translated into actionable messages', async ({ p
   ]);
 });
 
-test.describe('timestamp marker workflow', () => {
+test.describe('video controller workflow', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.__statsFakePlayer = {
@@ -72,33 +72,14 @@ test.describe('timestamp marker workflow', () => {
     await expect(page.locator('#workspace')).toBeVisible();
   });
 
-  test('captures, adjusts, replaces, seeks, previews, and deletes markers', async ({ page }) => {
+  test('exposes the current timestamp and seeking through the player adapter', async ({ page }) => {
     expect(await page.evaluate(() => window.__statsLoadedVideoId)).toBe('M7lc1UVf-VE');
     await expect(page.locator('#currentTime')).toHaveText('0:42.4');
 
-    await page.locator('#captureMarker').click();
-    const marker = page.locator('.marker');
-    await expect(marker).toHaveCount(1);
-    await expect(marker.locator('.marker-time')).toHaveText('0:42.4');
-
-    await marker.locator('[data-action="adjust"][data-delta="5"]').click();
-    await expect(marker.locator('.marker-time')).toHaveText('0:47.4');
-
-    await page.evaluate(() => { window.__statsFakePlayer.current = 81.2; });
-    await marker.locator('[data-action="use-current"]').click();
-    await expect(marker.locator('.marker-time')).toHaveText('1:21.2');
-
-    await marker.locator('[data-action="seek"]').click();
-    await marker.locator('[data-action="preview"]').click();
-    expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
-      ['seek', 81.2],
-      ['seek', 78.2],
-      ['play']
-    ]);
-
-    await marker.locator('[data-action="delete"]').click();
-    await expect(page.locator('.marker')).toHaveCount(0);
-    await expect(page.locator('#emptyMarkers')).toBeVisible();
+    const current = await page.evaluate(() => window.__statsApp.videoController.getCurrentSeconds());
+    expect(current).toBe(42.4);
+    await page.evaluate(() => window.__statsApp.videoController.seekTo(81.2));
+    expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([['seek', 81.2]]);
   });
 
   test('play and pause controls use the player adapter', async ({ page }) => {
@@ -110,10 +91,7 @@ test.describe('timestamp marker workflow', () => {
     ]);
   });
 
-  test('loading another video recreates the player mount and clears markers', async ({ page }) => {
-    await page.locator('#captureMarker').click();
-    await expect(page.locator('.marker')).toHaveCount(1);
-
+  test('loading another video recreates the player mount', async ({ page }) => {
     await page.locator('#videoUrl').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
     await page.locator('#loadVideo').click();
 
@@ -122,8 +100,6 @@ test.describe('timestamp marker workflow', () => {
       'dQw4w9WgXcQ'
     ]);
     await expect(page.locator('#playerFrame > #youtubePlayer')).toHaveCount(1);
-    await expect(page.locator('.marker')).toHaveCount(0);
-    await expect(page.locator('#emptyMarkers')).toBeVisible();
   });
 });
 
@@ -143,10 +119,8 @@ if (process.env.YOUTUBE_SMOKE) {
 
     await expect(page.locator('#workspace')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('#videoStatus')).toContainText('is ready');
-    await page.locator('#captureMarker').click();
-    await expect(page.locator('.marker')).toHaveCount(1);
-    await page.locator('.marker [data-action="seek"]').click();
-    await page.locator('.marker [data-action="preview"]').click();
+    await page.locator('#playVideo').click();
+    await page.locator('#pauseVideo').click();
     await expect(page.locator('#videoError')).toBeHidden();
   });
 }

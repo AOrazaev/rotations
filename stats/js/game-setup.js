@@ -31,6 +31,9 @@ export function buildGameFromSetup({
   startingLineupIds,
   source = 'standalone',
   plannedRotation = null,
+  events = [],
+  videoStartSeconds = 0,
+  videoEndSeconds = null,
   createdAt,
   now = new Date().toISOString()
 }) {
@@ -47,13 +50,13 @@ export function buildGameFromSetup({
       provider: 'youtube',
       videoId,
       sourceUrl: String(videoUrl).trim(),
-      startSeconds: 0,
-      endSeconds: null,
+      startSeconds: videoStartSeconds,
+      endSeconds: videoEndSeconds,
     },
     players: players.map(snapshotPlayer),
     startingLineupIds: [...startingLineupIds],
     plannedRotation: plannedRotation ? structuredClone(plannedRotation) : null,
-    events: [],
+    events: structuredClone(events),
   };
   validateGame(game);
   return game;
@@ -167,6 +170,9 @@ export function createGameSetupController({
       title: '',
       opponentName: '',
       videoUrl: '',
+      videoStartSeconds: 0,
+      videoEndSeconds: null,
+      events: [],
       players,
       startingLineupIds: players.map(player => player.id),
     });
@@ -183,6 +189,9 @@ export function createGameSetupController({
         title: '',
         opponentName: '',
         videoUrl: '',
+        videoStartSeconds: 0,
+        videoEndSeconds: null,
+        events: [],
         players: handoff.players,
         startingLineupIds: handoff.plannedRotation?.blocks[0]?.lineupIds || handoff.players.slice(0, 5).map(player => player.id),
       });
@@ -219,6 +228,9 @@ export function createGameSetupController({
       title: game.title,
       opponentName: game.opponentName,
       videoUrl: game.video.sourceUrl,
+      videoStartSeconds: game.video.startSeconds,
+      videoEndSeconds: game.video.endSeconds,
+      events: structuredClone(game.events),
       players: structuredClone(game.players),
       startingLineupIds: [...game.startingLineupIds],
     });
@@ -243,12 +255,18 @@ export function createGameSetupController({
         startingLineupIds: starters,
         source: draft.source,
         plannedRotation: draft.plannedRotation,
+        events: draft.events,
+        videoStartSeconds: draft.videoStartSeconds,
+        videoEndSeconds: draft.videoEndSeconds,
       });
       await store.saveGame(game);
       draft.id = game.id;
       draft.createdAt = game.createdAt;
       draft.players = structuredClone(game.players);
       draft.startingLineupIds = [...game.startingLineupIds];
+      draft.events = structuredClone(game.events);
+      draft.videoStartSeconds = game.video.startSeconds;
+      draft.videoEndSeconds = game.video.endSeconds;
       setupTitle.textContent = 'Edit game';
       await renderGames();
       onGameOpened(game);
@@ -295,5 +313,12 @@ export function createGameSetupController({
     ready,
     openGame,
     refreshGames: renderGames,
+    syncGame(game) {
+      if (draft?.id !== game.id) return;
+      draft.events = structuredClone(game.events);
+      draft.videoStartSeconds = game.video.startSeconds;
+      draft.videoEndSeconds = game.video.endSeconds;
+      draft.createdAt = game.createdAt;
+    },
   };
 }

@@ -90,7 +90,6 @@
           <div class="playback-actions">
             <button id="playVideo" class="secondary" type="button">Play</button>
             <button id="pauseVideo" class="secondary" type="button">Pause</button>
-            <button id="captureMarker" class="primary" type="button">Capture timestamp</button>
           </div>
         </div>
         <div id="playerFrame" class="player-frame">
@@ -101,31 +100,54 @@
       <section class="card">
         <div class="section-head">
           <div>
-            <h2>Timestamp markers</h2>
-            <p>Temporary markers prove the navigation workflow before game events are introduced.</p>
+            <h2>Event entry</h2>
+            <p id="eventGameStatus">Save or open a game to record events.</p>
           </div>
+          <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
         </div>
-        <div id="emptyMarkers" class="empty-state">Capture a timestamp to create the first marker.</div>
-        <ol id="markerList" class="marker-list"></ol>
+        <div class="scoreboard">
+          <div><span>Our team</span><strong id="teamScore">0</strong></div>
+          <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
+        </div>
+        <div class="event-side" role="group" aria-label="Event side">
+          <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
+          <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
+        </div>
+        <label class="event-player-label" for="eventPlayer">Player</label>
+        <select id="eventPlayer">
+          <option value="">Select player</option>
+        </select>
+        <div id="eventButtons" class="event-buttons">
+          <button class="event-action made" type="button" data-event-type="shot" data-shot-value="2" data-made="true">2PT made</button>
+          <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="2" data-made="false">2PT missed</button>
+          <button class="event-action made" type="button" data-event-type="shot" data-shot-value="3" data-made="true">3PT made</button>
+          <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="3" data-made="false">3PT missed</button>
+          <button class="event-action made" type="button" data-event-type="shot" data-shot-value="1" data-made="true">FT made</button>
+          <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="1" data-made="false">FT missed</button>
+          <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="offensive">Offensive rebound</button>
+          <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="defensive">Defensive rebound</button>
+          <button class="event-action" type="button" data-event-type="assist">Assist</button>
+          <button class="event-action" type="button" data-event-type="steal">Steal</button>
+          <button class="event-action" type="button" data-event-type="block">Block</button>
+          <button class="event-action" type="button" data-event-type="turnover">Turnover</button>
+          <button class="event-action" type="button" data-event-type="foul">Foul</button>
+        </div>
+        <p id="eventError" class="message error hidden" role="alert"></p>
+        <div class="quick-totals">
+          <span>FG <strong id="teamFieldGoals">0/0</strong></span>
+          <span>Opponent FG <strong id="opponentFieldGoals">0/0</strong></span>
+        </div>
+        <h3 class="recent-heading">Recent events</h3>
+        <div id="emptyEvents" class="empty-state">No events recorded.</div>
+        <ol id="eventList" class="event-list"></ol>
       </section>
     </section>
   </main>
 
-  <template id="markerTemplate">
-    <li class="marker">
-      <div>
-        <strong class="marker-name"></strong>
-        <button class="marker-time link-button" type="button" data-action="seek"></button>
-      </div>
-      <div class="marker-actions">
-        <button class="secondary small" type="button" data-action="adjust" data-delta="-5">−5s</button>
-        <button class="secondary small" type="button" data-action="adjust" data-delta="-1">−1s</button>
-        <button class="secondary small" type="button" data-action="preview">Preview</button>
-        <button class="secondary small" type="button" data-action="adjust" data-delta="1">+1s</button>
-        <button class="secondary small" type="button" data-action="adjust" data-delta="5">+5s</button>
-        <button class="secondary small" type="button" data-action="use-current">Use current time</button>
-        <button class="danger small" type="button" data-action="delete">Delete</button>
-      </div>
+  <template id="eventListItemTemplate">
+    <li class="event-list-item">
+      <time class="event-time"></time>
+      <span class="event-description"></span>
     </li>
   </template>
 

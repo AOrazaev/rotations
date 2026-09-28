@@ -89,10 +89,25 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 }
 .player-frame iframe, #youtubePlayer { width: 100%; height: 100%; }
 .empty-state { padding: 22px; color: var(--muted); text-align: center; background: #0f1727; border: 1px dashed var(--line); border-radius: 12px; }
-.marker-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.marker { display: grid; gap: 10px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
-.marker > div:first-child { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.link-button { padding: 4px 0; background: transparent; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.scoreboard { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.scoreboard > div { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; color: var(--muted); }
+.scoreboard strong { color: var(--text); font-size: 1.7rem; }
+.event-side { display: flex; gap: 8px; margin-bottom: 12px; }
+.view-tab { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font-weight: 600; }
+.view-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.event-player-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: .85rem; }
+#eventPlayer { width: 100%; padding: 9px 10px; background: #0a1220; color: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.event-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.event-action { background: #1b2540; color: #fff; border: 1px solid var(--line); padding: 9px; }
+.event-action.made { border-color: rgba(72, 199, 142, .7); }
+.event-action.missed { border-color: rgba(255, 107, 107, .55); }
+.event-action:disabled { cursor: not-allowed; opacity: .45; }
+.quick-totals { display: flex; justify-content: space-between; gap: 10px; margin: 12px 0; color: var(--muted); font-size: .85rem; }
+.recent-heading { margin: 16px 0 8px; font-size: 1rem; }
+.event-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.event-list-item { display: grid; grid-template-columns: 62px 1fr; gap: 9px; padding: 9px; background: #0f1727; border: 1px solid #202c43; border-radius: 10px; }
+.event-time { color: var(--accent2); font-variant-numeric: tabular-nums; }
+.invalid-count { color: var(--danger) !important; }
 .hidden { display: none; }
 
 @media (max-width: 900px) {

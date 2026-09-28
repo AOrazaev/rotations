@@ -327,6 +327,8 @@ Verification:
 
 ### Milestone 5: Timestamped event entry
 
+**Status: complete.** Implemented by `stats/js/event-entry.js`, the recording controller integration, and `tests/stats-event-entry.spec.js`.
+
 Deliver:
 
 - Select our team or opponent.
