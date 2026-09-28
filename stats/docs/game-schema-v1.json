@@ -287,6 +287,10 @@
           "type": "string",
           "minLength": 1
         },
+        "coachComment": {
+          "type": "string",
+          "minLength": 1
+        },
         "periodLabel": {
           "type": "string",
           "minLength": 1

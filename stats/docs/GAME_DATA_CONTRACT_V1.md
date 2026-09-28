@@ -76,6 +76,7 @@ Every event contains:
 - YouTube timestamp
 - Side: `team`, `opponent`, or `system`
 - Event type and type-specific fields
+- Optional non-empty `coachComment`
 - Our active five-player lineup
 - Creation and optional update timestamps
 
@@ -157,6 +158,10 @@ Period boundaries use `side: "system"`, `type: "period_end"`, `playerId: null`, 
 ### Note
 
 Notes use `side: "system"`, `type: "note"`, `playerId: null`, and a non-empty `note`.
+
+### Coach comment
+
+Any event may include an optional non-empty `coachComment`. It adds coaching context to the timeline but has no statistical or lineup effect.
 
 ## Lineup semantics
 

@@ -258,6 +258,11 @@
       <button class="event-time link-button" type="button" data-action="play-event"></button>
       <span class="event-description"></span>
       <div class="event-row-actions">
+        <button class="secondary icon-button" type="button" data-action="comment-event" aria-label="Add coach comment" title="Add coach comment">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5h14v10H9l-4 4V5Z" />
+          </svg>
+        </button>
         <button class="secondary icon-button" type="button" data-action="edit-event" aria-label="Edit event" title="Edit event">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 20h4l11-11-4-4L4 16v4Zm10-13 4 4" />
@@ -269,8 +274,29 @@
           </svg>
         </button>
       </div>
+      <blockquote class="coach-comment hidden"></blockquote>
     </li>
   </template>
+
+  <dialog id="coachCommentDialog" class="event-dialog">
+    <form id="coachCommentForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Coach comment</h2>
+          <p>Add context or feedback to this timeline event.</p>
+        </div>
+        <button id="cancelCoachComment" class="secondary small" type="button">Close</button>
+      </div>
+      <label class="dialog-field">Comment
+        <textarea id="coachCommentText" maxlength="500" required placeholder="Add coaching feedback"></textarea>
+      </label>
+      <p id="coachCommentError" class="message error hidden" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="removeCoachComment" class="danger hidden" type="button">Remove comment</button>
+        <button class="primary" type="submit">Save comment</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="eventEditDialog" class="event-dialog">
     <form id="eventEditForm" method="dialog">

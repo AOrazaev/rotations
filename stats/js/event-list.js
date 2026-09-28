@@ -69,15 +69,36 @@ export function createEventListController({
   const timestampDisplay = documentObject.querySelector('#editEventTimestamp');
   const useCurrentButton = documentObject.querySelector('#useCurrentEventTime');
   const editError = documentObject.querySelector('#eventEditError');
+  const commentDialog = documentObject.querySelector('#coachCommentDialog');
+  const commentForm = documentObject.querySelector('#coachCommentForm');
+  const commentText = documentObject.querySelector('#coachCommentText');
+  const commentError = documentObject.querySelector('#coachCommentError');
+  const cancelComment = documentObject.querySelector('#cancelCoachComment');
+  const removeComment = documentObject.querySelector('#removeCoachComment');
 
   let game = null;
   let editingEventId = null;
+  let commentEventId = null;
   let editingSeconds = 0;
   let busy = false;
 
   function setEditError(message = '') {
     editError.textContent = message;
     editError.classList.toggle('hidden', !message);
+  }
+
+  function setCommentError(message = '') {
+    commentError.textContent = message;
+    commentError.classList.toggle('hidden', !message);
+  }
+
+  function openCommentEditor(event) {
+    commentEventId = event.id;
+    commentText.value = event.coachComment || '';
+    removeComment.classList.toggle('hidden', !event.coachComment);
+    setCommentError();
+    commentDialog.showModal();
+    commentText.focus();
   }
 
   function updateDependentFields() {
@@ -183,6 +204,15 @@ export function createEventListController({
       const description = describeEvent(event, playersById);
       item.querySelector('.event-description').textContent = description;
       item.querySelector('.event-description').title = description;
+      const comment = String(event.coachComment || '').trim();
+      const commentBlock = item.querySelector('.coach-comment');
+      item.classList.toggle('has-comment', !!comment);
+      commentBlock.textContent = comment;
+      commentBlock.classList.toggle('hidden', !comment);
+      const commentButton = item.querySelector('[data-action="comment-event"]');
+      const commentLabel = comment ? 'Edit coach comment' : 'Add coach comment';
+      commentButton.setAttribute('aria-label', commentLabel);
+      commentButton.title = commentLabel;
       item.querySelector('[data-action="edit-event"]').disabled = !EDITABLE_TYPES.has(event.type);
       eventList.appendChild(item);
     }
@@ -203,6 +233,8 @@ export function createEventListController({
       if (button.dataset.action === 'play-event') {
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
+      } else if (button.dataset.action === 'comment-event') {
+        openCommentEditor(selected);
       } else if (button.dataset.action === 'edit-event') {
         openEditor(selected);
       } else if (button.dataset.action === 'delete-event' && confirmFn('Delete this event?')) {
@@ -225,6 +257,46 @@ export function createEventListController({
   });
   typeInput.addEventListener('change', updateDependentFields);
   cancelButton.addEventListener('click', () => dialog.close());
+  cancelComment.addEventListener('click', () => commentDialog.close());
+  commentForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!game || !commentEventId || busy) return;
+    setCommentError();
+    busy = true;
+    try {
+      const value = commentText.value.trim();
+      if (!value) throw new Error('Enter a coach comment.');
+      const next = structuredClone(game);
+      const commented = next.events.find(item => item.id === commentEventId);
+      commented.coachComment = value;
+      commented.updatedAt = now();
+      next.updatedAt = now();
+      await commit(next);
+      commentDialog.close();
+    } catch (error) {
+      setCommentError(error.message || 'Could not save the coach comment.');
+    } finally {
+      busy = false;
+    }
+  });
+  removeComment.addEventListener('click', async () => {
+    if (!game || !commentEventId || busy) return;
+    setCommentError();
+    busy = true;
+    try {
+      const next = structuredClone(game);
+      const commented = next.events.find(item => item.id === commentEventId);
+      delete commented.coachComment;
+      commented.updatedAt = now();
+      next.updatedAt = now();
+      await commit(next);
+      commentDialog.close();
+    } catch (error) {
+      setCommentError(error.message || 'Could not remove the coach comment.');
+    } finally {
+      busy = false;
+    }
+  });
   dialog.querySelectorAll('[data-time-adjust]').forEach(button => button.addEventListener('click', () => {
     editingSeconds = Math.max(0, editingSeconds + Number(button.dataset.timeAdjust));
     timestampDisplay.textContent = formatVideoTime(editingSeconds);

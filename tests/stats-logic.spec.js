@@ -129,6 +129,24 @@ test('validation rejects duplicate identities and sequences', async ({ page }) =
   expect(issues).toContain('Duplicate event sequence: 1.');
 });
 
+test('validation accepts non-empty coach comments and rejects empty ones', async ({ page }) => {
+  const { game } = await loadFixture(page);
+  game.events[0].coachComment = 'Keep the ball moving.';
+
+  const results = await page.evaluate(async gameData => {
+    const { collectGameValidationIssues } = await import('/stats/js/game-model.js');
+    const validIssues = collectGameValidationIssues(gameData);
+    gameData.events[0].coachComment = '   ';
+    return {
+      validIssues,
+      invalidIssues: collectGameValidationIssues(gameData)
+    };
+  }, game);
+
+  expect(results.validIssues).toEqual([]);
+  expect(results.invalidIssues).toContain('Event e1 coach comment must be a non-empty string when present.');
+});
+
 test('validation rejects invalid lineup snapshots and substitutions', async ({ page }) => {
   const { game } = await loadFixture(page);
   const substitution = game.events.find(event => event.id === 'e7');

@@ -141,6 +141,9 @@ export function collectGameValidationIssues(game) {
     if (!hasFiveValidPlayers(event.lineupIds, playerIds)) {
       issues.push(`${label} lineup must contain five unique game players.`);
     }
+    if (event.coachComment !== undefined && !isNonEmptyString(event.coachComment)) {
+      issues.push(`${label} coach comment must be a non-empty string when present.`);
+    }
     if (!['team', 'opponent', 'system'].includes(event.side)) {
       issues.push(`${label} has an invalid side.`);
     }

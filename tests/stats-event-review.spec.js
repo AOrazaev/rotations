@@ -232,3 +232,33 @@ test('note text can be corrected from the timeline', async ({ page }) => {
   const event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
   expect(event).toMatchObject({ type: 'note', side: 'system', playerId: null, note: 'Corrected note' });
 });
+
+test('coach comments can be added, edited, displayed as quotes, and removed', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]');
+
+  await page.locator('[data-action="comment-event"]').click();
+  await page.locator('#coachCommentText').fill('Excellent help defense.');
+  await page.locator('#coachCommentForm button[type="submit"]').click();
+
+  const comment = page.locator('.coach-comment');
+  await expect(comment).toBeVisible();
+  await expect(comment).toHaveText('Excellent help defense.');
+  await expect(page.locator('[data-action="comment-event"]')).toHaveAttribute('aria-label', 'Edit coach comment');
+
+  await page.locator('[data-action="comment-event"]').click();
+  await page.locator('#coachCommentText').fill('Excellent help defense and recovery.');
+  await page.locator('#coachCommentForm button[type="submit"]').click();
+  await expect(comment).toHaveText('Excellent help defense and recovery.');
+
+  let event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(event.coachComment).toBe('Excellent help defense and recovery.');
+
+  await page.locator('[data-action="comment-event"]').click();
+  await page.locator('#removeCoachComment').click();
+  await expect(comment).toBeHidden();
+  await expect(page.locator('[data-action="comment-event"]')).toHaveAttribute('aria-label', 'Add coach comment');
+
+  event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(event).not.toHaveProperty('coachComment');
+});
