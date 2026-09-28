@@ -58,6 +58,25 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   await page.locator('#showGamePanel').click();
   await expect(page.locator('#gamePanel')).toBeVisible();
   await expect(page.locator('#hideGamePanel')).toBeFocused();
+
+  await page.locator('#decreaseVideoSize').click();
+  await expect(page.locator('#videoSizeValue')).toHaveText('95%');
+  const resizeHandle = await page.locator('#videoResizeHandle').boundingBox();
+  await page.mouse.move(resizeHandle.x + resizeHandle.width / 2, resizeHandle.y + resizeHandle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(resizeHandle.x - 140, resizeHandle.y + resizeHandle.height / 2, { steps: 5 });
+  await page.mouse.up();
+  const persistedVideoSize = Number((await page.locator('#videoResizeHandle').getAttribute('aria-valuenow')));
+  expect(persistedVideoSize).toBeLessThan(95);
+  expect(persistedVideoSize).toBeGreaterThanOrEqual(60);
+  const resizedVideoWidth = await page.locator('.video-card').evaluate(element => element.getBoundingClientRect().width);
+  expect(resizedVideoWidth).toBeLessThan(expandedVideoWidth);
+  expect(resizedVideoWidth).toBeGreaterThanOrEqual(expandedVideoWidth * 0.6);
+
+  await page.reload();
+  await page.evaluate(() => window.__statsApp.setupController.ready);
+  await expect(page.locator('#videoResizeHandle')).toHaveAttribute('aria-valuenow', String(persistedVideoSize));
+  await expect(page.locator('#videoSizeValue')).toHaveText(`${persistedVideoSize}%`);
 });
 
 test('game editor collapses and reopens for a new game', async ({ page }) => {

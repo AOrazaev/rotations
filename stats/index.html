@@ -78,9 +78,17 @@
                 <h2>Recording</h2>
                 <p>Current position: <strong id="currentTime">0:00.0</strong></p>
               </div>
-              <div class="playback-actions">
-                <button id="playVideo" class="secondary" type="button">Play</button>
-                <button id="pauseVideo" class="secondary" type="button">Pause</button>
+              <div class="recording-controls">
+                <div class="playback-actions">
+                  <button id="playVideo" class="secondary" type="button">Play</button>
+                  <button id="pauseVideo" class="secondary" type="button">Pause</button>
+                </div>
+                <div class="video-size-actions" role="group" aria-label="Video size">
+                  <button id="decreaseVideoSize" class="secondary small" type="button" aria-label="Decrease video size">-</button>
+                  <output id="videoSizeValue" aria-live="polite">100%</output>
+                  <button id="increaseVideoSize" class="secondary small" type="button" aria-label="Increase video size">+</button>
+                  <button id="resetVideoSize" class="secondary small" type="button">Reset</button>
+                </div>
               </div>
             </div>
             <div class="recording-status">
@@ -91,6 +99,17 @@
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
             </div>
+            <button
+              id="videoResizeHandle"
+              class="video-resize-handle"
+              type="button"
+              role="slider"
+              aria-label="Resize video"
+              aria-valuemin="60"
+              aria-valuemax="100"
+              aria-valuenow="100"
+              aria-valuetext="100 percent"
+            ></button>
           </section>
 
         </section>

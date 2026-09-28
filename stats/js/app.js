@@ -149,6 +149,15 @@ const gamePanel = document.querySelector('#gamePanel');
 const hideGamePanelButton = document.querySelector('#hideGamePanel');
 const showGamePanelButton = document.querySelector('#showGamePanel');
 const gamePanelStorageKey = 'basketball-stats-game-panel-collapsed';
+const videoCard = document.querySelector('.video-card');
+const videoSizeValue = document.querySelector('#videoSizeValue');
+const decreaseVideoSizeButton = document.querySelector('#decreaseVideoSize');
+const increaseVideoSizeButton = document.querySelector('#increaseVideoSize');
+const resetVideoSizeButton = document.querySelector('#resetVideoSize');
+const videoResizeHandle = document.querySelector('#videoResizeHandle');
+const videoSizeStorageKey = 'basketball-stats-video-size';
+let videoSize = 100;
+let resizePointerId = null;
 
 function setGamePanelCollapsed(collapsed, { moveFocus = false } = {}) {
   statsShell.classList.toggle('game-panel-collapsed', collapsed);
@@ -163,6 +172,64 @@ function setGamePanelCollapsed(collapsed, { moveFocus = false } = {}) {
 hideGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(true, { moveFocus: true }));
 showGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(false, { moveFocus: true }));
 setGamePanelCollapsed(localStorage.getItem(gamePanelStorageKey) === 'true');
+
+function setVideoSize(value) {
+  const size = Math.min(100, Math.max(60, Number(value) || 100));
+  videoSize = size;
+  videoCard.style.setProperty('--video-card-width', `${size}%`);
+  videoSizeValue.value = `${size}%`;
+  decreaseVideoSizeButton.disabled = size <= 60;
+  increaseVideoSizeButton.disabled = size >= 100;
+  resetVideoSizeButton.disabled = size >= 100;
+  videoResizeHandle.setAttribute('aria-valuenow', String(size));
+  videoResizeHandle.setAttribute('aria-valuetext', `${size} percent`);
+  localStorage.setItem(videoSizeStorageKey, String(size));
+}
+
+function resizeVideoFromPointer(clientX) {
+  const workspaceBox = videoCard.parentElement.getBoundingClientRect();
+  if (!workspaceBox.width) return;
+  setVideoSize(Math.round(((clientX - workspaceBox.left) / workspaceBox.width) * 100));
+}
+
+decreaseVideoSizeButton.addEventListener('click', () => setVideoSize(videoSize - 5));
+increaseVideoSizeButton.addEventListener('click', () => setVideoSize(videoSize + 5));
+resetVideoSizeButton.addEventListener('click', () => setVideoSize(100));
+videoResizeHandle.addEventListener('dblclick', () => setVideoSize(100));
+videoResizeHandle.addEventListener('pointerdown', event => {
+  resizePointerId = event.pointerId;
+  videoResizeHandle.setPointerCapture(event.pointerId);
+  document.body.classList.add('video-resizing');
+  resizeVideoFromPointer(event.clientX);
+});
+videoResizeHandle.addEventListener('pointermove', event => {
+  if (event.pointerId !== resizePointerId) return;
+  resizeVideoFromPointer(event.clientX);
+});
+videoResizeHandle.addEventListener('pointerup', event => {
+  if (event.pointerId !== resizePointerId) return;
+  resizePointerId = null;
+  document.body.classList.remove('video-resizing');
+  videoResizeHandle.releasePointerCapture(event.pointerId);
+});
+videoResizeHandle.addEventListener('pointercancel', () => {
+  resizePointerId = null;
+  document.body.classList.remove('video-resizing');
+});
+videoResizeHandle.addEventListener('keydown', event => {
+  const changes = {
+    ArrowLeft: -5,
+    ArrowDown: -5,
+    ArrowRight: 5,
+    ArrowUp: 5,
+  };
+  if (event.key === 'Home') setVideoSize(60);
+  else if (event.key === 'End') setVideoSize(100);
+  else if (changes[event.key]) setVideoSize(videoSize + changes[event.key]);
+  else return;
+  event.preventDefault();
+});
+setVideoSize(localStorage.getItem(videoSizeStorageKey));
 
 const store = new GameStore({
   databaseName: window.__STATS_DATABASE_NAME__ || 'basketball-stats'
