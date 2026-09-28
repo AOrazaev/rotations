@@ -63,6 +63,7 @@ export function createReportController({
   const feedbackList = documentObject.querySelector('#playerFeedbackList');
   const emptyFeedback = documentObject.querySelector('#emptyPlayerFeedback');
   const copyFeedbackButton = documentObject.querySelector('#copyPlayerFeedback');
+  const copyYouTubeFeedbackButton = documentObject.querySelector('#copyYouTubeFeedback');
   const feedbackStatus = documentObject.querySelector('#playerFeedbackStatus');
 
   let game = null;
@@ -106,6 +107,16 @@ export function createReportController({
     return `https://youtu.be/${encodeURIComponent(game.video.videoId)}?t=${Math.floor(feedbackSeconds(event))}`;
   }
 
+  function formatYouTubeTimestamp(seconds) {
+    const totalSeconds = Math.floor(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = String(totalSeconds % 60).padStart(2, '0');
+    return hours
+      ? `${hours}:${String(minutes).padStart(2, '0')}:${remainingSeconds}`
+      : `${minutes}:${remainingSeconds}`;
+  }
+
   function renderFeedback() {
     const previousPlayerId = feedbackPlayer.value;
     feedbackPlayer.innerHTML = '';
@@ -126,6 +137,7 @@ export function createReportController({
     const events = player ? feedbackEvents(player) : [];
     emptyFeedback.classList.toggle('hidden', events.length > 0);
     copyFeedbackButton.disabled = events.length === 0;
+    copyYouTubeFeedbackButton.disabled = events.length === 0;
     for (const event of events) {
       const item = documentObject.createElement('li');
       item.className = 'player-feedback-item';
@@ -156,29 +168,53 @@ export function createReportController({
     }
   }
 
-  function feedbackText() {
+  function selectedFeedback() {
     const player = game.players.find(item => item.id === feedbackPlayer.value);
-    if (!player) return '';
+    if (!player) return null;
     const playersById = Object.fromEntries(game.players.map(item => [item.id, item]));
     const includedIds = new Set(
       [...feedbackList.querySelectorAll('.feedback-event-select:checked')]
         .map(input => input.closest('[data-event-id]').dataset.eventId)
     );
-    const entries = feedbackEvents(player)
-      .filter(event => includedIds.has(event.id))
+    return {
+      player,
+      playersById,
+      events: feedbackEvents(player).filter(event => includedIds.has(event.id))
+    };
+  }
+
+  function feedbackHeading(player) {
+    const opponent = game.opponentName ? ` vs ${game.opponentName}` : '';
+    return `${player.name} — ${game.title}${opponent}`;
+  }
+
+  function telegramFeedbackText() {
+    const selection = selectedFeedback();
+    if (!selection) return '';
+    const entries = selection.events
       .map(event => [
-        `▶ ${formatVideoTime(feedbackSeconds(event))} — ${describeEvent(event, playersById)}`,
+        `▶ ${formatVideoTime(feedbackSeconds(event))} — ${describeEvent(event, selection.playersById)}`,
         `“${event.coachComment.trim()}”`,
         feedbackUrl(event)
       ].join('\n'));
-    const opponent = game.opponentName ? ` vs ${game.opponentName}` : '';
     return entries.length
-      ? `${player.name} — ${game.title}${opponent}\n\n${entries.join('\n\n')}`
+      ? `${feedbackHeading(selection.player)}\n\n${entries.join('\n\n')}`
       : '';
   }
 
-  async function copyPlayerFeedback() {
-    const text = feedbackText();
+  function youtubeFeedbackText() {
+    const selection = selectedFeedback();
+    if (!selection) return '';
+    const entries = selection.events.map(event => [
+      `${formatYouTubeTimestamp(feedbackSeconds(event))} — ${describeEvent(event, selection.playersById)}`,
+      event.coachComment.trim()
+    ].join('\n'));
+    return entries.length
+      ? `${feedbackHeading(selection.player)}\n\n${entries.join('\n\n')}`
+      : '';
+  }
+
+  async function copyFeedback(text, successMessage) {
     if (!text) {
       setFeedbackStatus('Select at least one feedback moment.', true);
       return;
@@ -187,7 +223,7 @@ export function createReportController({
       const clipboard = documentObject.defaultView?.navigator?.clipboard;
       if (!clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.');
       await clipboard.writeText(text);
-      setFeedbackStatus('Copied player feedback for Telegram.');
+      setFeedbackStatus(successMessage);
     } catch (error) {
       setFeedbackStatus(error.message || 'Could not copy player feedback.', true);
     }
@@ -364,9 +400,15 @@ export function createReportController({
   feedbackList.addEventListener('change', () => {
     const hasSelection = Boolean(feedbackList.querySelector('.feedback-event-select:checked'));
     copyFeedbackButton.disabled = !hasSelection;
+    copyYouTubeFeedbackButton.disabled = !hasSelection;
     setFeedbackStatus();
   });
-  copyFeedbackButton.addEventListener('click', copyPlayerFeedback);
+  copyFeedbackButton.addEventListener('click', () => {
+    copyFeedback(telegramFeedbackText(), 'Copied player feedback for Telegram.');
+  });
+  copyYouTubeFeedbackButton.addEventListener('click', () => {
+    copyFeedback(youtubeFeedbackText(), 'Copied timestamp comment for YouTube.');
+  });
 
   return {
     render(nextGame, nextAnalysis) {

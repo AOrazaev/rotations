@@ -127,6 +127,15 @@ test('player feedback copies selected coach comments with timestamped YouTube li
   expect(copied).toContain('https://youtu.be/M7lc1UVf-VE?t=107');
   expect(copied).not.toContain('Good timing on the pass.');
   expect(copied).not.toContain('Secure the rebound first.');
+
+  await page.locator('#copyYouTubeFeedback').click();
+  await expect(page.locator('#playerFeedbackStatus')).toHaveText('Copied timestamp comment for YouTube.');
+  const youtubeComment = await page.evaluate(() => window.__clipboardWrites.at(-1));
+  expect(youtubeComment).toContain('Alex — MVP contract verification game vs Falcons');
+  expect(youtubeComment).toContain('1:47 — Alex made 2PT');
+  expect(youtubeComment).toContain('Attack the space decisively.');
+  expect(youtubeComment).not.toContain('youtu.be');
+  expect(youtubeComment).not.toContain('Good timing on the pass.');
 });
 
 test('player feedback includes explicit jersey and team mentions', async ({ page }) => {
