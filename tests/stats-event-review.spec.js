@@ -87,7 +87,7 @@ test('using current video time reorders display without changing insertion seque
   await addTeamEvent(page, '[data-event-type="steal"]', 50);
   await addTeamEvent(page, '[data-event-type="assist"]', 60);
 
-  await page.locator('.event-list-item').nth(1).locator('[data-action="edit-event"]').click();
+  await page.locator('.event-list-item').first().locator('[data-action="edit-event"]').click();
   await page.locator('[data-time-adjust="-5"]').click();
   await expect(page.locator('#editEventTimestamp')).toHaveText('0:55.0');
   await page.evaluate(() => { window.__statsFakePlayer.current = 40; });
@@ -95,8 +95,8 @@ test('using current video time reorders display without changing insertion seque
   await expect(page.locator('#editEventTimestamp')).toHaveText('0:40.0');
   await page.locator('#eventEditForm button[type="submit"]').click();
 
-  await expect(page.locator('.event-time')).toHaveText(['0:40.0', '0:50.0']);
-  await expect(page.locator('.event-description').first()).toContainText('assist');
+  await expect(page.locator('.event-time')).toHaveText(['0:50.0', '0:40.0']);
+  await expect(page.locator('.event-description').last()).toContainText('assist');
   const events = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events;
   expect(events.map(event => event.sequence)).toEqual([1, 2]);
   expect(events[1].videoSeconds).toBe(40);
@@ -104,7 +104,7 @@ test('using current video time reorders display without changing insertion seque
   await page.reload();
   await page.evaluate(() => window.__statsApp.setupController.ready);
   await page.locator('[data-action="open-game"]').click();
-  await expect(page.locator('.event-time')).toHaveText(['0:40.0', '0:50.0']);
+  await expect(page.locator('.event-time')).toHaveText(['0:50.0', '0:40.0']);
 });
 
 test('event type can be corrected with type-specific fields', async ({ page }) => {
@@ -200,17 +200,17 @@ test('timeout ownership and period labels can be corrected from the timeline', a
   await page.locator('#periodEndForm button[type="submit"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(2);
 
-  await page.locator('.event-list-item').first().locator('[data-action="edit-event"]').click();
+  await page.locator('.event-list-item').filter({ hasText: 'timeout' }).locator('[data-action="edit-event"]').click();
   await expect(page.locator('#editEventType')).toBeDisabled();
   await page.locator('#editEventSide').selectOption('opponent');
   await page.locator('#eventEditForm button[type="submit"]').click();
 
-  await page.locator('.event-list-item').nth(1).locator('[data-action="edit-event"]').click();
+  await page.locator('.event-list-item').filter({ hasText: 'End of Q1' }).locator('[data-action="edit-event"]').click();
   await expect(page.locator('#editPeriodEndFields')).toBeVisible();
   await page.locator('#editPeriodLabel').fill('Halftime');
   await page.locator('#eventEditForm button[type="submit"]').click();
 
-  await expect(page.locator('.event-description')).toHaveText(['Opponent timeout', 'Halftime']);
+  await expect(page.locator('.event-description')).toHaveText(['Halftime', 'Opponent timeout']);
   const events = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events;
   expect(events[0]).toMatchObject({ type: 'timeout', side: 'opponent', playerId: null });
   expect(events[1]).toMatchObject({ type: 'period_end', side: 'system', periodLabel: 'Halftime' });

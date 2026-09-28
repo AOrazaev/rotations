@@ -54,6 +54,17 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   expect(reviewBoxes[1] / reviewBoxes[0]).toBeGreaterThan(0.25);
   expect(reviewBoxes[1] / reviewBoxes[0]).toBeLessThan(0.35);
 
+  const shotPairs = await page.locator('.shot-button-pair').evaluateAll(elements =>
+    elements.map(element => [...element.querySelectorAll('button')].map(button => {
+      const box = button.getBoundingClientRect();
+      return { x: box.x, y: box.y };
+    }))
+  );
+  expect(shotPairs).toHaveLength(3);
+  expect(shotPairs.every(pair => Math.abs(pair[0].x - pair[1].x) < 2 && pair[0].y < pair[1].y)).toBe(true);
+  expect(shotPairs[0][0].x).toBeLessThan(shotPairs[1][0].x);
+  expect(shotPairs[1][0].x).toBeLessThan(shotPairs[2][0].x);
+
   const expandedVideoWidth = workspaceBoxes[0].width;
   await page.locator('#hideGamePanel').click();
   await expect(page.locator('#gamePanel')).toBeHidden();

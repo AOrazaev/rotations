@@ -154,9 +154,9 @@ test('timeouts and labeled period ends are timestamped timeline events without s
 
   await expect(page.locator('.event-list-item')).toHaveCount(3);
   await expect(page.locator('.event-description')).toHaveText([
-    'Our team timeout',
+    'Halftime',
     'Opponent timeout',
-    'Halftime'
+    'Our team timeout'
   ]);
   await expect(page.locator('#teamScore')).toHaveText('0');
   await expect(page.locator('#opponentScore')).toHaveText('0');

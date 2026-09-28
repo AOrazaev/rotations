@@ -145,6 +145,8 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-entry-card .lineup-panel { margin-bottom: 10px; }
 .event-entry-card .event-buttons { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .event-entry-card .event-action { padding: 8px 6px; font-size: .82rem; }
+.shot-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; grid-column: 1 / -1; }
+.shot-button-pair { display: grid; gap: 6px; }
 .playback-actions, .marker-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .player-frame {
   position: relative;

@@ -168,7 +168,7 @@ export function createEventListController({
       return;
     }
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
-    const events = orderGameEvents(game.events);
+    const events = orderGameEvents(game.events).reverse();
     emptyEvents.classList.toggle('hidden', events.length > 0);
     for (const event of events) {
       const item = eventTemplate.content.firstElementChild.cloneNode(true);

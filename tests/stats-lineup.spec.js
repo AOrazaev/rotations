@@ -93,7 +93,8 @@ test('editing and deleting an earlier substitution rebuilds every later lineup s
   await page.locator('[data-event-side="opponent"]').click();
   await page.locator('[data-event-type="shot"][data-shot-value="2"][data-made="false"]').click();
 
-  await page.locator('.event-list-item').first().locator('[data-action="edit-event"]').click();
+  const substitutionEvent = page.locator('.event-list-item').filter({ hasText: 'in for' });
+  await substitutionEvent.locator('[data-action="edit-event"]').click();
   await expect(page.locator('#editSubstitutionFields')).toBeVisible();
   await expect(page.locator('#editEventType')).toBeDisabled();
   await page.locator('#editPlayerOut').selectOption(before.active[1]);
@@ -111,7 +112,7 @@ test('editing and deleting an earlier substitution rebuilds every later lineup s
   expect(laterEvent.lineupIds).toContain(before.bench[0]);
 
   page.once('dialog', dialog => dialog.accept());
-  await page.locator('.event-list-item').first().locator('[data-action="delete-event"]').click();
+  await page.locator('.event-list-item').filter({ hasText: 'in for' }).locator('[data-action="delete-event"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(1);
   game = await page.evaluate(() => window.__statsApp.eventController.getGame());
   expect(game.events).toHaveLength(1);

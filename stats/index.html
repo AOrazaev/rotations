@@ -146,12 +146,20 @@
               <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
             </div>
             <div id="eventButtons" class="event-buttons">
-              <button class="event-action made" type="button" data-event-type="shot" data-shot-value="2" data-made="true">2PT made</button>
-              <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="2" data-made="false">2PT missed</button>
-              <button class="event-action made" type="button" data-event-type="shot" data-shot-value="3" data-made="true">3PT made</button>
-              <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="3" data-made="false">3PT missed</button>
-              <button class="event-action made" type="button" data-event-type="shot" data-shot-value="1" data-made="true">FT made</button>
-              <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="1" data-made="false">FT missed</button>
+              <div class="shot-buttons">
+                <div class="shot-button-pair">
+                  <button class="event-action made" type="button" data-event-type="shot" data-shot-value="2" data-made="true">2PT made</button>
+                  <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="2" data-made="false">2PT missed</button>
+                </div>
+                <div class="shot-button-pair">
+                  <button class="event-action made" type="button" data-event-type="shot" data-shot-value="3" data-made="true">3PT made</button>
+                  <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="3" data-made="false">3PT missed</button>
+                </div>
+                <div class="shot-button-pair">
+                  <button class="event-action made" type="button" data-event-type="shot" data-shot-value="1" data-made="true">FT made</button>
+                  <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="1" data-made="false">FT missed</button>
+                </div>
+              </div>
               <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="offensive">Offensive rebound</button>
               <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="defensive">Defensive rebound</button>
               <button class="event-action" type="button" data-event-type="assist">Assist</button>
@@ -173,7 +181,7 @@
           <div class="section-head">
             <div>
               <h2>Event timeline</h2>
-              <p>Seek, preview, correct, or remove recorded events.</p>
+              <p>Newest first. Seek, preview, correct, or remove recorded events.</p>
             </div>
             <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
           </div>
