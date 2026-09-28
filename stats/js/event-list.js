@@ -15,7 +15,8 @@ const EDITABLE_TYPES = new Set([
   'foul',
   'substitution',
   'timeout',
-  'period_end'
+  'period_end',
+  'note'
 ]);
 
 export function describeEvent(event, playersById) {
@@ -63,6 +64,8 @@ export function createEventListController({
   const playerInInput = documentObject.querySelector('#editPlayerIn');
   const periodEndFields = documentObject.querySelector('#editPeriodEndFields');
   const periodLabelInput = documentObject.querySelector('#editPeriodLabel');
+  const noteFields = documentObject.querySelector('#editNoteFields');
+  const noteInput = documentObject.querySelector('#editNote');
   const timestampDisplay = documentObject.querySelector('#editEventTimestamp');
   const useCurrentButton = documentObject.querySelector('#useCurrentEventTime');
   const editError = documentObject.querySelector('#eventEditError');
@@ -82,6 +85,7 @@ export function createEventListController({
     reboundFields.classList.toggle('hidden', typeInput.value !== 'rebound');
     substitutionFields.classList.toggle('hidden', typeInput.value !== 'substitution');
     periodEndFields.classList.toggle('hidden', typeInput.value !== 'period_end');
+    noteFields.classList.toggle('hidden', typeInput.value !== 'note');
   }
 
   function playerLabel(player) {
@@ -125,7 +129,7 @@ export function createEventListController({
     if (!event) return;
     if (event.type === 'substitution') {
       populateSubstitutionPlayers(event, playerOutInput.value || event.playerOutId, playerInInput.value || event.playerInId);
-    } else if (!['timeout', 'period_end'].includes(event.type)) {
+    } else if (!['timeout', 'period_end', 'note'].includes(event.type)) {
       populatePlayers(event, playerInput.value || event.playerId);
     }
   }
@@ -139,13 +143,14 @@ export function createEventListController({
     const isSubstitution = event.type === 'substitution';
     const isTimeout = event.type === 'timeout';
     const isPeriodEnd = event.type === 'period_end';
-    const isSpecial = isSubstitution || isTimeout || isPeriodEnd;
+    const isNote = event.type === 'note';
+    const isSpecial = isSubstitution || isTimeout || isPeriodEnd || isNote;
     typeInput.disabled = isSpecial;
     for (const option of typeInput.options) {
-      option.disabled = ['substitution', 'timeout', 'period_end'].includes(option.value)
+      option.disabled = ['substitution', 'timeout', 'period_end', 'note'].includes(option.value)
         && option.value !== event.type;
     }
-    sideInput.disabled = isSubstitution || isPeriodEnd;
+    sideInput.disabled = isSubstitution || isPeriodEnd || isNote;
     playerInput.disabled = isSpecial || event.side === 'opponent';
     if (isSubstitution) populateSubstitutionPlayers(event);
     else if (!isSpecial) populatePlayers(event);
@@ -154,6 +159,7 @@ export function createEventListController({
     shotMadeInput.value = String(event.made ?? true);
     reboundKindInput.value = event.reboundKind || 'defensive';
     periodLabelInput.value = event.periodLabel || '';
+    noteInput.value = event.note || '';
     timestampDisplay.textContent = formatVideoTime(editingSeconds);
     updateDependentFields();
     setEditError();
@@ -251,6 +257,7 @@ export function createEventListController({
       delete edited.playerOutId;
       delete edited.playerInId;
       delete edited.periodLabel;
+      delete edited.note;
       if (typeInput.value === 'substitution') {
         edited.side = 'team';
         edited.type = 'substitution';
@@ -270,6 +277,12 @@ export function createEventListController({
         edited.playerId = null;
         edited.periodLabel = periodLabelInput.value.trim();
         if (!edited.periodLabel) throw new Error('Enter a period label.');
+      } else if (typeInput.value === 'note') {
+        edited.side = 'system';
+        edited.type = 'note';
+        edited.playerId = null;
+        edited.note = noteInput.value.trim();
+        if (!edited.note) throw new Error('Enter note text.');
       } else {
         edited.side = sideInput.value;
         edited.playerId = edited.side === 'team' ? playerInput.value : null;

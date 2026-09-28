@@ -201,3 +201,25 @@ test('timeouts and labeled period ends are timestamped timeline events without s
     { type: 'period_end', side: 'system', playerId: null, videoSeconds: 120, periodLabel: 'Halftime' }
   ]);
 });
+
+test('notes add freeform timeline text without changing statistics', async ({ page }) => {
+  await openEventEntry(page);
+  await page.evaluate(() => { window.__statsFakePlayer.current = 75; });
+  await page.locator('#openNote').click();
+  await expect(page.locator('#noteTimestamp')).toHaveText('1:15.0');
+  await page.locator('#noteText').fill('Great defensive possession');
+  await page.locator('#noteForm button[type="submit"]').click();
+
+  await expect(page.locator('.event-description')).toHaveText('Great defensive possession');
+  await expect(page.locator('#teamScore')).toHaveText('0');
+  await expect(page.locator('#opponentScore')).toHaveText('0');
+
+  const event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(event).toMatchObject({
+    videoSeconds: 75,
+    side: 'system',
+    type: 'note',
+    playerId: null,
+    note: 'Great defensive possession'
+  });
+});

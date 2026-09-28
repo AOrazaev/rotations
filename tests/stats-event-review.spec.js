@@ -214,3 +214,21 @@ test('timeout ownership and period labels can be corrected from the timeline', a
   expect(events[0]).toMatchObject({ type: 'timeout', side: 'opponent', playerId: null });
   expect(events[1]).toMatchObject({ type: 'period_end', side: 'system', periodLabel: 'Halftime' });
 });
+
+test('note text can be corrected from the timeline', async ({ page }) => {
+  await openReview(page);
+  await page.locator('#openNote').click();
+  await page.locator('#noteText').fill('Initial note');
+  await page.locator('#noteForm button[type="submit"]').click();
+
+  await page.locator('[data-action="edit-event"]').click();
+  await expect(page.locator('#editEventType')).toHaveValue('note');
+  await expect(page.locator('#editEventType')).toBeDisabled();
+  await expect(page.locator('#editNoteFields')).toBeVisible();
+  await page.locator('#editNote').fill('Corrected note');
+  await page.locator('#eventEditForm button[type="submit"]').click();
+
+  await expect(page.locator('.event-description')).toHaveText('Corrected note');
+  const event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(event).toMatchObject({ type: 'note', side: 'system', playerId: null, note: 'Corrected note' });
+});

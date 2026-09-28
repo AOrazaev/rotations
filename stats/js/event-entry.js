@@ -43,6 +43,13 @@ export function createEventEntryController({
   const periodEndLabel = documentObject.querySelector('#periodEndLabel');
   const periodEndError = documentObject.querySelector('#periodEndError');
   const cancelPeriodEnd = documentObject.querySelector('#cancelPeriodEnd');
+  const openNoteButton = documentObject.querySelector('#openNote');
+  const noteDialog = documentObject.querySelector('#noteDialog');
+  const noteForm = documentObject.querySelector('#noteForm');
+  const noteTimestamp = documentObject.querySelector('#noteTimestamp');
+  const noteText = documentObject.querySelector('#noteText');
+  const noteError = documentObject.querySelector('#noteError');
+  const cancelNote = documentObject.querySelector('#cancelNote');
 
   let game = null;
   let side = 'team';
@@ -50,6 +57,7 @@ export function createEventEntryController({
   let eventListController;
   let substitutionSeconds = 0;
   let periodEndSeconds = 0;
+  let noteSeconds = 0;
   let selectedPlayerId = null;
   const reportController = createReportController({ documentObject, videoController });
 
@@ -67,6 +75,7 @@ export function createEventEntryController({
     undoButton.disabled = !game?.events.length;
     openSubstitutionButton.disabled = !enabled || !game || game.players.length <= 5;
     openPeriodEndButton.disabled = !enabled;
+    openNoteButton.disabled = !enabled;
   }
 
   function updatePlayerSelection() {
@@ -314,6 +323,57 @@ export function createEventEntryController({
       periodEndDialog.close();
     } catch (error) {
       setPeriodEndError(error.message || 'Could not save the period marker.');
+    } finally {
+      busy = false;
+    }
+  });
+
+  function setNoteError(message = '') {
+    noteError.textContent = message;
+    noteError.classList.toggle('hidden', !message);
+  }
+
+  openNoteButton.addEventListener('click', () => {
+    if (!game || busy) return;
+    try {
+      noteSeconds = videoController.getCurrentSeconds();
+      noteTimestamp.textContent = formatVideoTime(noteSeconds);
+      noteText.value = '';
+      setNoteError();
+      noteDialog.showModal();
+      noteText.focus();
+    } catch (error) {
+      setError(error.message || 'Could not prepare the note.');
+    }
+  });
+  cancelNote.addEventListener('click', () => noteDialog.close());
+  noteForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!game || busy) return;
+    setNoteError();
+    busy = true;
+    try {
+      const text = noteText.value.trim();
+      if (!text) throw new Error('Enter note text.');
+      const next = structuredClone(game);
+      next.events.push({
+        id: crypto.randomUUID(),
+        sequence: Math.max(0, ...next.events.map(item => item.sequence)) + 1,
+        videoSeconds: noteSeconds,
+        side: 'system',
+        type: 'note',
+        playerId: null,
+        note: text,
+        relatedEventId: null,
+        lineupIds: getLineupAtEventPosition(next, noteSeconds),
+        createdAt: now(),
+        updatedAt: null,
+      });
+      next.updatedAt = now();
+      await persist(next);
+      noteDialog.close();
+    } catch (error) {
+      setNoteError(error.message || 'Could not save the note.');
     } finally {
       busy = false;
     }

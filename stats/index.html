@@ -169,6 +169,7 @@
               <button class="event-action" type="button" data-event-type="foul">Foul</button>
               <button class="event-action" type="button" data-event-type="timeout">Timeout</button>
               <button id="openPeriodEnd" class="event-action" type="button">Period end</button>
+              <button id="openNote" class="event-action" type="button">Note</button>
             </div>
             <p id="eventError" class="message error hidden" role="alert"></p>
             <div class="quick-totals">
@@ -181,7 +182,7 @@
           <div class="section-head">
             <div>
               <h2>Event timeline</h2>
-              <p>Newest first. Seek, preview, correct, or remove recorded events.</p>
+              <p>Newest first. Play, correct, or remove recorded events.</p>
             </div>
             <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
           </div>
@@ -302,6 +303,7 @@
             <option value="substitution">Substitution</option>
             <option value="timeout">Timeout</option>
             <option value="period_end">Period end</option>
+            <option value="note">Custom</option>
           </select>
         </label>
         <div id="editShotFields" class="edit-dependent-fields">
@@ -338,6 +340,11 @@
         <div id="editPeriodEndFields" class="edit-dependent-fields hidden">
           <label>Label
             <input id="editPeriodLabel" type="text" maxlength="80" placeholder="End of Q1" />
+          </label>
+        </div>
+        <div id="editNoteFields" class="edit-dependent-fields hidden">
+          <label>Timeline text
+            <input id="editNote" type="text" maxlength="160" placeholder="Describe what happened" />
           </label>
         </div>
       </div>
@@ -397,6 +404,25 @@
       <p id="periodEndError" class="message error hidden" role="alert"></p>
       <div class="form-actions">
         <button class="primary" type="submit">Save period end</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="noteDialog" class="event-dialog">
+    <form id="noteForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Add note</h2>
+          <p>At <strong id="noteTimestamp">0:00.0</strong> in the recording.</p>
+        </div>
+        <button id="cancelNote" class="secondary small" type="button">Close</button>
+      </div>
+      <label class="dialog-field">Timeline text
+        <input id="noteText" type="text" maxlength="160" required placeholder="Describe what happened" />
+      </label>
+      <p id="noteError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Add to timeline</button>
       </div>
     </form>
   </dialog>
