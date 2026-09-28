@@ -362,3 +362,29 @@ test('Print button triggers window.print() for the current rotation', async ({ p
 
   expect(await page.evaluate(() => window.__printCalls)).toBe(1);
 });
+
+test('print view uses a strong continuous outline for on-court runs', async ({ page }) => {
+  await page.locator('#generate').click();
+  await page.emulateMedia({ media: 'print' });
+
+  const styles = await page.locator('.timeline-cell.on.run-start').first().evaluate(el => {
+    const computed = getComputedStyle(el);
+    return {
+      backgroundImage: computed.backgroundImage,
+      boxSizing: computed.boxSizing,
+      height: computed.height,
+      borderTopWidth: computed.borderTopWidth,
+      borderBottomWidth: computed.borderBottomWidth,
+      borderLeftWidth: computed.borderLeftWidth,
+      borderRightWidth: computed.borderRightWidth,
+    };
+  });
+
+  expect(styles.backgroundImage).toBe('none');
+  expect(styles.boxSizing).toBe('border-box');
+  expect(styles.height).toBe('28px');
+  expect(styles.borderTopWidth).toBe('3px');
+  expect(styles.borderBottomWidth).toBe('3px');
+  expect(styles.borderLeftWidth).toBe('3px');
+  expect(styles.borderRightWidth).toBe('0px');
+});

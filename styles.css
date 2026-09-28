@@ -153,11 +153,36 @@ footer { color:var(--muted); text-align:center; padding-top:10px; font-size:.9re
   #rotationCard h2, #rotationCard p, #rotationCard .section-head p { color:#000; }
   #rotationCard .rotation-actions, #swapHint, #swapMode { display:none !important; }
   .timeline-legend { color:#333; }
-  .swatch-on { background:#333; }
+  .swatch-on {
+    background:#fff;
+    border:3px solid #000;
+  }
   .swatch-off { background:#fff; border:1px solid #000; }
   .timeline-header-cell, .tl-minutes { color:#333; border-color:#000; }
-  .timeline-cell { background:#eee; border:1px solid #ccc; }
-  .timeline-cell.on { background:#ccc; border:1px solid #333; }
+  .timeline-cell {
+    box-sizing:border-box;
+    height:28px;
+    background:#eee;
+    border:1px solid #ccc;
+  }
+  .timeline-cell.on {
+    background:#fff;
+    border-top:3px solid #000;
+    border-right:0;
+    border-bottom:3px solid #000;
+    border-left:0;
+  }
+  .timeline-cell.on.run-start {
+    border-left:3px solid #000;
+    border-top-left-radius:8px;
+    border-bottom-left-radius:8px;
+  }
+  .timeline-cell.on.run-end {
+    border-right:3px solid #000;
+    border-top-right-radius:8px;
+    border-bottom-right-radius:8px;
+  }
+  .timeline-cell.on.timeline-half-divider { border-left:2px solid #000; }
   .sub-label { background:#fff; color:#000; border:1px solid #000; }
   .minute-card { background:#fff; border:1px solid #000; }
   .minute-card span { color:#333; }
