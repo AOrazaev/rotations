@@ -43,6 +43,8 @@ test('analysis exposes deterministic ordering, active lineup, progression, and s
   ]);
   expect(analysis.traceability.teamComparison.opponent.fieldGoals).toEqual(['e2', 'e4']);
   expect(analysis.traceability.players.p1.points).toEqual(['e1']);
+  expect(analysis.traceability.players.p1.efficiency).toEqual(['e1', 'e9']);
+  expect(analysis.traceability.players.p1.trueShootingPercentage).toEqual(['e1']);
   expect(analysis.traceability.players.p1.plusMinus).toEqual(['e1', 'e4', 'e8', 'e12']);
   expect(analysis.traceability.participationIntervals).toEqual([
     {

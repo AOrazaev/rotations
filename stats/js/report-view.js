@@ -30,6 +30,10 @@ function signed(value) {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function formatPercentage(value) {
+  return value == null ? '—' : `${Number(value.toFixed(1))}%`;
+}
+
 function addCell(row, content, className = '') {
   const cell = row.insertCell();
   cell.className = className;
@@ -142,6 +146,12 @@ export function createReportController({
         addCell(row, sourceValue(stats[field], trace[field], className));
       }
       addCell(row, sourceValue(signed(stats.plusMinus), trace.plusMinus, 'player-plus-minus'));
+      addCell(row, sourceValue(stats.efficiency, trace.efficiency, 'player-efficiency'));
+      addCell(row, sourceValue(
+        formatPercentage(stats.trueShootingPercentage),
+        trace.trueShootingPercentage,
+        'player-true-shooting'
+      ));
       addCell(row, formatVideoTime(stats.videoSeconds), 'player-video-time');
     }
   }

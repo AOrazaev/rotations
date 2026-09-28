@@ -47,6 +47,8 @@ function emptyPlayerStats() {
     blocks: 0,
     turnovers: 0,
     fouls: 0,
+    efficiency: 0,
+    trueShootingPercentage: null,
     plusMinus: 0,
     videoSeconds: 0
   };
@@ -66,6 +68,8 @@ function emptyTraceFields() {
     blocks: [],
     turnovers: [],
     fouls: [],
+    efficiency: [],
+    trueShootingPercentage: [],
     plusMinus: []
   };
 }
@@ -200,6 +204,43 @@ export function buildGameAnalysis(game) {
     finishPercentage(side.twoPoint);
     finishPercentage(side.threePoint);
     finishPercentage(side.freeThrows);
+  }
+
+  for (const [playerId, player] of Object.entries(players)) {
+    const missedFieldGoals = player.fieldGoalsAttempted - player.fieldGoalsMade;
+    const missedFreeThrows = player.freeThrowsAttempted - player.freeThrowsMade;
+    player.efficiency = player.points
+      + player.offensiveRebounds
+      + player.defensiveRebounds
+      + player.assists
+      + player.steals
+      + player.blocks
+      - missedFieldGoals
+      - missedFreeThrows
+      - player.turnovers;
+    const trueShootingAttempts = player.fieldGoalsAttempted + 0.44 * player.freeThrowsAttempted;
+    player.trueShootingPercentage = trueShootingAttempts
+      ? Number((player.points * 100 / (2 * trueShootingAttempts)).toFixed(4))
+      : null;
+
+    const playerTrace = traceability.players[playerId];
+    const efficiencyEventIds = new Set([
+      ...playerTrace.fieldGoals,
+      ...playerTrace.freeThrows,
+      ...playerTrace.offensiveRebounds,
+      ...playerTrace.defensiveRebounds,
+      ...playerTrace.assists,
+      ...playerTrace.steals,
+      ...playerTrace.blocks,
+      ...playerTrace.turnovers
+    ]);
+    const shootingEventIds = new Set([...playerTrace.fieldGoals, ...playerTrace.freeThrows]);
+    playerTrace.efficiency = orderedEvents
+      .filter(event => efficiencyEventIds.has(event.id))
+      .map(event => event.id);
+    playerTrace.trueShootingPercentage = orderedEvents
+      .filter(event => shootingEventIds.has(event.id))
+      .map(event => event.id);
   }
 
   let currentLineup = [...game.startingLineupIds];

@@ -179,7 +179,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .report-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
 .report-table { width: 100%; border-collapse: collapse; min-width: 480px; }
 .team-comparison-table { min-width: 980px; }
-.player-report-table { min-width: 1050px; }
+.player-report-table { min-width: 1160px; }
 .report-table th, .report-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
 .report-table th:first-child, .report-table td:first-child { text-align: left; }
 .report-table thead th { color: var(--muted); background: #0f1727; font-size: .78rem; }

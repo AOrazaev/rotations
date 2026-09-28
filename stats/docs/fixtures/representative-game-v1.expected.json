@@ -79,6 +79,8 @@
       "blocks": 0,
       "turnovers": 0,
       "fouls": 0,
+      "efficiency": 3,
+      "trueShootingPercentage": 100,
       "plusMinus": 2,
       "videoSeconds": 100
     },
@@ -97,6 +99,8 @@
       "blocks": 0,
       "turnovers": 0,
       "fouls": 1,
+      "efficiency": 1,
+      "trueShootingPercentage": null,
       "plusMinus": 2,
       "videoSeconds": 100
     },
@@ -115,6 +119,8 @@
       "blocks": 0,
       "turnovers": 0,
       "fouls": 0,
+      "efficiency": -1,
+      "trueShootingPercentage": 0,
       "plusMinus": 2,
       "videoSeconds": 100
     },
@@ -133,6 +139,8 @@
       "blocks": 0,
       "turnovers": 0,
       "fouls": 0,
+      "efficiency": 1,
+      "trueShootingPercentage": null,
       "plusMinus": 2,
       "videoSeconds": 100
     },
@@ -151,6 +159,8 @@
       "blocks": 0,
       "turnovers": 0,
       "fouls": 0,
+      "efficiency": 0,
+      "trueShootingPercentage": null,
       "plusMinus": 0,
       "videoSeconds": 40
     },
@@ -169,6 +179,8 @@
       "blocks": 0,
       "turnovers": 0,
       "fouls": 0,
+      "efficiency": 3,
+      "trueShootingPercentage": 150,
       "plusMinus": 2,
       "videoSeconds": 60
     }

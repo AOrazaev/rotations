@@ -187,6 +187,9 @@ Team totals are derived symmetrically for `team` and `opponent`:
 
 Our player totals are the same calculations filtered by `playerId`.
 
+- EFF: `PTS + OREB + DREB + AST + STL + BLK - missed FG - missed FT - TO`
+- TS%: `PTS / (2 × (FGA + 0.44 × FTA)) × 100`; players without a field-goal or free-throw attempt have no TS% value
+
 Plus/minus changes only on made shots:
 
 - Team made shot: add its value to every player in `lineupIds`.
@@ -210,6 +213,7 @@ It is labeled as video elapsed time, never official playing time.
 | Team/opponent shooting percentages | Made and missed `shot` events grouped by `side` and `shotValue` |
 | Team/opponent rebounds and other totals | Corresponding statistical events grouped by `side` |
 | Player box score | Team statistical events grouped by `playerId` |
+| Player EFF and TS% | Contributing player statistical and shot events |
 | Player plus/minus | Made shots and each event's `lineupIds` |
 | Lineup plus/minus | Made shots grouped by normalized `lineupIds` |
 | Video participation time | Video start/end plus substitution events |

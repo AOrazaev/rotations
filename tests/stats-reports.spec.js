@@ -45,12 +45,16 @@ test('fixture report renders hand-calculated team, player, lineup, and progressi
 
   const p1 = page.locator('#playerReportBody tr[data-player-id="p1"]');
   await expect(p1.locator('.player-points')).toHaveText('2');
+  await expect(p1.locator('.player-efficiency')).toHaveText('3');
+  await expect(p1.locator('.player-true-shooting')).toHaveText('100%');
   await expect(p1.locator('.player-assists')).toHaveText('1');
   await expect(p1.locator('.player-plus-minus')).toHaveText('+2');
   await expect(p1.locator('.player-video-time')).toHaveText('1:40.0');
 
   const p6 = page.locator('#playerReportBody tr[data-player-id="p6"]');
   await expect(p6.locator('.player-points')).toHaveText('3');
+  await expect(p6.locator('.player-efficiency')).toHaveText('3');
+  await expect(p6.locator('.player-true-shooting')).toHaveText('150%');
   await expect(p6.locator('.player-video-time')).toHaveText('1:00.0');
 
   await expect(page.locator('#lineupReportBody tr')).toHaveCount(2);
