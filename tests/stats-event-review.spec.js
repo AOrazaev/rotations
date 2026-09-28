@@ -35,15 +35,14 @@ async function addTeamEvent(page, selector, seconds = null) {
   return playerId;
 }
 
-test('event timestamp seeks exactly and previews with three-second pre-roll', async ({ page }) => {
+test('event timestamp plays with a three-second pre-roll', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="steal"]');
   await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
 
   await page.locator('.event-time').click();
-  await page.locator('[data-action="preview-event"]').click();
+  await expect(page.locator('[data-action="preview-event"]')).toHaveCount(0);
   expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
-    ['seek', 42.4],
     ['seek', 39.4],
     ['play']
   ]);

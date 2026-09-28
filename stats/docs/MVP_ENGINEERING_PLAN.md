@@ -150,8 +150,7 @@ Events with identical video timestamps retain a stable insertion sequence. Editi
 - `videoSeconds` is the precise event reference.
 - Official player minutes are not claimed.
 - Participation duration is reported as on-court video elapsed time.
-- Clicking an event timestamp seeks directly to the event.
-- Preview seeks to a configurable pre-roll, initially three seconds, and starts playback.
+- Clicking an event timestamp seeks to a configurable pre-roll, initially three seconds before the event, and starts playback.
 - Event timestamps can be adjusted by `-5s`, `-1s`, `+1s`, and `+5s`.
 - A user can replace an event timestamp with the player's current video position.
 - YouTube may seek to a nearby keyframe, so frame-perfect seeking is not promised.
@@ -256,8 +255,7 @@ Deliver:
 - Parse supported YouTube URLs.
 - Embed a video with the YouTube IFrame API.
 - Read the current playback timestamp.
-- Seek to an event.
-- Preview from three seconds before an event.
+- Play from three seconds before an event by clicking its timestamp.
 - Surface invalid URLs, API failures, and embedding-disabled videos.
 
 Verification:

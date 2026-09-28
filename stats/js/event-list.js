@@ -192,9 +192,7 @@ export function createEventListController({
     const selected = game.events.find(item => item.id === row.dataset.eventId);
     if (!selected) return;
     try {
-      if (button.dataset.action === 'seek-event') {
-        videoController.seekTo(selected.videoSeconds);
-      } else if (button.dataset.action === 'preview-event') {
+      if (button.dataset.action === 'play-event') {
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
       } else if (button.dataset.action === 'edit-event') {
