@@ -25,6 +25,7 @@ export function createEventEntryController({
   const eventButtons = documentObject.querySelector('#eventButtons');
   const eventError = documentObject.querySelector('#eventError');
   const undoButton = documentObject.querySelector('#undoEvent');
+  const eventLogPanel = documentObject.querySelector('#eventLogPanel');
   const currentLineup = documentObject.querySelector('#currentLineup');
   const benchPlayers = documentObject.querySelector('#benchPlayers');
   const openSubstitutionButton = documentObject.querySelector('#openSubstitution');
@@ -109,6 +110,7 @@ export function createEventEntryController({
       opponentFieldGoals.textContent = '0/0';
       lockMessage.textContent = 'Save or open a game before recording statistics.';
       lockMessage.classList.remove('hidden');
+      eventLogPanel.classList.add('hidden');
       renderPlayerOptions();
       renderLineup(null);
       setControlsEnabled(false);
@@ -118,6 +120,7 @@ export function createEventEntryController({
     }
 
     const analysis = buildGameAnalysis(game);
+    eventLogPanel.classList.remove('hidden');
     gameStatus.textContent = `${game.title} · ${game.startingLineupIds.length} players on court`;
     teamScore.textContent = String(analysis.report.score.team);
     opponentScore.textContent = String(analysis.report.score.opponent);

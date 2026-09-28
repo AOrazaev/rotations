@@ -77,6 +77,7 @@ export function createGameSetupController({
   const newStandaloneButton = documentObject.querySelector('#newStandaloneGame');
   const importPlannerButton = documentObject.querySelector('#importPlannerRoster');
   const setupForm = documentObject.querySelector('#gameSetupForm');
+  const gameEditorDetails = documentObject.querySelector('#gameEditorDetails');
   const setupTitle = documentObject.querySelector('#gameSetupTitle');
   const titleInput = documentObject.querySelector('#gameTitle');
   const opponentInput = documentObject.querySelector('#opponentName');
@@ -152,6 +153,7 @@ export function createGameSetupController({
 
   function showDraft(nextDraft) {
     draft = nextDraft;
+    gameEditorDetails.open = true;
     setupTitle.textContent = draft.id ? 'Edit game' : 'New game';
     titleInput.value = draft.title || '';
     opponentInput.value = draft.opponentName || '';

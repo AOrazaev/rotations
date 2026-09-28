@@ -18,145 +18,162 @@
       <a class="nav-link" href="../">Rotation Planner</a>
     </header>
 
-    <section class="card">
-      <div class="section-head">
-        <div>
-          <h2>Games</h2>
-          <p>Games are saved only in this browser.</p>
-        </div>
-        <div class="playback-actions">
-          <button id="importPlannerRoster" class="secondary" type="button">Import planner roster</button>
-          <button id="newStandaloneGame" class="primary" type="button">New standalone game</button>
-        </div>
-      </div>
-      <p id="gamesStatus" class="message" aria-live="polite"></p>
-      <div id="emptyGames" class="empty-state">No saved games yet.</div>
-      <ul id="gamesList" class="games-list"></ul>
-    </section>
-
-    <section id="gameSetupCard" class="card">
-      <div class="section-head">
-        <div>
-          <h2 id="gameSetupTitle">New game</h2>
-          <p>Choose the roster, recording, and exactly five starters.</p>
-        </div>
-      </div>
-      <form id="gameSetupForm">
-        <div class="setup-fields">
-          <label>Game title<input id="gameTitle" type="text" required /></label>
-          <label>Opponent<input id="opponentName" type="text" /></label>
-          <label class="wide-field">YouTube URL<input id="gameVideoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." /></label>
-        </div>
-        <div class="section-head roster-heading">
-          <div>
-            <h3>Roster</h3>
-            <p><span id="starterCount">5</span>/5 starters selected</p>
+    <div class="app-shell">
+      <aside class="panel-stack side-panel game-panel">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>Games</h2>
+              <p>Saved only in this browser.</p>
+            </div>
           </div>
-          <button id="addSetupPlayer" class="secondary small" type="button">+ Add player</button>
-        </div>
-        <div id="setupRoster" class="setup-roster"></div>
-        <p id="setupError" class="message error hidden" role="alert"></p>
-        <div class="form-actions">
-          <button id="saveGame" class="primary" type="submit">Save game</button>
-        </div>
-      </form>
-    </section>
+          <div class="game-actions">
+            <button id="importPlannerRoster" class="secondary small" type="button">Import planner roster</button>
+            <button id="newStandaloneGame" class="primary small" type="button">New standalone game</button>
+          </div>
+          <p id="gamesStatus" class="message" aria-live="polite"></p>
+          <div id="emptyGames" class="empty-state compact">No saved games yet.</div>
+          <ul id="gamesList" class="games-list"></ul>
+        </section>
 
-    <section class="card">
-      <div class="section-head">
-        <div>
-          <h2>Recording preview</h2>
-          <p>Load the current game URL, capture timestamps, and verify navigation.</p>
-        </div>
+        <details id="gameEditorDetails" class="card game-editor" open>
+          <summary>Game editor</summary>
+          <section id="gameSetupCard" class="game-setup-content">
+            <div class="section-head">
+              <div>
+                <h2 id="gameSetupTitle">New game</h2>
+                <p>Choose the roster, recording, and exactly five starters.</p>
+              </div>
+            </div>
+            <form id="gameSetupForm">
+              <div class="setup-fields">
+                <label>Game title<input id="gameTitle" type="text" required /></label>
+                <label>Opponent<input id="opponentName" type="text" /></label>
+                <label class="wide-field">YouTube URL<input id="gameVideoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." /></label>
+              </div>
+              <div class="section-head roster-heading">
+                <div>
+                  <h3>Roster</h3>
+                  <p><span id="starterCount">5</span>/5 starters selected</p>
+                </div>
+                <button id="addSetupPlayer" class="secondary small" type="button">+ Add player</button>
+              </div>
+              <div id="setupRoster" class="setup-roster"></div>
+              <p id="setupError" class="message error hidden" role="alert"></p>
+              <div class="form-actions">
+                <button id="saveGame" class="primary" type="submit">Save game</button>
+              </div>
+            </form>
+          </section>
+        </details>
+      </aside>
+
+      <div class="panel-stack center-panel">
+        <section class="card recording-loader">
+          <div class="section-head">
+            <div>
+              <h2>Recording preview</h2>
+              <p>Load the current game recording.</p>
+            </div>
+          </div>
+          <form id="videoForm" class="video-form">
+            <label for="videoUrl">YouTube URL</label>
+            <div class="input-row">
+              <input id="videoUrl" name="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" />
+              <button id="loadVideo" class="primary" type="submit">Load video</button>
+            </div>
+          </form>
+          <p id="videoError" class="message error hidden" role="alert"></p>
+          <p id="videoStatus" class="message" aria-live="polite">No video loaded.</p>
+        </section>
+
+        <section id="workspace" class="workspace hidden">
+          <section class="card video-card">
+            <div class="section-head">
+              <div>
+                <h2>Recording</h2>
+                <p>Current position: <strong id="currentTime">0:00.0</strong></p>
+              </div>
+              <div class="playback-actions">
+                <button id="playVideo" class="secondary" type="button">Play</button>
+                <button id="pauseVideo" class="secondary" type="button">Pause</button>
+              </div>
+            </div>
+            <div id="playerFrame" class="player-frame">
+              <div id="youtubePlayer"></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="section-head">
+              <div>
+                <h2>Event entry</h2>
+                <p id="eventGameStatus">Save or open a game to record events.</p>
+              </div>
+            </div>
+            <div id="eventLockMessage" class="locked-message">Save or open a game, then load its recording.</div>
+            <div class="scoreboard">
+              <div><span>Our team</span><strong id="teamScore">0</strong></div>
+              <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
+            </div>
+            <div class="lineup-panel">
+              <div class="lineup-heading">
+                <div>
+                  <h3>Current lineup</h3>
+                  <p>Derived from the starting five and substitution timeline.</p>
+                </div>
+                <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
+              </div>
+              <div id="currentLineup" class="player-chips" aria-label="Current lineup"></div>
+              <p class="bench-label">Bench</p>
+              <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
+            </div>
+            <div class="event-side" role="group" aria-label="Event side">
+              <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
+              <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
+            </div>
+            <label class="event-player-label" for="eventPlayer">Player</label>
+            <select id="eventPlayer">
+              <option value="">Select player</option>
+            </select>
+            <div id="eventButtons" class="event-buttons">
+              <button class="event-action made" type="button" data-event-type="shot" data-shot-value="2" data-made="true">2PT made</button>
+              <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="2" data-made="false">2PT missed</button>
+              <button class="event-action made" type="button" data-event-type="shot" data-shot-value="3" data-made="true">3PT made</button>
+              <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="3" data-made="false">3PT missed</button>
+              <button class="event-action made" type="button" data-event-type="shot" data-shot-value="1" data-made="true">FT made</button>
+              <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="1" data-made="false">FT missed</button>
+              <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="offensive">Offensive rebound</button>
+              <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="defensive">Defensive rebound</button>
+              <button class="event-action" type="button" data-event-type="assist">Assist</button>
+              <button class="event-action" type="button" data-event-type="steal">Steal</button>
+              <button class="event-action" type="button" data-event-type="block">Block</button>
+              <button class="event-action" type="button" data-event-type="turnover">Turnover</button>
+              <button class="event-action" type="button" data-event-type="foul">Foul</button>
+              <button class="event-action" type="button" data-event-type="timeout">Timeout</button>
+              <button id="openPeriodEnd" class="event-action" type="button">Period end</button>
+            </div>
+            <p id="eventError" class="message error hidden" role="alert"></p>
+            <div class="quick-totals">
+              <span>FG <strong id="teamFieldGoals">0/0</strong></span>
+              <span>Opponent FG <strong id="opponentFieldGoals">0/0</strong></span>
+            </div>
+          </section>
+        </section>
       </div>
-      <form id="videoForm" class="video-form">
-        <label for="videoUrl">YouTube URL</label>
-        <div class="input-row">
-          <input id="videoUrl" name="videoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" />
-          <button id="loadVideo" class="primary" type="submit">Load video</button>
-        </div>
-      </form>
-      <p id="videoError" class="message error hidden" role="alert"></p>
-      <p id="videoStatus" class="message" aria-live="polite">No video loaded.</p>
-    </section>
 
-    <section id="workspace" class="workspace hidden">
-      <section class="card video-card">
+      <aside id="eventLogPanel" class="card side-panel event-log-panel hidden">
         <div class="section-head">
           <div>
-            <h2>Recording</h2>
-            <p>Current position: <strong id="currentTime">0:00.0</strong></p>
-          </div>
-          <div class="playback-actions">
-            <button id="playVideo" class="secondary" type="button">Play</button>
-            <button id="pauseVideo" class="secondary" type="button">Pause</button>
-          </div>
-        </div>
-        <div id="playerFrame" class="player-frame">
-          <div id="youtubePlayer"></div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <h2>Event entry</h2>
-            <p id="eventGameStatus">Save or open a game to record events.</p>
+            <h2>Event timeline</h2>
+            <p>Seek, preview, correct, or remove recorded events.</p>
           </div>
           <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
         </div>
-        <div id="eventLockMessage" class="locked-message">Save or open a game, then load its recording.</div>
-        <div class="scoreboard">
-          <div><span>Our team</span><strong id="teamScore">0</strong></div>
-          <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
-        </div>
-        <div class="lineup-panel">
-          <div class="lineup-heading">
-            <div>
-              <h3>Current lineup</h3>
-              <p>Derived from the starting five and substitution timeline.</p>
-            </div>
-            <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
-          </div>
-          <div id="currentLineup" class="player-chips" aria-label="Current lineup"></div>
-          <p class="bench-label">Bench</p>
-          <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
-        </div>
-        <div class="event-side" role="group" aria-label="Event side">
-          <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
-          <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
-        </div>
-        <label class="event-player-label" for="eventPlayer">Player</label>
-        <select id="eventPlayer">
-          <option value="">Select player</option>
-        </select>
-        <div id="eventButtons" class="event-buttons">
-          <button class="event-action made" type="button" data-event-type="shot" data-shot-value="2" data-made="true">2PT made</button>
-          <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="2" data-made="false">2PT missed</button>
-          <button class="event-action made" type="button" data-event-type="shot" data-shot-value="3" data-made="true">3PT made</button>
-          <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="3" data-made="false">3PT missed</button>
-          <button class="event-action made" type="button" data-event-type="shot" data-shot-value="1" data-made="true">FT made</button>
-          <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="1" data-made="false">FT missed</button>
-          <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="offensive">Offensive rebound</button>
-          <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="defensive">Defensive rebound</button>
-          <button class="event-action" type="button" data-event-type="assist">Assist</button>
-          <button class="event-action" type="button" data-event-type="steal">Steal</button>
-          <button class="event-action" type="button" data-event-type="block">Block</button>
-          <button class="event-action" type="button" data-event-type="turnover">Turnover</button>
-          <button class="event-action" type="button" data-event-type="foul">Foul</button>
-          <button class="event-action" type="button" data-event-type="timeout">Timeout</button>
-          <button id="openPeriodEnd" class="event-action" type="button">Period end</button>
-        </div>
-        <p id="eventError" class="message error hidden" role="alert"></p>
-        <div class="quick-totals">
-          <span>FG <strong id="teamFieldGoals">0/0</strong></span>
-          <span>Opponent FG <strong id="opponentFieldGoals">0/0</strong></span>
-        </div>
-        <h3 class="recent-heading">Recent events</h3>
         <div id="emptyEvents" class="empty-state">No events recorded.</div>
         <ol id="eventList" class="event-list"></ol>
-      </section>
-    </section>
+      </aside>
+    </div>
 
     <section id="reportCard" class="card hidden">
       <div class="section-head">

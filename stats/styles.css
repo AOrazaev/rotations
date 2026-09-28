@@ -25,7 +25,7 @@ button, .nav-link {
   padding: 10px 14px;
   cursor: pointer;
 }
-.container { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 48px; }
+.container { width: min(1680px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 48px; }
 .hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 20px; }
 .eyebrow { margin: 0 0 8px; color: var(--accent2); font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1; }
@@ -34,6 +34,22 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .subtitle { max-width: 760px; font-size: 1.05rem; line-height: 1.5; }
 .nav-link { background: #1b2540; color: #fff; border: 1px solid var(--line); text-decoration: none; white-space: nowrap; }
 .card { margin: 16px 0; padding: 18px; background: rgba(18, 26, 43, .94); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 18px 50px rgba(0, 0, 0, .18); }
+.app-shell { display: grid; grid-template-columns: minmax(280px, 320px) minmax(520px, 1fr) minmax(320px, 380px); gap: 16px; align-items: start; }
+.panel-stack { min-width: 0; }
+.panel-stack > .card, .app-shell > .card { margin: 0 0 16px; }
+.side-panel { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; scrollbar-gutter: stable; }
+.game-actions { display: grid; gap: 8px; }
+.game-editor { padding: 0; overflow: hidden; }
+.game-editor > summary { padding: 14px 18px; cursor: pointer; font-weight: 700; }
+.game-editor[open] > summary { border-bottom: 1px solid var(--line); }
+.game-setup-content { padding: 16px; }
+.game-panel .setup-fields { grid-template-columns: 1fr; }
+.game-panel .wide-field { grid-column: auto; }
+.game-panel .setup-player { grid-template-columns: 76px 54px minmax(0, 1fr); }
+.game-panel .setup-player .setup-name { grid-column: 1 / -1; grid-row: 1; }
+.game-panel .setup-delete { grid-column: 3; }
+.game-panel .game-list-item { align-items: stretch; flex-direction: column; }
+.game-panel .marker-actions button { flex: 1; }
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
 .section-head p, .message { margin: 0; }
 .video-form label { display: block; margin-bottom: 7px; color: var(--muted); font-size: .9rem; }
@@ -75,7 +91,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .small { padding: 7px 10px; font-size: .82rem; }
 .message { margin-top: 10px; min-height: 1.3em; }
 .message.error { color: #ffb4b4; }
-.workspace { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .8fr); gap: 16px; align-items: start; }
+.workspace { display: grid; gap: 16px; }
 .workspace > .card { margin: 0; }
 .playback-actions, .marker-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .player-frame {
@@ -129,9 +145,11 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-action:disabled { cursor: not-allowed; opacity: .45; }
 .locked-message { margin-bottom: 12px; padding: 10px 12px; color: #ffd9a8; background: rgba(255, 173, 71, .1); border: 1px solid rgba(255, 173, 71, .35); border-radius: 10px; }
 .quick-totals { display: flex; justify-content: space-between; gap: 10px; margin: 12px 0; color: var(--muted); font-size: .85rem; }
-.recent-heading { margin: 16px 0 8px; font-size: 1rem; }
 .event-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .event-list-item { display: grid; grid-template-columns: 62px minmax(120px, 1fr) auto; gap: 9px; align-items: center; padding: 9px; background: #0f1727; border: 1px solid #202c43; border-radius: 10px; }
+.event-log-panel .event-list-item { grid-template-columns: 58px minmax(0, 1fr); }
+.event-log-panel .event-row-actions { grid-column: 1 / -1; justify-content: stretch; }
+.event-log-panel .event-row-actions button { flex: 1; }
 .event-time { color: var(--accent2); font-variant-numeric: tabular-nums; }
 .link-button { padding: 4px 0; background: transparent; color: var(--accent2); text-align: left; }
 .event-row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
@@ -147,8 +165,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .invalid-count { color: var(--danger) !important; }
 .hidden { display: none; }
 
-@media (max-width: 900px) {
-  .workspace { grid-template-columns: 1fr; }
+@media (max-width: 1100px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .side-panel { position: static; max-height: none; overflow: visible; }
   .report-grid { grid-template-columns: 1fr; }
 }
 
