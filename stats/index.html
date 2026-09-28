@@ -104,7 +104,7 @@
             </div>
           </section>
 
-          <section class="card">
+          <section class="card event-entry-card">
             <div class="section-head">
               <div>
                 <h2>Event entry</h2>
@@ -120,7 +120,7 @@
               <div class="lineup-heading">
                 <div>
                   <h3>Current lineup</h3>
-                  <p>Derived from the starting five and substitution timeline.</p>
+                  <p>Select a player here before recording our team’s event.</p>
                 </div>
                 <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
               </div>
@@ -132,10 +132,6 @@
               <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
               <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
             </div>
-            <label class="event-player-label" for="eventPlayer">Player</label>
-            <select id="eventPlayer">
-              <option value="">Select player</option>
-            </select>
             <div id="eventButtons" class="event-buttons">
               <button class="event-action made" type="button" data-event-type="shot" data-shot-value="2" data-made="true">2PT made</button>
               <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="2" data-made="false">2PT missed</button>

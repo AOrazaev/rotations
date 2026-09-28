@@ -29,10 +29,17 @@ async function openEventEntry(page, { playerFails = false } = {}) {
   return databaseName;
 }
 
+async function selectFirstLineupPlayer(page) {
+  const button = page.locator('#currentLineup .player-select-button').first();
+  const playerId = await button.getAttribute('data-player-id');
+  await button.click();
+  return playerId;
+}
+
 test('records a timestamped team event with selected player and active lineup', async ({ page }) => {
   await openEventEntry(page);
-  const playerId = await page.locator('#eventPlayer option').nth(1).getAttribute('value');
-  await page.locator('#eventPlayer').selectOption(playerId);
+  const playerId = await selectFirstLineupPlayer(page);
+  await expect(page.locator(`#currentLineup [data-player-id="${playerId}"]`)).toHaveAttribute('aria-pressed', 'true');
   await page.locator('[data-event-type="shot"][data-shot-value="2"][data-made="true"]').click();
 
   await expect(page.locator('#teamScore')).toHaveText('2');
@@ -62,7 +69,7 @@ test('team events require a player while opponent events remain team-level', asy
   expect((await page.evaluate(() => window.__statsApp.eventController.getGame())).events).toHaveLength(0);
 
   await page.locator('[data-event-side="opponent"]').click();
-  await expect(page.locator('#eventPlayer')).toBeDisabled();
+  await expect(page.locator('#currentLineup .player-select-button').first()).toBeDisabled();
   await page.locator('[data-event-type="shot"][data-shot-value="3"][data-made="false"]').click();
 
   await expect(page.locator('#opponentScore')).toHaveText('0');
@@ -78,10 +85,8 @@ test('team events require a player while opponent events remain team-level', asy
 
 test('identical timestamps retain insertion sequence and survive reload', async ({ page }) => {
   await openEventEntry(page);
-  const playerId = await page.locator('#eventPlayer option').nth(1).getAttribute('value');
-  await page.locator('#eventPlayer').selectOption(playerId);
+  const playerId = await selectFirstLineupPlayer(page);
   await page.locator('[data-event-type="shot"][data-shot-value="2"][data-made="true"]').click();
-  await page.locator('#eventPlayer').selectOption(playerId);
   await page.locator('[data-event-type="assist"]').click();
 
   let events = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events;
@@ -97,8 +102,7 @@ test('identical timestamps retain insertion sequence and survive reload', async 
 
 test('undo removes and persists only the latest entered event', async ({ page }) => {
   await openEventEntry(page);
-  const playerId = await page.locator('#eventPlayer option').nth(1).getAttribute('value');
-  await page.locator('#eventPlayer').selectOption(playerId);
+  await selectFirstLineupPlayer(page);
   await page.locator('[data-event-type="shot"][data-shot-value="2"][data-made="true"]').click();
   await page.locator('[data-event-side="opponent"]').click();
   await page.locator('[data-event-type="shot"][data-shot-value="3"][data-made="true"]').click();
@@ -115,8 +119,7 @@ test('undo removes and persists only the latest entered event', async ({ page })
 
 test('editing game setup after event entry preserves the event log', async ({ page }) => {
   await openEventEntry(page);
-  const playerId = await page.locator('#eventPlayer option').nth(1).getAttribute('value');
-  await page.locator('#eventPlayer').selectOption(playerId);
+  const playerId = await selectFirstLineupPlayer(page);
   await page.locator('[data-event-type="steal"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(1);
 

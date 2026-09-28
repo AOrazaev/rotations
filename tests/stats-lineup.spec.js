@@ -63,12 +63,12 @@ test('records a valid substitution and attributes later events to the new lineup
   expect(after.active).not.toContain(before.active[0]);
   expect(after.bench).toEqual([before.active[0]]);
   await expect(page.locator('.event-description')).toContainText('in for');
-  await expect(page.locator('#eventPlayer option')).toHaveCount(6);
-  expect(await page.locator(`#eventPlayer option[value="${before.bench[0]}"]`).count()).toBe(1);
-  expect(await page.locator(`#eventPlayer option[value="${before.active[0]}"]`).count()).toBe(0);
+  await expect(page.locator('#currentLineup .player-select-button')).toHaveCount(5);
+  expect(await page.locator(`#currentLineup [data-player-id="${before.bench[0]}"]`).count()).toBe(1);
+  expect(await page.locator(`#currentLineup [data-player-id="${before.active[0]}"]`).count()).toBe(0);
 
   await page.evaluate(() => { window.__statsFakePlayer.current = 50; });
-  await page.locator('#eventPlayer').selectOption(before.bench[0]);
+  await page.locator(`#currentLineup [data-player-id="${before.bench[0]}"]`).click();
   await page.locator('[data-event-type="assist"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(2);
   const game = await page.evaluate(() => window.__statsApp.eventController.getGame());

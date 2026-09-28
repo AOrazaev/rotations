@@ -32,8 +32,9 @@ async function addTeamEvent(page, selector, seconds = null) {
   if (seconds !== null) {
     await page.evaluate(value => { window.__statsFakePlayer.current = value; }, seconds);
   }
-  const playerId = await page.locator('#eventPlayer option').nth(1).getAttribute('value');
-  await page.locator('#eventPlayer').selectOption(playerId);
+  const button = page.locator('#currentLineup .player-select-button').first();
+  const playerId = await button.getAttribute('data-player-id');
+  await button.click();
   await page.locator(selector).click();
   return playerId;
 }

@@ -21,7 +21,6 @@ export function createEventEntryController({
   const teamFieldGoals = documentObject.querySelector('#teamFieldGoals');
   const opponentFieldGoals = documentObject.querySelector('#opponentFieldGoals');
   const sideButtons = [...documentObject.querySelectorAll('[data-event-side]')];
-  const playerSelect = documentObject.querySelector('#eventPlayer');
   const eventButtons = documentObject.querySelector('#eventButtons');
   const eventError = documentObject.querySelector('#eventError');
   const undoButton = documentObject.querySelector('#undoEvent');
@@ -50,6 +49,7 @@ export function createEventEntryController({
   let eventListController;
   let substitutionSeconds = 0;
   let periodEndSeconds = 0;
+  let selectedPlayerId = null;
   const reportController = createReportController({ documentObject, videoController });
 
   function playerLabel(player) {
@@ -68,36 +68,34 @@ export function createEventEntryController({
     openPeriodEndButton.disabled = !enabled;
   }
 
-  function renderPlayerOptions(lineupIds = []) {
-    const selectedPlayerId = playerSelect.value;
-    playerSelect.innerHTML = '<option value="">Select player</option>';
-    if (!game) {
-      playerSelect.disabled = true;
-      return;
-    }
-    const byId = Object.fromEntries(game.players.map(player => [player.id, player]));
-    for (const playerId of lineupIds) {
-      const player = byId[playerId];
-      const option = documentObject.createElement('option');
-      option.value = player.id;
-      option.textContent = playerLabel(player);
-      playerSelect.appendChild(option);
-    }
-    if (lineupIds.includes(selectedPlayerId)) playerSelect.value = selectedPlayerId;
-    playerSelect.disabled = side === 'opponent';
+  function updatePlayerSelection() {
+    currentLineup.querySelectorAll('.player-select-button').forEach(button => {
+      const selected = side === 'team' && button.dataset.playerId === selectedPlayerId;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+      button.disabled = side === 'opponent';
+    });
   }
 
   function renderLineup(analysis) {
     currentLineup.innerHTML = '';
     benchPlayers.innerHTML = '';
     const activeIds = new Set(analysis?.activeLineupIds || []);
+    if (!activeIds.has(selectedPlayerId)) selectedPlayerId = null;
     for (const player of game?.players || []) {
-      const chip = documentObject.createElement('span');
+      const isActive = activeIds.has(player.id);
+      const chip = documentObject.createElement(isActive ? 'button' : 'span');
       chip.className = 'player-chip';
       chip.dataset.playerId = player.id;
       chip.textContent = playerLabel(player);
-      (activeIds.has(player.id) ? currentLineup : benchPlayers).appendChild(chip);
+      if (isActive) {
+        chip.type = 'button';
+        chip.classList.add('player-select-button');
+        chip.setAttribute('aria-pressed', 'false');
+      }
+      (isActive ? currentLineup : benchPlayers).appendChild(chip);
     }
+    updatePlayerSelection();
   }
 
   function render() {
@@ -111,7 +109,6 @@ export function createEventEntryController({
       lockMessage.textContent = 'Save or open a game before recording statistics.';
       lockMessage.classList.remove('hidden');
       eventLogPanel.classList.add('hidden');
-      renderPlayerOptions();
       renderLineup(null);
       setControlsEnabled(false);
       eventListController.render(null);
@@ -128,7 +125,6 @@ export function createEventEntryController({
     const theirFg = analysis.report.teamComparison.opponent.fieldGoals;
     teamFieldGoals.textContent = `${ourFg.made}/${ourFg.attempted}`;
     opponentFieldGoals.textContent = `${theirFg.made}/${theirFg.attempted}`;
-    renderPlayerOptions(analysis.activeLineupIds);
     renderLineup(analysis);
     const videoReady = videoController.isReady();
     lockMessage.textContent = videoReady ? '' : 'Load this game’s recording before adding a new event.';
@@ -164,7 +160,7 @@ export function createEventEntryController({
       const videoSeconds = videoController.getCurrentSeconds();
       const type = button.dataset.eventType;
       const requiresPlayer = side === 'team' && type !== 'timeout';
-      const playerId = requiresPlayer ? playerSelect.value : null;
+      const playerId = requiresPlayer ? selectedPlayerId : null;
       if (requiresPlayer && !playerId) throw new Error('Select one of our on-court players.');
 
       const next = structuredClone(game);
@@ -317,9 +313,17 @@ export function createEventEntryController({
       candidate.classList.toggle('active', active);
       candidate.setAttribute('aria-pressed', String(active));
     });
-    playerSelect.disabled = side === 'opponent' || !game;
-    if (side === 'opponent') playerSelect.value = '';
+    if (side === 'opponent') selectedPlayerId = null;
+    updatePlayerSelection();
   }));
+
+  currentLineup.addEventListener('click', event => {
+    const button = event.target.closest('.player-select-button');
+    if (!button || side !== 'team') return;
+    selectedPlayerId = button.dataset.playerId;
+    updatePlayerSelection();
+    setError();
+  });
 
   eventButtons.addEventListener('click', event => {
     const button = event.target.closest('button[data-event-type]');
@@ -350,6 +354,7 @@ export function createEventEntryController({
     setGame(nextGame) {
       game = structuredClone(nextGame);
       side = 'team';
+      selectedPlayerId = null;
       sideButtons[0].click();
       render();
     },

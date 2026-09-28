@@ -34,7 +34,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .subtitle { max-width: 760px; font-size: 1.05rem; line-height: 1.5; }
 .nav-link { background: #1b2540; color: #fff; border: 1px solid var(--line); text-decoration: none; white-space: nowrap; }
 .card { margin: 16px 0; padding: 18px; background: rgba(18, 26, 43, .94); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 18px 50px rgba(0, 0, 0, .18); }
-.app-shell { display: grid; grid-template-columns: minmax(280px, 320px) minmax(520px, 1fr) minmax(320px, 380px); gap: 16px; align-items: start; }
+.app-shell { display: grid; grid-template-columns: minmax(260px, 300px) minmax(600px, 1fr) minmax(300px, 340px); gap: 16px; align-items: start; }
 .panel-stack { min-width: 0; }
 .panel-stack > .card, .app-shell > .card { margin: 0 0 16px; }
 .side-panel { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; scrollbar-gutter: stable; }
@@ -91,8 +91,14 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .small { padding: 7px 10px; font-size: .82rem; }
 .message { margin-top: 10px; min-height: 1.3em; }
 .message.error { color: #ffb4b4; }
-.workspace { display: grid; gap: 16px; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr); gap: 16px; align-items: start; }
 .workspace > .card { margin: 0; }
+.video-card { position: sticky; top: 16px; }
+.event-entry-card .section-head { margin-bottom: 10px; }
+.event-entry-card .scoreboard { margin-bottom: 10px; }
+.event-entry-card .lineup-panel { margin-bottom: 10px; }
+.event-entry-card .event-buttons { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.event-entry-card .event-action { padding: 8px 6px; font-size: .82rem; }
 .playback-actions, .marker-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .player-frame {
   position: relative;
@@ -115,6 +121,10 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .bench-label { margin-top: 10px; margin-bottom: 5px; }
 .player-chips { display: flex; gap: 6px; flex-wrap: wrap; min-height: 27px; }
 .player-chip { padding: 5px 8px; color: #dce2ff; background: #1b2540; border: 1px solid var(--line); border-radius: 999px; font-size: .8rem; }
+.player-select-button { cursor: pointer; }
+.player-select-button:hover { border-color: var(--accent2); }
+.player-select-button.selected { color: #fff; background: var(--accent); border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(130, 144, 255, .2); }
+.player-select-button:disabled { cursor: not-allowed; opacity: .55; }
 .report-final-score { font-size: 2rem; font-variant-numeric: tabular-nums; }
 .report-section { margin-top: 20px; }
 .report-section > h3 { margin: 0 0 9px; font-size: 1rem; }
@@ -136,8 +146,6 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-side { display: flex; gap: 8px; margin-bottom: 12px; }
 .view-tab { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font-weight: 600; }
 .view-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.event-player-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: .85rem; }
-#eventPlayer { width: 100%; padding: 9px 10px; background: #0a1220; color: #fff; border: 1px solid var(--line); border-radius: 10px; }
 .event-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .event-action { background: #1b2540; color: #fff; border: 1px solid var(--line); padding: 9px; }
 .event-action.made { border-color: rgba(72, 199, 142, .7); }
@@ -165,10 +173,16 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .invalid-count { color: var(--danger) !important; }
 .hidden { display: none; }
 
-@media (max-width: 1100px) {
+@media (max-width: 1300px) {
   .app-shell { grid-template-columns: 1fr; }
   .side-panel { position: static; max-height: none; overflow: visible; }
   .report-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .workspace { grid-template-columns: 1fr; }
+  .video-card { position: static; }
+  .event-entry-card .event-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
