@@ -6,7 +6,7 @@ A static basketball rotation planner for GitHub Pages.
 - Add/edit/remove players
 - Multiple positions (G/F/C)
 - Skill rating 1-100
-- Optional per-player minimum/maximum minutes and maximum consecutive blocks
+- Optional per-player minimum/maximum minutes and maximum consecutive blocks, reset at halftime
 - Toggle game attendance
 - Rotation style slider (equal minutes ↔ fully competitive) instead of fixed presets
 - 4- or 5-minute blocks

@@ -25,7 +25,7 @@ function applySwap(rotation, blockIndex, onCourtId, benchId) {
   if (lineupIdx === -1 || benchIdx === -1) return false;
   const onPlayer = block.lineup[lineupIdx];
   const benchPlayer = block.bench[benchIdx];
-  if (exceedsConsecutiveLimit(rotation.result, benchPlayer, blockIndex, true)) return false;
+  if (exceedsConsecutiveLimit(rotation, benchPlayer, blockIndex, true)) return false;
   block.lineup[lineupIdx] = benchPlayer;
   block.bench[benchIdx] = onPlayer;
   rotation.minutes[onPlayer.id] -= rotation.blockMinutes;
@@ -36,7 +36,7 @@ function applySwap(rotation, blockIndex, onCourtId, benchId) {
 function swapConsecutiveLimitViolation(rotation, blockIndex, benchId) {
   const block = rotation.result[blockIndex];
   const player = block?.bench.find(p => p.id === benchId);
-  if (!player || !exceedsConsecutiveLimit(rotation.result, player, blockIndex, true)) return null;
+  if (!player || !exceedsConsecutiveLimit(rotation, player, blockIndex, true)) return null;
   return `${player.name} cannot play more than ${maxConsecutiveBlocksFor(player)} consecutive blocks.`;
 }
 
