@@ -44,6 +44,7 @@ export function createReportController({
 }) {
   const reportCard = documentObject.querySelector('#reportCard');
   const finalScore = documentObject.querySelector('#reportFinalScore');
+  const comparisonHead = documentObject.querySelector('#teamComparisonHead');
   const comparisonBody = documentObject.querySelector('#teamComparisonBody');
   const playerBody = documentObject.querySelector('#playerReportBody');
   const lineupBody = documentObject.querySelector('#lineupReportBody');
@@ -78,21 +79,36 @@ export function createReportController({
   }
 
   function renderComparison() {
+    comparisonHead.innerHTML = '';
     comparisonBody.innerHTML = '';
+    const headingRow = comparisonHead.insertRow();
+    const sideHeading = documentObject.createElement('th');
+    sideHeading.scope = 'col';
+    sideHeading.textContent = 'Team';
+    headingRow.appendChild(sideHeading);
     for (const [key, label] of COMPARISON_METRICS) {
+      const heading = documentObject.createElement('th');
+      heading.scope = 'col';
+      heading.dataset.metric = key;
+      heading.textContent = label;
+      headingRow.appendChild(heading);
+    }
+
+    for (const [side, label] of [['team', 'Our team'], ['opponent', 'Opponent']]) {
       const row = comparisonBody.insertRow();
-      row.dataset.metric = key;
+      row.dataset.side = side;
       const heading = documentObject.createElement('th');
       heading.scope = 'row';
       heading.textContent = label;
       row.appendChild(heading);
-      for (const side of ['team', 'opponent']) {
+      for (const [key] of COMPARISON_METRICS) {
         const value = analysis.report.teamComparison[side][key];
         const display = typeof value === 'object' ? formatShooting(value) : value;
-        addCell(
+        const cell = addCell(
           row,
           sourceValue(display, analysis.traceability.teamComparison[side][key], `${side}-report-value`)
         );
+        cell.dataset.metric = key;
       }
     }
   }

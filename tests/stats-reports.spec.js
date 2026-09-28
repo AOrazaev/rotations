@@ -33,10 +33,15 @@ test('fixture report renders hand-calculated team, player, lineup, and progressi
   await openFixtureReport(page);
 
   await expect(page.locator('#reportFinalScore')).toHaveText('5–3');
-  const fieldGoals = page.locator('#teamComparisonBody tr[data-metric="fieldGoals"]');
-  await expect(fieldGoals.locator('.team-report-value')).toHaveText('2/3 (66.7%)');
-  await expect(fieldGoals.locator('.opponent-report-value')).toHaveText('1/2 (50%)');
-  await expect(page.locator('#teamComparisonBody tr[data-metric="defensiveRebounds"] .team-report-value')).toHaveText('1');
+  await expect(page.locator('#teamComparisonHead th')).toHaveText([
+    'Team', 'FG', '2PT', '3PT', 'FT', 'Offensive rebounds', 'Defensive rebounds',
+    'Assists', 'Steals', 'Blocks', 'Turnovers', 'Fouls'
+  ]);
+  const teamRow = page.locator('#teamComparisonBody tr[data-side="team"]');
+  const opponentRow = page.locator('#teamComparisonBody tr[data-side="opponent"]');
+  await expect(teamRow.locator('[data-metric="fieldGoals"] .team-report-value')).toHaveText('2/3 (66.7%)');
+  await expect(opponentRow.locator('[data-metric="fieldGoals"] .opponent-report-value')).toHaveText('1/2 (50%)');
+  await expect(teamRow.locator('[data-metric="defensiveRebounds"] .team-report-value')).toHaveText('1');
 
   const p1 = page.locator('#playerReportBody tr[data-player-id="p1"]');
   await expect(p1.locator('.player-points')).toHaveText('2');
@@ -63,7 +68,7 @@ test('linked report values expose source events and seek to the expected play', 
   await openFixtureReport(page);
   await expect(page.locator('#eventLockMessage')).toBeHidden();
 
-  await page.locator('#teamComparisonBody tr[data-metric="fieldGoals"] .team-report-value').click();
+  await page.locator('#teamComparisonBody tr[data-side="team"] [data-metric="fieldGoals"] .team-report-value').click();
   await expect(page.locator('#reportSourceTitle')).toHaveText('3 source plays');
   await expect(page.locator('#reportSourceList li')).toHaveCount(3);
   await expect(page.locator('#reportSourceList li[data-event-id="e8"]')).toContainText('made 3PT');
