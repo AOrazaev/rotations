@@ -187,6 +187,17 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .report-table tbody tr:last-child > * { border-bottom: 0; }
 .report-value-link { padding: 2px 0; color: var(--accent2); background: transparent; border-radius: 0; text-decoration: underline; text-underline-offset: 3px; }
 .report-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, .6fr); gap: 16px; }
+.player-feedback { padding-top: 16px; border-top: 1px solid var(--line); }
+.feedback-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.feedback-actions label { color: var(--muted); font-size: .85rem; }
+.feedback-actions select { min-width: 180px; padding: 7px 10px; color: #fff; background: #0a1220; border: 1px solid var(--line); border-radius: 10px; }
+.player-feedback-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.player-feedback-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 11px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
+.player-feedback-item > input { margin-top: 5px; }
+.player-feedback-content { display: grid; gap: 6px; min-width: 0; }
+.player-feedback-heading { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.player-feedback-heading a { color: var(--accent2); font-variant-numeric: tabular-nums; }
+.player-feedback-comment { margin: 0; padding: 8px 10px; color: #dce2ff; background: rgba(109, 124, 255, .08); border-left: 3px solid var(--accent2); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
 .report-event-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .report-event-list li { display: flex; align-items: center; gap: 12px; padding: 9px 10px; background: #0f1727; border: 1px solid #202c43; border-radius: 10px; }
 .report-event-list .link-button { min-width: 58px; }
@@ -263,4 +274,6 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
   .filter-groups { grid-template-columns: 1fr; }
   .edit-dependent-fields { grid-column: auto; }
   .lineup-heading { align-items: stretch; flex-direction: column; }
+  .feedback-actions { align-items: stretch; flex-direction: column; width: 100%; }
+  .feedback-actions select, .feedback-actions button { width: 100%; }
 }

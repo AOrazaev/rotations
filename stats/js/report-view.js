@@ -14,6 +14,7 @@ const COMPARISON_METRICS = [
   ['turnovers', 'Turnovers'],
   ['fouls', 'Fouls']
 ];
+const FEEDBACK_PREVIEW_SECONDS = 3;
 
 function lineupKey(playerIds) {
   return [...playerIds].sort().join('|');
@@ -58,6 +59,11 @@ export function createReportController({
   const sourceList = documentObject.querySelector('#reportSourceList');
   const sourceEmpty = documentObject.querySelector('#reportSourceEmpty');
   const reportError = documentObject.querySelector('#reportError');
+  const feedbackPlayer = documentObject.querySelector('#feedbackPlayer');
+  const feedbackList = documentObject.querySelector('#playerFeedbackList');
+  const emptyFeedback = documentObject.querySelector('#emptyPlayerFeedback');
+  const copyFeedbackButton = documentObject.querySelector('#copyPlayerFeedback');
+  const feedbackStatus = documentObject.querySelector('#playerFeedbackStatus');
 
   let game = null;
   let analysis = null;
@@ -65,6 +71,126 @@ export function createReportController({
   function setError(message = '') {
     reportError.textContent = message;
     reportError.classList.toggle('hidden', !message);
+  }
+
+  function setFeedbackStatus(message = '', isError = false) {
+    feedbackStatus.textContent = message;
+    feedbackStatus.classList.toggle('error', isError);
+  }
+
+  function commentMentionsPlayer(comment, player) {
+    const mentions = [...String(comment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+      .map(match => match[1].toLowerCase());
+    return mentions.includes('team')
+      || Boolean(player.number && mentions.includes(String(player.number).toLowerCase()));
+  }
+
+  function feedbackEvents(player) {
+    return analysis.orderedEventIds
+      .map(eventId => game.events.find(event => event.id === eventId))
+      .filter(event => event
+        && String(event.coachComment || '').trim()
+        && (
+          event.playerId === player.id
+          || event.playerInId === player.id
+          || event.playerOutId === player.id
+          || commentMentionsPlayer(event.coachComment, player)
+        ));
+  }
+
+  function feedbackSeconds(event) {
+    return Math.max(0, event.videoSeconds - FEEDBACK_PREVIEW_SECONDS);
+  }
+
+  function feedbackUrl(event) {
+    return `https://youtu.be/${encodeURIComponent(game.video.videoId)}?t=${Math.floor(feedbackSeconds(event))}`;
+  }
+
+  function renderFeedback() {
+    const previousPlayerId = feedbackPlayer.value;
+    feedbackPlayer.innerHTML = '';
+    for (const player of game.players) {
+      const option = documentObject.createElement('option');
+      option.value = player.id;
+      option.textContent = player.number ? `#${player.number} ${player.name}` : player.name;
+      feedbackPlayer.appendChild(option);
+    }
+    if (game.players.some(player => player.id === previousPlayerId)) {
+      feedbackPlayer.value = previousPlayerId;
+    }
+
+    feedbackList.innerHTML = '';
+    setFeedbackStatus();
+    const player = game.players.find(item => item.id === feedbackPlayer.value);
+    const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
+    const events = player ? feedbackEvents(player) : [];
+    emptyFeedback.classList.toggle('hidden', events.length > 0);
+    copyFeedbackButton.disabled = events.length === 0;
+    for (const event of events) {
+      const item = documentObject.createElement('li');
+      item.className = 'player-feedback-item';
+      item.dataset.eventId = event.id;
+      const include = documentObject.createElement('input');
+      include.type = 'checkbox';
+      include.checked = true;
+      include.className = 'feedback-event-select';
+      include.setAttribute('aria-label', `Include ${describeEvent(event, playersById)}`);
+      const content = documentObject.createElement('div');
+      content.className = 'player-feedback-content';
+      const heading = documentObject.createElement('div');
+      heading.className = 'player-feedback-heading';
+      const link = documentObject.createElement('a');
+      link.href = feedbackUrl(event);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = formatVideoTime(feedbackSeconds(event));
+      const description = documentObject.createElement('strong');
+      description.textContent = describeEvent(event, playersById);
+      heading.append(link, description);
+      const comment = documentObject.createElement('blockquote');
+      comment.className = 'player-feedback-comment';
+      comment.textContent = event.coachComment.trim();
+      content.append(heading, comment);
+      item.append(include, content);
+      feedbackList.appendChild(item);
+    }
+  }
+
+  function feedbackText() {
+    const player = game.players.find(item => item.id === feedbackPlayer.value);
+    if (!player) return '';
+    const playersById = Object.fromEntries(game.players.map(item => [item.id, item]));
+    const includedIds = new Set(
+      [...feedbackList.querySelectorAll('.feedback-event-select:checked')]
+        .map(input => input.closest('[data-event-id]').dataset.eventId)
+    );
+    const entries = feedbackEvents(player)
+      .filter(event => includedIds.has(event.id))
+      .map(event => [
+        `▶ ${formatVideoTime(feedbackSeconds(event))} — ${describeEvent(event, playersById)}`,
+        `“${event.coachComment.trim()}”`,
+        feedbackUrl(event)
+      ].join('\n'));
+    const opponent = game.opponentName ? ` vs ${game.opponentName}` : '';
+    return entries.length
+      ? `${player.name} — ${game.title}${opponent}\n\n${entries.join('\n\n')}`
+      : '';
+  }
+
+  async function copyPlayerFeedback() {
+    const text = feedbackText();
+    if (!text) {
+      setFeedbackStatus('Select at least one feedback moment.', true);
+      return;
+    }
+    try {
+      const clipboard = documentObject.defaultView?.navigator?.clipboard;
+      if (!clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.');
+      await clipboard.writeText(text);
+      setFeedbackStatus('Copied player feedback for Telegram.');
+    } catch (error) {
+      setFeedbackStatus(error.message || 'Could not copy player feedback.', true);
+    }
   }
 
   function sourceValue(value, eventIds, className = '') {
@@ -234,6 +360,13 @@ export function createReportController({
     const eventLink = event.target.closest('[data-report-event-id]');
     if (eventLink) seekToEvent(eventLink.dataset.reportEventId);
   });
+  feedbackPlayer.addEventListener('change', renderFeedback);
+  feedbackList.addEventListener('change', () => {
+    const hasSelection = Boolean(feedbackList.querySelector('.feedback-event-select:checked'));
+    copyFeedbackButton.disabled = !hasSelection;
+    setFeedbackStatus();
+  });
+  copyFeedbackButton.addEventListener('click', copyPlayerFeedback);
 
   return {
     render(nextGame, nextAnalysis) {
@@ -246,6 +379,7 @@ export function createReportController({
       finalScore.textContent = `${analysis.report.score.team}–${analysis.report.score.opponent}`;
       renderComparison();
       renderPlayers(playersById);
+      renderFeedback();
       renderLineups(playersById);
       renderProgression();
       renderSources();

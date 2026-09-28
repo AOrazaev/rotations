@@ -240,6 +240,23 @@
         </div>
       </div>
 
+      <div class="report-section player-feedback">
+        <div class="section-head">
+          <div>
+            <h3>Player feedback</h3>
+            <p>Share commented moments with direct links to the recording.</p>
+          </div>
+          <div class="feedback-actions">
+            <label for="feedbackPlayer">Player</label>
+            <select id="feedbackPlayer"></select>
+            <button id="copyPlayerFeedback" class="primary small" type="button">Copy for Telegram</button>
+          </div>
+        </div>
+        <div id="emptyPlayerFeedback" class="empty-state compact">No coach-commented events for this player.</div>
+        <ol id="playerFeedbackList" class="player-feedback-list"></ol>
+        <p id="playerFeedbackStatus" class="message" role="status"></p>
+      </div>
+
       <div class="report-grid">
         <div class="report-section">
           <h3>Lineups</h3>
@@ -344,12 +361,12 @@
       <div class="section-head">
         <div>
           <h2>Coach comment</h2>
-          <p>Add context or feedback to this timeline event.</p>
+          <p>Add context or feedback. Use @NUMBER for a player or @team for everyone.</p>
         </div>
         <button id="cancelCoachComment" class="secondary small" type="button">Close</button>
       </div>
       <label class="dialog-field">Comment
-        <textarea id="coachCommentText" maxlength="500" required placeholder="Add coaching feedback"></textarea>
+        <textarea id="coachCommentText" maxlength="500" required placeholder="Add coaching feedback, optionally mentioning @12 or @team"></textarea>
       </label>
       <p id="coachCommentError" class="message error hidden" role="alert"></p>
       <div class="dialog-actions">

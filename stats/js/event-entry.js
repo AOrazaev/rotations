@@ -59,6 +59,7 @@ export function createEventEntryController({
   let periodEndSeconds = 0;
   let noteSeconds = 0;
   let selectedPlayerId = null;
+  let eventEntryQueue = Promise.resolve();
   const reportController = createReportController({ documentObject, videoController });
 
   function playerLabel(player) {
@@ -175,7 +176,7 @@ export function createEventEntryController({
   });
 
   async function addEvent(button) {
-    if (!game || busy) return;
+    if (!game) return;
     setError();
     busy = true;
     try {
@@ -392,7 +393,9 @@ export function createEventEntryController({
 
   eventButtons.addEventListener('click', event => {
     const button = event.target.closest('button[data-event-type]');
-    if (button) addEvent(button);
+    if (button) {
+      eventEntryQueue = eventEntryQueue.then(() => addEvent(button));
+    }
   });
 
   undoButton.addEventListener('click', async () => {

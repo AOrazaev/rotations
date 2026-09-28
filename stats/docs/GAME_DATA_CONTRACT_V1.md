@@ -162,6 +162,7 @@ Notes use `side: "system"`, `type: "note"`, `playerId: null`, and a non-empty `n
 ### Coach comment
 
 Any event may include an optional non-empty `coachComment`. It adds coaching context to the timeline but has no statistical or lineup effect.
+Within player feedback reports, `@NUMBER` includes the comment for players with that jersey number and `@team` includes it for every player. Directly attributed player events and substitutions remain included without requiring a mention.
 
 ## Lineup semantics
 
