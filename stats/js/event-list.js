@@ -1,8 +1,11 @@
-import { orderGameEvents } from './game-model.js';
+import {
+  getLineupAtEventPosition,
+  orderGameEvents
+} from './game-model.js';
 import { formatVideoTime } from './youtube-player.js';
 
 const PREVIEW_SECONDS = 3;
-const EDITABLE_TYPES = new Set(['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul']);
+const EDITABLE_TYPES = new Set(['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul', 'substitution']);
 
 export function describeEvent(event, playersById) {
   const subject = event.side === 'opponent'
@@ -42,6 +45,9 @@ export function createEventListController({
   const shotMadeInput = documentObject.querySelector('#editShotMade');
   const reboundFields = documentObject.querySelector('#editReboundFields');
   const reboundKindInput = documentObject.querySelector('#editReboundKind');
+  const substitutionFields = documentObject.querySelector('#editSubstitutionFields');
+  const playerOutInput = documentObject.querySelector('#editPlayerOut');
+  const playerInInput = documentObject.querySelector('#editPlayerIn');
   const timestampDisplay = documentObject.querySelector('#editEventTimestamp');
   const useCurrentButton = documentObject.querySelector('#useCurrentEventTime');
   const editError = documentObject.querySelector('#eventEditError');
@@ -59,20 +65,53 @@ export function createEventListController({
   function updateDependentFields() {
     shotFields.classList.toggle('hidden', typeInput.value !== 'shot');
     reboundFields.classList.toggle('hidden', typeInput.value !== 'rebound');
+    substitutionFields.classList.toggle('hidden', typeInput.value !== 'substitution');
   }
 
-  function populatePlayers(event) {
+  function playerLabel(player) {
+    return player.number ? `#${player.number} ${player.name}` : player.name;
+  }
+
+  function addPlayerOption(select, player) {
+    const option = documentObject.createElement('option');
+    option.value = player.id;
+    option.textContent = playerLabel(player);
+    select.appendChild(option);
+  }
+
+  function lineupForEditor(event) {
+    return getLineupAtEventPosition(game, editingSeconds, event.sequence, event.id);
+  }
+
+  function populatePlayers(event, preferredPlayerId = event.playerId) {
     playerInput.innerHTML = '<option value="">Select player</option>';
     const byId = Object.fromEntries(game.players.map(player => [player.id, player]));
-    for (const playerId of event.lineupIds) {
-      const player = byId[playerId];
-      const option = documentObject.createElement('option');
-      option.value = player.id;
-      option.textContent = player.number ? `#${player.number} ${player.name}` : player.name;
-      playerInput.appendChild(option);
+    for (const playerId of lineupForEditor(event)) {
+      addPlayerOption(playerInput, byId[playerId]);
     }
-    playerInput.value = event.playerId || '';
+    playerInput.value = preferredPlayerId || '';
     playerInput.disabled = sideInput.value === 'opponent';
+  }
+
+  function populateSubstitutionPlayers(event, preferredOutId = event.playerOutId, preferredInId = event.playerInId) {
+    const activeIds = new Set(lineupForEditor(event));
+    playerOutInput.innerHTML = '<option value="">Select player</option>';
+    playerInInput.innerHTML = '<option value="">Select player</option>';
+    for (const player of game.players) {
+      addPlayerOption(activeIds.has(player.id) ? playerOutInput : playerInInput, player);
+    }
+    playerOutInput.value = preferredOutId || '';
+    playerInInput.value = preferredInId || '';
+  }
+
+  function refreshEditorLineupOptions() {
+    const event = game.events.find(item => item.id === editingEventId);
+    if (!event) return;
+    if (event.type === 'substitution') {
+      populateSubstitutionPlayers(event, playerOutInput.value || event.playerOutId, playerInInput.value || event.playerInId);
+    } else {
+      populatePlayers(event, playerInput.value || event.playerId);
+    }
   }
 
   function openEditor(event) {
@@ -81,7 +120,13 @@ export function createEventListController({
     editingSeconds = event.videoSeconds;
     sideInput.value = event.side;
     typeInput.value = event.type;
-    populatePlayers(event);
+    const isSubstitution = event.type === 'substitution';
+    typeInput.disabled = isSubstitution;
+    typeInput.querySelector('option[value="substitution"]').disabled = !isSubstitution;
+    sideInput.disabled = isSubstitution;
+    playerInput.disabled = isSubstitution || event.side === 'opponent';
+    if (isSubstitution) populateSubstitutionPlayers(event);
+    else populatePlayers(event);
     shotValueInput.value = String(event.shotValue || 2);
     shotMadeInput.value = String(event.made ?? true);
     reboundKindInput.value = event.reboundKind || 'defensive';
@@ -153,11 +198,13 @@ export function createEventListController({
   dialog.querySelectorAll('[data-time-adjust]').forEach(button => button.addEventListener('click', () => {
     editingSeconds = Math.max(0, editingSeconds + Number(button.dataset.timeAdjust));
     timestampDisplay.textContent = formatVideoTime(editingSeconds);
+    refreshEditorLineupOptions();
   }));
   useCurrentButton.addEventListener('click', () => {
     try {
       editingSeconds = videoController.getCurrentSeconds();
       timestampDisplay.textContent = formatVideoTime(editingSeconds);
+      refreshEditorLineupOptions();
       setEditError();
     } catch (error) {
       setEditError(error.message);
@@ -172,20 +219,33 @@ export function createEventListController({
     try {
       const next = structuredClone(game);
       const edited = next.events.find(item => item.id === editingEventId);
-      edited.side = sideInput.value;
-      edited.playerId = edited.side === 'team' ? playerInput.value : null;
-      if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
-      edited.type = typeInput.value;
       edited.videoSeconds = editingSeconds;
       edited.updatedAt = now();
       delete edited.shotValue;
       delete edited.made;
       delete edited.reboundKind;
-      if (edited.type === 'shot') {
-        edited.shotValue = Number(shotValueInput.value);
-        edited.made = shotMadeInput.value === 'true';
-      } else if (edited.type === 'rebound') {
-        edited.reboundKind = reboundKindInput.value;
+      delete edited.playerOutId;
+      delete edited.playerInId;
+      if (typeInput.value === 'substitution') {
+        edited.side = 'team';
+        edited.type = 'substitution';
+        edited.playerId = null;
+        edited.playerOutId = playerOutInput.value;
+        edited.playerInId = playerInInput.value;
+        if (!edited.playerOutId || !edited.playerInId) {
+          throw new Error('Select one on-court player and one bench player.');
+        }
+      } else {
+        edited.side = sideInput.value;
+        edited.playerId = edited.side === 'team' ? playerInput.value : null;
+        if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
+        edited.type = typeInput.value;
+        if (edited.type === 'shot') {
+          edited.shotValue = Number(shotValueInput.value);
+          edited.made = shotMadeInput.value === 'true';
+        } else if (edited.type === 'rebound') {
+          edited.reboundKind = reboundKindInput.value;
+        }
       }
       next.updatedAt = now();
       await commit(next);

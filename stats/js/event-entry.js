@@ -1,5 +1,10 @@
 import { buildGameAnalysis } from './event-reducer.js';
 import { createEventListController } from './event-list.js';
+import {
+  getLineupAtEventPosition,
+  rebuildLineupSnapshots
+} from './game-model.js';
+import { formatVideoTime } from './youtube-player.js';
 
 export function createEventEntryController({
   documentObject = document,
@@ -19,11 +24,27 @@ export function createEventEntryController({
   const eventButtons = documentObject.querySelector('#eventButtons');
   const eventError = documentObject.querySelector('#eventError');
   const undoButton = documentObject.querySelector('#undoEvent');
+  const currentLineup = documentObject.querySelector('#currentLineup');
+  const benchPlayers = documentObject.querySelector('#benchPlayers');
+  const plannedReference = documentObject.querySelector('#plannedLineupReference');
+  const openSubstitutionButton = documentObject.querySelector('#openSubstitution');
+  const substitutionDialog = documentObject.querySelector('#substitutionDialog');
+  const substitutionForm = documentObject.querySelector('#substitutionForm');
+  const substitutionTimestamp = documentObject.querySelector('#substitutionTimestamp');
+  const substitutionPlayerOut = documentObject.querySelector('#substitutionPlayerOut');
+  const substitutionPlayerIn = documentObject.querySelector('#substitutionPlayerIn');
+  const substitutionError = documentObject.querySelector('#substitutionError');
+  const cancelSubstitution = documentObject.querySelector('#cancelSubstitution');
 
   let game = null;
   let side = 'team';
   let busy = false;
   let eventListController;
+  let substitutionSeconds = 0;
+
+  function playerLabel(player) {
+    return player.number ? `#${player.number} ${player.name}` : player.name;
+  }
 
   function setError(message = '') {
     eventError.textContent = message;
@@ -33,23 +54,55 @@ export function createEventEntryController({
   function setControlsEnabled(enabled) {
     eventButtons.querySelectorAll('button').forEach(button => { button.disabled = !enabled; });
     undoButton.disabled = !game?.events.length;
+    openSubstitutionButton.disabled = !enabled || !game || game.players.length <= 5;
   }
 
-  function renderPlayerOptions() {
+  function renderPlayerOptions(lineupIds = []) {
+    const selectedPlayerId = playerSelect.value;
     playerSelect.innerHTML = '<option value="">Select player</option>';
     if (!game) {
       playerSelect.disabled = true;
       return;
     }
     const byId = Object.fromEntries(game.players.map(player => [player.id, player]));
-    for (const playerId of game.startingLineupIds) {
+    for (const playerId of lineupIds) {
       const player = byId[playerId];
       const option = documentObject.createElement('option');
       option.value = player.id;
-      option.textContent = player.number ? `#${player.number} ${player.name}` : player.name;
+      option.textContent = playerLabel(player);
       playerSelect.appendChild(option);
     }
+    if (lineupIds.includes(selectedPlayerId)) playerSelect.value = selectedPlayerId;
     playerSelect.disabled = side === 'opponent';
+  }
+
+  function renderLineup(analysis) {
+    currentLineup.innerHTML = '';
+    benchPlayers.innerHTML = '';
+    const activeIds = new Set(analysis?.activeLineupIds || []);
+    for (const player of game?.players || []) {
+      const chip = documentObject.createElement('span');
+      chip.className = 'player-chip';
+      chip.dataset.playerId = player.id;
+      chip.textContent = playerLabel(player);
+      (activeIds.has(player.id) ? currentLineup : benchPlayers).appendChild(chip);
+    }
+    plannedReference.innerHTML = '';
+    const planned = game?.plannedRotation;
+    plannedReference.classList.toggle('hidden', !planned);
+    if (planned) {
+      const heading = documentObject.createElement('strong');
+      heading.textContent = `Planned reference · ${planned.blockMinutes}-minute blocks`;
+      const blocks = documentObject.createElement('div');
+      blocks.className = 'planned-blocks';
+      const byId = Object.fromEntries(game.players.map(player => [player.id, player]));
+      planned.blocks.forEach((block, index) => {
+        const item = documentObject.createElement('span');
+        item.textContent = `B${index + 1}: ${block.lineupIds.map(id => byId[id]?.name || id).join(', ')}`;
+        blocks.appendChild(item);
+      });
+      plannedReference.append(heading, blocks);
+    }
   }
 
   function render() {
@@ -63,6 +116,7 @@ export function createEventEntryController({
       lockMessage.textContent = 'Save or open a game before recording statistics.';
       lockMessage.classList.remove('hidden');
       renderPlayerOptions();
+      renderLineup(null);
       setControlsEnabled(false);
       eventListController.render(null);
       return;
@@ -76,7 +130,8 @@ export function createEventEntryController({
     const theirFg = analysis.report.teamComparison.opponent.fieldGoals;
     teamFieldGoals.textContent = `${ourFg.made}/${ourFg.attempted}`;
     opponentFieldGoals.textContent = `${theirFg.made}/${theirFg.attempted}`;
-    renderPlayerOptions();
+    renderPlayerOptions(analysis.activeLineupIds);
+    renderLineup(analysis);
     const videoReady = videoController.isReady();
     lockMessage.textContent = videoReady ? '' : 'Load this game’s recording before adding a new event.';
     lockMessage.classList.toggle('hidden', videoReady);
@@ -85,8 +140,9 @@ export function createEventEntryController({
   }
 
   async function persist(nextGame) {
-    await store.saveGame(nextGame);
-    game = nextGame;
+    const rebuilt = rebuildLineupSnapshots(nextGame);
+    await store.saveGame(rebuilt);
+    game = rebuilt;
     render();
     await onGameChanged(game);
   }
@@ -119,7 +175,7 @@ export function createEventEntryController({
         type: button.dataset.eventType,
         playerId,
         relatedEventId: null,
-        lineupIds: [...next.startingLineupIds],
+        lineupIds: getLineupAtEventPosition(next, videoSeconds),
         createdAt: now(),
         updatedAt: null,
       };
@@ -145,6 +201,69 @@ export function createEventEntryController({
       const active = candidate === button;
       candidate.classList.toggle('active', active);
       candidate.setAttribute('aria-pressed', String(active));
+    });
+
+    function setSubstitutionError(message = '') {
+      substitutionError.textContent = message;
+      substitutionError.classList.toggle('hidden', !message);
+    }
+
+    function populateSubstitutionOptions(lineupIds) {
+      const active = new Set(lineupIds);
+      substitutionPlayerOut.innerHTML = '';
+      substitutionPlayerIn.innerHTML = '';
+      for (const player of game.players) {
+        const option = documentObject.createElement('option');
+        option.value = player.id;
+        option.textContent = playerLabel(player);
+        (active.has(player.id) ? substitutionPlayerOut : substitutionPlayerIn).appendChild(option);
+      }
+    }
+
+    openSubstitutionButton.addEventListener('click', () => {
+      if (!game || busy) return;
+      try {
+        substitutionSeconds = videoController.getCurrentSeconds();
+        const sequence = Math.max(0, ...game.events.map(event => event.sequence)) + 1;
+        const lineupIds = getLineupAtEventPosition(game, substitutionSeconds, sequence);
+        populateSubstitutionOptions(lineupIds);
+        substitutionTimestamp.textContent = formatVideoTime(substitutionSeconds);
+        setSubstitutionError();
+        substitutionDialog.showModal();
+      } catch (error) {
+        setError(error.message || 'Could not prepare the substitution.');
+      }
+    });
+    cancelSubstitution.addEventListener('click', () => substitutionDialog.close());
+    substitutionForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!game || busy) return;
+      setSubstitutionError();
+      busy = true;
+      try {
+        const next = structuredClone(game);
+        next.events.push({
+          id: crypto.randomUUID(),
+          sequence: Math.max(0, ...next.events.map(item => item.sequence)) + 1,
+          videoSeconds: substitutionSeconds,
+          side: 'team',
+          type: 'substitution',
+          playerId: null,
+          playerOutId: substitutionPlayerOut.value,
+          playerInId: substitutionPlayerIn.value,
+          relatedEventId: null,
+          lineupIds: [],
+          createdAt: now(),
+          updatedAt: null,
+        });
+        next.updatedAt = now();
+        await persist(next);
+        substitutionDialog.close();
+      } catch (error) {
+        setSubstitutionError(error.message || 'Could not save the substitution.');
+      } finally {
+        busy = false;
+      }
     });
     playerSelect.disabled = side === 'opponent' || !game;
     if (side === 'opponent') playerSelect.value = '';

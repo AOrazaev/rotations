@@ -110,6 +110,19 @@
           <div><span>Our team</span><strong id="teamScore">0</strong></div>
           <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
         </div>
+        <div class="lineup-panel">
+          <div class="lineup-heading">
+            <div>
+              <h3>Current lineup</h3>
+              <p>Derived from the starting five and substitution timeline.</p>
+            </div>
+            <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
+          </div>
+          <div id="currentLineup" class="player-chips" aria-label="Current lineup"></div>
+          <p class="bench-label">Bench</p>
+          <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
+          <div id="plannedLineupReference" class="planned-reference hidden"></div>
+        </div>
         <div class="event-side" role="group" aria-label="Event side">
           <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
           <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
@@ -185,6 +198,7 @@
             <option value="block">Block</option>
             <option value="turnover">Turnover</option>
             <option value="foul">Foul</option>
+            <option value="substitution">Substitution</option>
           </select>
         </label>
         <div id="editShotFields" class="edit-dependent-fields">
@@ -210,6 +224,14 @@
             </select>
           </label>
         </div>
+        <div id="editSubstitutionFields" class="edit-dependent-fields hidden">
+          <label>Player out
+            <select id="editPlayerOut"></select>
+          </label>
+          <label>Player in
+            <select id="editPlayerIn"></select>
+          </label>
+        </div>
       </div>
       <div class="timestamp-editor">
         <span>Timestamp <strong id="editEventTimestamp">0:00.0</strong></span>
@@ -224,6 +246,30 @@
       <p id="eventEditError" class="message error hidden" role="alert"></p>
       <div class="form-actions">
         <button class="primary" type="submit">Save correction</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="substitutionDialog" class="event-dialog">
+    <form id="substitutionForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Make substitution</h2>
+          <p>At <strong id="substitutionTimestamp">0:00.0</strong> in the recording.</p>
+        </div>
+        <button id="cancelSubstitution" class="secondary small" type="button">Close</button>
+      </div>
+      <div class="edit-event-grid">
+        <label>Player out
+          <select id="substitutionPlayerOut"></select>
+        </label>
+        <label>Player in
+          <select id="substitutionPlayerIn"></select>
+        </label>
+      </div>
+      <p id="substitutionError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Save substitution</button>
       </div>
     </form>
   </dialog>

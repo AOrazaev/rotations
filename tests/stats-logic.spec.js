@@ -154,6 +154,7 @@ test('same-timestamp substitution ordering follows sequence numbers', async ({ p
   shot.videoSeconds = 150;
   substitution.sequence = 8;
   shot.sequence = 7;
+  shot.playerId = 'p5';
   shot.lineupIds = ['p1', 'p2', 'p3', 'p4', 'p5'];
   game.events.find(event => event.id === 'e9').lineupIds = ['p1', 'p2', 'p3', 'p4', 'p6'];
 
@@ -170,4 +171,36 @@ test('same-timestamp substitution ordering follows sequence numbers', async ({ p
   expect(result.order).toEqual(['e8', 'e7', 'e9']);
   expect(result.p5PlusMinus).toBe(3);
   expect(result.p6PlusMinus).toBe(-1);
+});
+
+test('lineup rebuilding repairs all later snapshots after a substitution correction', async ({ page }) => {
+  const { game } = await loadFixture(page);
+  const substitution = game.events.find(event => event.id === 'e7');
+  substitution.playerOutId = 'p4';
+  game.events.find(event => event.id === 'e11').playerId = 'p6';
+  for (const event of game.events.filter(event => event.sequence > substitution.sequence)) {
+    event.lineupIds = ['stale'];
+  }
+
+  const result = await page.evaluate(async gameData => {
+    const { rebuildLineupSnapshots, validateGame } = await import('/stats/js/game-model.js');
+    const rebuilt = rebuildLineupSnapshots(gameData);
+    validateGame(rebuilt);
+    return rebuilt.events.filter(event => event.sequence >= 7).map(event => event.lineupIds);
+  }, game);
+
+  expect(result.every(lineup => lineup.join(',') === 'p1,p2,p3,p6,p5')).toBe(true);
+});
+
+test('validation rejects team statistics attributed to a bench player', async ({ page }) => {
+  const { game } = await loadFixture(page);
+  const event = game.events.find(item => item.id === 'e1');
+  event.playerId = 'p6';
+
+  const issues = await page.evaluate(async gameData => {
+    const { collectGameValidationIssues } = await import('/stats/js/game-model.js');
+    return collectGameValidationIssues(gameData);
+  }, game);
+
+  expect(issues).toContain('Event e1 team statistic player must be on court.');
 });

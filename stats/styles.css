@@ -92,6 +92,15 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .scoreboard { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
 .scoreboard > div { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; color: var(--muted); }
 .scoreboard strong { color: var(--text); font-size: 1.7rem; }
+.lineup-panel { margin-bottom: 14px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
+.lineup-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 9px; }
+.lineup-heading h3 { margin: 0 0 3px; font-size: 1rem; }
+.lineup-heading p, .bench-label { margin: 0; color: var(--muted); font-size: .8rem; }
+.bench-label { margin-top: 10px; margin-bottom: 5px; }
+.player-chips { display: flex; gap: 6px; flex-wrap: wrap; min-height: 27px; }
+.player-chip { padding: 5px 8px; color: #dce2ff; background: #1b2540; border: 1px solid var(--line); border-radius: 999px; font-size: .8rem; }
+.planned-reference { display: grid; gap: 7px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
+.planned-blocks { display: grid; gap: 4px; }
 .event-side { display: flex; gap: 8px; margin-bottom: 12px; }
 .view-tab { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font-weight: 600; }
 .view-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -139,4 +148,5 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
   .event-row-actions button { flex: 1; }
   .edit-event-grid { grid-template-columns: 1fr; }
   .edit-dependent-fields { grid-column: auto; }
+  .lineup-heading { align-items: stretch; flex-direction: column; }
 }

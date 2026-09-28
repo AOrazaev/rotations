@@ -365,6 +365,8 @@ Verification:
 
 ### Milestone 7: Substitutions and lineup tracking
 
+**Status: complete.** Implemented by the shared lineup replay helpers in `stats/js/game-model.js`, the substitution/current-lineup workflow in `stats/js/event-entry.js`, correction support in `stats/js/event-list.js`, and `tests/stats-lineup.spec.js`.
+
 Deliver:
 
 - Current lineup display

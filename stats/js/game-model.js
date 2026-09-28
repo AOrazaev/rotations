@@ -37,6 +37,42 @@ export function orderGameEvents(events) {
   return [...events].sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
 }
 
+function applySubstitution(lineupIds, event, playerIds) {
+  if (!lineupIds.includes(event.playerOutId)) {
+    throw new Error('The outgoing player is not on court at this timestamp.');
+  }
+  if (!playerIds.has(event.playerInId) || lineupIds.includes(event.playerInId)) {
+    throw new Error('The incoming player must be on the bench at this timestamp.');
+  }
+  return lineupIds.map(id => id === event.playerOutId ? event.playerInId : id);
+}
+
+export function getLineupAtEventPosition(game, videoSeconds, sequence = Number.MAX_SAFE_INTEGER, excludedEventId = null) {
+  const playerIds = new Set(game.players.map(player => player.id));
+  let lineupIds = [...game.startingLineupIds];
+  for (const event of orderGameEvents(game.events)) {
+    if (event.id === excludedEventId) continue;
+    if (event.videoSeconds > videoSeconds || (event.videoSeconds === videoSeconds && event.sequence >= sequence)) break;
+    if (event.type === 'substitution') {
+      lineupIds = applySubstitution(lineupIds, event, playerIds);
+    }
+  }
+  return lineupIds;
+}
+
+export function rebuildLineupSnapshots(game) {
+  const next = structuredClone(game);
+  const playerIds = new Set(next.players.map(player => player.id));
+  let lineupIds = [...next.startingLineupIds];
+  for (const event of orderGameEvents(next.events)) {
+    if (event.type === 'substitution') {
+      lineupIds = applySubstitution(lineupIds, event, playerIds);
+    }
+    event.lineupIds = [...lineupIds];
+  }
+  return next;
+}
+
 export function collectGameValidationIssues(game) {
   const issues = [];
   if (!game || typeof game !== 'object' || Array.isArray(game)) {
@@ -118,6 +154,12 @@ export function collectGameValidationIssues(game) {
       }
       if (event.side === 'team' && !playerIds.has(event.playerId)) {
         issues.push(`${label} team statistic requires a valid player.`);
+      }
+      if (event.side === 'team'
+        && playerIds.has(event.playerId)
+        && Array.isArray(event.lineupIds)
+        && !event.lineupIds.includes(event.playerId)) {
+        issues.push(`${label} team statistic player must be on court.`);
       }
       if (event.side === 'opponent' && event.playerId !== null) {
         issues.push(`${label} opponent statistic cannot identify an individual player.`);
