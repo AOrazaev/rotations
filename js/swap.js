@@ -25,11 +25,19 @@ function applySwap(rotation, blockIndex, onCourtId, benchId) {
   if (lineupIdx === -1 || benchIdx === -1) return false;
   const onPlayer = block.lineup[lineupIdx];
   const benchPlayer = block.bench[benchIdx];
+  if (exceedsConsecutiveLimit(rotation.result, benchPlayer, blockIndex, true)) return false;
   block.lineup[lineupIdx] = benchPlayer;
   block.bench[benchIdx] = onPlayer;
   rotation.minutes[onPlayer.id] -= rotation.blockMinutes;
   rotation.minutes[benchPlayer.id] += rotation.blockMinutes;
   return true;
+}
+
+function swapConsecutiveLimitViolation(rotation, blockIndex, benchId) {
+  const block = rotation.result[blockIndex];
+  const player = block?.bench.find(p => p.id === benchId);
+  if (!player || !exceedsConsecutiveLimit(rotation.result, player, blockIndex, true)) return null;
+  return `${player.name} cannot play more than ${maxConsecutiveBlocksFor(player)} consecutive blocks.`;
 }
 
 // Captures just enough to reconstruct rotation.result/minutes later (player
@@ -94,6 +102,13 @@ timelineGrid.addEventListener('click', (e) => {
   if (swapSelection && swapSelection.blockIndex === blockIndex && swapSelection.status !== status) {
     const onCourtId = status === 'on' ? playerId : swapSelection.playerId;
     const benchId = status === 'off' ? playerId : swapSelection.playerId;
+    const violation = swapConsecutiveLimitViolation(lastRotation, blockIndex, benchId);
+    if (violation) {
+      swapSelection = null;
+      highlightSwapSelection();
+      alert(violation);
+      return;
+    }
     const beforeSwap = snapshotRotation(lastRotation);
     const swapped = applySwap(lastRotation, blockIndex, onCourtId, benchId);
     swapSelection = null;

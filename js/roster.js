@@ -13,6 +13,7 @@ function renderRoster() {
     const posBoxes = [...node.querySelectorAll('.positions input')];
     const minMinutes = node.querySelector('.min-minutes');
     const maxMinutes = node.querySelector('.max-minutes');
+    const maxConsecutiveBlocks = node.querySelector('.max-consecutive-blocks');
     const compactJersey = node.querySelector('.compact-jersey');
     const nameText = node.querySelector('.name-text');
 
@@ -27,6 +28,7 @@ function renderRoster() {
     posBoxes.forEach(box => box.checked = player.positions.includes(box.value));
     minMinutes.value = player.minMinutes ?? '';
     maxMinutes.value = player.maxMinutes ?? '';
+    maxConsecutiveBlocks.value = player.maxConsecutiveBlocks ?? '';
 
     const update = () => {
       player.present = present.checked;
@@ -41,6 +43,10 @@ function renderRoster() {
       skillValue.textContent = player.skill;
       player.minMinutes = minMinutes.value === '' ? null : Math.max(0, Number(minMinutes.value));
       player.maxMinutes = maxMinutes.value === '' ? null : Math.max(0, Number(maxMinutes.value));
+      player.maxConsecutiveBlocks = maxConsecutiveBlocks.value === ''
+        ? null
+        : Math.max(1, Math.floor(Number(maxConsecutiveBlocks.value)));
+      maxConsecutiveBlocks.value = player.maxConsecutiveBlocks ?? '';
       saveState();
     };
 
@@ -51,6 +57,7 @@ function renderRoster() {
     posBoxes.forEach(box => box.addEventListener('change', update));
     minMinutes.addEventListener('input', update);
     maxMinutes.addEventListener('input', update);
+    maxConsecutiveBlocks.addEventListener('input', update);
     node.querySelector('.delete').addEventListener('click', () => {
       state.players = state.players.filter(p => p.id !== player.id);
       saveState();

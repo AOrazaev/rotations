@@ -18,6 +18,7 @@ function makePlayers(n) {
     skill: 40 + ((i * 7) % 55),
     minMinutes: null,
     maxMinutes: null,
+    maxConsecutiveBlocks: null,
   }));
 }
 
@@ -99,6 +100,56 @@ test('buildRotation() guarantees a hard maximum-minutes ceiling', async ({ page 
     { players, blockMinutes }
   );
   expect(output.minutes.p0).toBeLessThanOrEqual(10);
+});
+
+test('buildRotation() guarantees a hard maximum-consecutive-block limit', async ({ page }) => {
+  const players = makePlayers(8);
+  players.forEach(p => { p.maxConsecutiveBlocks = 2; });
+  const output = await page.evaluate(players => buildRotation(players, 4, 50), players);
+
+  for (const player of players) {
+    let consecutive = 0;
+    for (const block of output.result) {
+      consecutive = block.lineup.some(p => p.id === player.id) ? consecutive + 1 : 0;
+      expect(consecutive).toBeLessThanOrEqual(2);
+    }
+  }
+});
+
+test('buildRotation() reports when consecutive-block limits make a block impossible', async ({ page }) => {
+  const players = makePlayers(6);
+  players.forEach(p => { p.maxConsecutiveBlocks = 2; });
+  const message = await page.evaluate(players => {
+    try { buildRotation(players, 4, 50); return null; }
+    catch (e) { return e.message; }
+  }, players);
+  expect(message).toMatch(/consecutive-block limits/i);
+});
+
+test('manual swaps reject a third consecutive block', async ({ page }) => {
+  const players = makePlayers(6);
+  players[5].maxConsecutiveBlocks = 2;
+  const result = await page.evaluate(players => {
+    const rotation = {
+      result: [
+        { lineup: players.slice(0, 5), bench: [players[5]] },
+        { lineup: [players[5], ...players.slice(1, 5)], bench: [players[0]] },
+        { lineup: [players[5], ...players.slice(1, 5)], bench: [players[0]] },
+      ],
+      minutes: Object.fromEntries(players.map(p => [p.id, 0])),
+      blockMinutes: 4,
+    };
+    const message = swapConsecutiveLimitViolation(rotation, 0, players[5].id);
+    const swapped = applySwap(rotation, 0, players[0].id, players[5].id);
+    return {
+      message,
+      swapped,
+      lineup: rotation.result[0].lineup.map(p => p.id),
+    };
+  }, players);
+  expect(result.message).toMatch(/cannot play more than 2 consecutive blocks/i);
+  expect(result.swapped).toBe(false);
+  expect(result.lineup).toEqual(players.slice(0, 5).map(p => p.id));
 });
 
 test('buildRotation() rejects a per-player minimum greater than that player\'s maximum', async ({ page }) => {

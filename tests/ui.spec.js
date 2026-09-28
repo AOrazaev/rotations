@@ -95,6 +95,31 @@ test('setting a player\'s max minutes via the UI is enforced by a generated rota
   expect(minutes).toBeLessThanOrEqual(4);
 });
 
+test('setting max consecutive blocks via the UI is persisted and enforced', async ({ page }) => {
+  await page.locator('#rosterEditTab').click();
+  const rows = page.locator('.player-row');
+  const count = await rows.count();
+  for (let i = 0; i < count; i++) {
+    await rows.nth(i).locator('.max-consecutive-blocks').fill('2');
+  }
+
+  await page.reload();
+  await page.locator('#generate').click();
+
+  const result = await page.evaluate(() => ({
+    limits: state.players.filter(p => p.present).map(p => p.maxConsecutiveBlocks),
+    valid: state.players.filter(p => p.present).every(player => {
+      let consecutive = 0;
+      return lastRotation.result.every(block => {
+        consecutive = block.lineup.some(p => p.id === player.id) ? consecutive + 1 : 0;
+        return consecutive <= player.maxConsecutiveBlocks;
+      });
+    }),
+  }));
+  expect(result.limits.every(limit => limit === 2)).toBe(true);
+  expect(result.valid).toBe(true);
+});
+
 test('changing Block minutes via the UI changes the number of rendered timeline blocks', async ({ page }) => {
   await page.locator('#blockMinutes').selectOption('5');
   await page.locator('#generate').click();
