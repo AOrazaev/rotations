@@ -46,6 +46,13 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   expect(workspaceBoxes[0].x).toBeLessThan(workspaceBoxes[1].x);
   expect(workspaceBoxes[0].width).toBeGreaterThan(workspaceBoxes[1].width);
   expect(workspaceBoxes[0].width).toBeGreaterThanOrEqual(600);
+  expect(workspaceBoxes[1].x - (workspaceBoxes[0].x + workspaceBoxes[0].width)).toBeLessThanOrEqual(10);
+
+  const reviewBoxes = await page.locator('#reviewShell, .capture-panel').evaluateAll(elements =>
+    elements.map(element => element.getBoundingClientRect().width)
+  );
+  expect(reviewBoxes[1] / reviewBoxes[0]).toBeGreaterThan(0.25);
+  expect(reviewBoxes[1] / reviewBoxes[0]).toBeLessThan(0.35);
 
   const expandedVideoWidth = workspaceBoxes[0].width;
   await page.locator('#hideGamePanel').click();
@@ -60,15 +67,15 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   await expect(page.locator('#hideGamePanel')).toBeFocused();
 
   await page.locator('#decreaseVideoSize').click();
-  await expect(page.locator('#videoSizeValue')).toHaveText('95%');
+  await expect(page.locator('#videoSizeValue')).toHaveText('65%');
   const resizeHandle = await page.locator('#videoResizeHandle').boundingBox();
   await page.mouse.move(resizeHandle.x + resizeHandle.width / 2, resizeHandle.y + resizeHandle.height / 2);
   await page.mouse.down();
   await page.mouse.move(resizeHandle.x - 140, resizeHandle.y + resizeHandle.height / 2, { steps: 5 });
   await page.mouse.up();
   const persistedVideoSize = Number((await page.locator('#videoResizeHandle').getAttribute('aria-valuenow')));
-  expect(persistedVideoSize).toBeLessThan(95);
-  expect(persistedVideoSize).toBeGreaterThanOrEqual(60);
+  expect(persistedVideoSize).toBeLessThan(65);
+  expect(persistedVideoSize).toBeGreaterThanOrEqual(55);
   const resizedVideoWidth = await page.locator('.video-card').evaluate(element => element.getBoundingClientRect().width);
   expect(resizedVideoWidth).toBeLessThan(expandedVideoWidth);
   expect(resizedVideoWidth).toBeGreaterThanOrEqual(expandedVideoWidth * 0.6);

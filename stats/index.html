@@ -70,6 +70,7 @@
         </details>
       </aside>
 
+      <div id="reviewShell" class="review-shell">
       <div class="panel-stack center-panel">
         <section id="workspace" class="workspace hidden">
           <section class="card video-card">
@@ -85,7 +86,7 @@
                 </div>
                 <div class="video-size-actions" role="group" aria-label="Video size">
                   <button id="decreaseVideoSize" class="secondary small" type="button" aria-label="Decrease video size">-</button>
-                  <output id="videoSizeValue" aria-live="polite">100%</output>
+                  <output id="videoSizeValue" aria-live="polite">70%</output>
                   <button id="increaseVideoSize" class="secondary small" type="button" aria-label="Increase video size">+</button>
                   <button id="resetVideoSize" class="secondary small" type="button">Reset</button>
                 </div>
@@ -105,10 +106,10 @@
               type="button"
               role="slider"
               aria-label="Resize video"
-              aria-valuemin="60"
-              aria-valuemax="100"
-              aria-valuenow="100"
-              aria-valuetext="100 percent"
+              aria-valuemin="55"
+              aria-valuemax="75"
+              aria-valuenow="70"
+              aria-valuetext="70 percent"
             ></button>
           </section>
 
@@ -180,6 +181,7 @@
           <ol id="eventList" class="event-list"></ol>
         </section>
       </aside>
+      </div>
     </div>
 
     <section id="reportCard" class="card hidden">

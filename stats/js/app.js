@@ -149,14 +149,15 @@ const gamePanel = document.querySelector('#gamePanel');
 const hideGamePanelButton = document.querySelector('#hideGamePanel');
 const showGamePanelButton = document.querySelector('#showGamePanel');
 const gamePanelStorageKey = 'basketball-stats-game-panel-collapsed';
+const reviewShell = document.querySelector('#reviewShell');
 const videoCard = document.querySelector('.video-card');
 const videoSizeValue = document.querySelector('#videoSizeValue');
 const decreaseVideoSizeButton = document.querySelector('#decreaseVideoSize');
 const increaseVideoSizeButton = document.querySelector('#increaseVideoSize');
 const resetVideoSizeButton = document.querySelector('#resetVideoSize');
 const videoResizeHandle = document.querySelector('#videoResizeHandle');
-const videoSizeStorageKey = 'basketball-stats-video-size';
-let videoSize = 100;
+const videoSizeStorageKey = 'basketball-stats-video-column-size';
+let videoSize = 70;
 let resizePointerId = null;
 
 function setGamePanelCollapsed(collapsed, { moveFocus = false } = {}) {
@@ -174,28 +175,28 @@ showGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(false,
 setGamePanelCollapsed(localStorage.getItem(gamePanelStorageKey) === 'true');
 
 function setVideoSize(value) {
-  const size = Math.min(100, Math.max(60, Number(value) || 100));
+  const size = Math.min(75, Math.max(55, Number(value) || 70));
   videoSize = size;
-  videoCard.style.setProperty('--video-card-width', `${size}%`);
+  reviewShell.style.setProperty('--video-column-width', `${size}%`);
   videoSizeValue.value = `${size}%`;
-  decreaseVideoSizeButton.disabled = size <= 60;
-  increaseVideoSizeButton.disabled = size >= 100;
-  resetVideoSizeButton.disabled = size >= 100;
+  decreaseVideoSizeButton.disabled = size <= 55;
+  increaseVideoSizeButton.disabled = size >= 75;
+  resetVideoSizeButton.disabled = size === 70;
   videoResizeHandle.setAttribute('aria-valuenow', String(size));
   videoResizeHandle.setAttribute('aria-valuetext', `${size} percent`);
   localStorage.setItem(videoSizeStorageKey, String(size));
 }
 
 function resizeVideoFromPointer(clientX) {
-  const workspaceBox = videoCard.parentElement.getBoundingClientRect();
-  if (!workspaceBox.width) return;
-  setVideoSize(Math.round(((clientX - workspaceBox.left) / workspaceBox.width) * 100));
+  const reviewBox = reviewShell.getBoundingClientRect();
+  if (!reviewBox.width) return;
+  setVideoSize(Math.round(((clientX - reviewBox.left) / reviewBox.width) * 100));
 }
 
 decreaseVideoSizeButton.addEventListener('click', () => setVideoSize(videoSize - 5));
 increaseVideoSizeButton.addEventListener('click', () => setVideoSize(videoSize + 5));
-resetVideoSizeButton.addEventListener('click', () => setVideoSize(100));
-videoResizeHandle.addEventListener('dblclick', () => setVideoSize(100));
+resetVideoSizeButton.addEventListener('click', () => setVideoSize(70));
+videoResizeHandle.addEventListener('dblclick', () => setVideoSize(70));
 videoResizeHandle.addEventListener('pointerdown', event => {
   resizePointerId = event.pointerId;
   videoResizeHandle.setPointerCapture(event.pointerId);
@@ -223,8 +224,8 @@ videoResizeHandle.addEventListener('keydown', event => {
     ArrowRight: 5,
     ArrowUp: 5,
   };
-  if (event.key === 'Home') setVideoSize(60);
-  else if (event.key === 'End') setVideoSize(100);
+  if (event.key === 'Home') setVideoSize(55);
+  else if (event.key === 'End') setVideoSize(75);
   else if (changes[event.key]) setVideoSize(videoSize + changes[event.key]);
   else return;
   event.preventDefault();
