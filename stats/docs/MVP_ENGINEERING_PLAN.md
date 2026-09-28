@@ -383,6 +383,8 @@ Verification:
 
 ### Milestone 8: MVP reports
 
+**Status: complete.** Implemented by `stats/js/report-view.js`, the reducer traceability integration, and `tests/stats-reports.spec.js`.
+
 Deliver:
 
 - Team versus opponent comparison

@@ -1,5 +1,6 @@
 import { buildGameAnalysis } from './event-reducer.js';
 import { createEventListController } from './event-list.js';
+import { createReportController } from './report-view.js';
 import {
   getLineupAtEventPosition,
   rebuildLineupSnapshots
@@ -41,6 +42,7 @@ export function createEventEntryController({
   let busy = false;
   let eventListController;
   let substitutionSeconds = 0;
+  const reportController = createReportController({ documentObject, videoController });
 
   function playerLabel(player) {
     return player.number ? `#${player.number} ${player.name}` : player.name;
@@ -119,6 +121,7 @@ export function createEventEntryController({
       renderLineup(null);
       setControlsEnabled(false);
       eventListController.render(null);
+      reportController.render(null, null);
       return;
     }
 
@@ -136,6 +139,7 @@ export function createEventEntryController({
     lockMessage.textContent = videoReady ? '' : 'Load this game’s recording before adding a new event.';
     lockMessage.classList.toggle('hidden', videoReady);
     eventListController.render(game);
+    reportController.render(game, analysis);
     setControlsEnabled(videoReady);
   }
 
