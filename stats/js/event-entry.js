@@ -74,8 +74,18 @@ export function createEventEntryController({
       const selected = side === 'team' && button.dataset.playerId === selectedPlayerId;
       button.classList.toggle('selected', selected);
       button.setAttribute('aria-pressed', String(selected));
-      button.disabled = side === 'opponent';
     });
+  }
+
+  function setEventSide(nextSide) {
+    side = nextSide;
+    sideButtons.forEach(button => {
+      const active = button.dataset.eventSide === side;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    if (side === 'opponent') selectedPlayerId = null;
+    updatePlayerSelection();
   }
 
   function renderLineup(analysis) {
@@ -309,20 +319,12 @@ export function createEventEntryController({
     }
   });
 
-  sideButtons.forEach(button => button.addEventListener('click', () => {
-    side = button.dataset.eventSide;
-    sideButtons.forEach(candidate => {
-      const active = candidate === button;
-      candidate.classList.toggle('active', active);
-      candidate.setAttribute('aria-pressed', String(active));
-    });
-    if (side === 'opponent') selectedPlayerId = null;
-    updatePlayerSelection();
-  }));
+  sideButtons.forEach(button => button.addEventListener('click', () => setEventSide(button.dataset.eventSide)));
 
   currentLineup.addEventListener('click', event => {
     const button = event.target.closest('.player-select-button');
-    if (!button || side !== 'team') return;
+    if (!button) return;
+    setEventSide('team');
     selectedPlayerId = button.dataset.playerId;
     updatePlayerSelection();
     setError();

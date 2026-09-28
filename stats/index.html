@@ -133,7 +133,7 @@
               <div class="lineup-heading">
                 <div>
                   <h3>Current lineup</h3>
-                  <p>Select a player here before recording our team’s event.</p>
+                  <p>Selecting a player switches event entry to our team.</p>
                 </div>
                 <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
               </div>
@@ -257,8 +257,16 @@
       <button class="event-time link-button" type="button" data-action="play-event"></button>
       <span class="event-description"></span>
       <div class="event-row-actions">
-        <button class="secondary small" type="button" data-action="edit-event">Edit</button>
-        <button class="danger small" type="button" data-action="delete-event">Delete</button>
+        <button class="secondary icon-button" type="button" data-action="edit-event" aria-label="Edit event" title="Edit event">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20h4l11-11-4-4L4 16v4Zm10-13 4 4" />
+          </svg>
+        </button>
+        <button class="danger icon-button" type="button" data-action="delete-event" aria-label="Delete event" title="Delete event">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" />
+          </svg>
+        </button>
       </div>
     </li>
   </template>

@@ -45,6 +45,15 @@ test('records a timestamped team event with selected player and active lineup', 
   await expect(page.locator('#teamFieldGoals')).toHaveText('1/1');
   await expect(page.locator('.event-list-item')).toHaveCount(1);
   await expect(page.locator('.event-description')).toContainText('made 2PT');
+  await expect(page.locator('[data-action="edit-event"]')).toHaveAttribute('aria-label', 'Edit event');
+  await expect(page.locator('[data-action="delete-event"]')).toHaveAttribute('aria-label', 'Delete event');
+  const timelineRowPositions = await page.locator('.event-time, .event-description, .event-row-actions').evaluateAll(elements =>
+    elements.map(element => {
+      const box = element.getBoundingClientRect();
+      return box.y + box.height / 2;
+    })
+  );
+  expect(Math.max(...timelineRowPositions) - Math.min(...timelineRowPositions)).toBeLessThan(3);
 
   const game = await page.evaluate(() => window.__statsApp.eventController.getGame());
   expect(game.events[0]).toMatchObject({
@@ -68,7 +77,7 @@ test('team events require a player while opponent events remain team-level', asy
   expect((await page.evaluate(() => window.__statsApp.eventController.getGame())).events).toHaveLength(0);
 
   await page.locator('[data-event-side="opponent"]').click();
-  await expect(page.locator('#currentLineup .player-select-button').first()).toBeDisabled();
+  await expect(page.locator('#currentLineup .player-select-button').first()).toBeEnabled();
   await page.locator('[data-event-type="shot"][data-shot-value="3"][data-made="false"]').click();
 
   await expect(page.locator('#opponentScore')).toHaveText('0');
@@ -80,6 +89,24 @@ test('team events require a player while opponent events remain team-level', asy
     shotValue: 3,
     made: false
   });
+});
+
+test('selecting a lineup player switches event entry from opponent to our team', async ({ page }) => {
+  await openEventEntry(page);
+  await page.locator('[data-event-side="opponent"]').click();
+
+  const playerButton = page.locator('#currentLineup .player-select-button').first();
+  const playerId = await playerButton.getAttribute('data-player-id');
+  await playerButton.click();
+
+  await expect(page.locator('[data-event-side="team"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-event-side="opponent"]')).toHaveAttribute('aria-pressed', 'false');
+  await expect(playerButton).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-event-type="steal"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+
+  const event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(event).toMatchObject({ side: 'team', playerId, type: 'steal' });
 });
 
 test('identical timestamps retain insertion sequence and survive reload', async ({ page }) => {

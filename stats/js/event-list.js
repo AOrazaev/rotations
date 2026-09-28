@@ -174,7 +174,9 @@ export function createEventListController({
       const item = eventTemplate.content.firstElementChild.cloneNode(true);
       item.dataset.eventId = event.id;
       item.querySelector('.event-time').textContent = formatVideoTime(event.videoSeconds);
-      item.querySelector('.event-description').textContent = describeEvent(event, playersById);
+      const description = describeEvent(event, playersById);
+      item.querySelector('.event-description').textContent = description;
+      item.querySelector('.event-description').title = description;
       item.querySelector('[data-action="edit-event"]').disabled = !EDITABLE_TYPES.has(event.type);
       eventList.appendChild(item);
     }
