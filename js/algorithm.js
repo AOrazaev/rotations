@@ -24,14 +24,19 @@ function maxConsecutiveBlocksFor(player) {
     : Infinity;
 }
 
-function exceedsConsecutiveLimit(result, player, blockIndex, playsTargetBlock = true) {
+function startsNewHalf(blockIndex, blockMinutes) {
+  return blockIndex > 0 && halfForBlock(blockIndex, blockMinutes) !== halfForBlock(blockIndex - 1, blockMinutes);
+}
+
+function exceedsConsecutiveLimit(rotation, player, blockIndex, playsTargetBlock = true) {
   let run = 0;
   const limit = maxConsecutiveBlocksFor(player);
   if (!Number.isFinite(limit)) return false;
-  for (let i = 0; i < result.length; i++) {
+  for (let i = 0; i < rotation.result.length; i++) {
+    if (startsNewHalf(i, rotation.blockMinutes)) run = 0;
     const plays = i === blockIndex
       ? playsTargetBlock
-      : result[i].lineup.some(p => p.id === player.id);
+      : rotation.result[i].lineup.some(p => p.id === player.id);
     run = plays ? run + 1 : 0;
     if (run > limit) return true;
   }
@@ -109,6 +114,9 @@ function buildRotation(players, blockMinutes, intensity, rng) {
   const targetBlocks = Object.fromEntries(players.map(p => [p.id, (blocks*5)*(weights[p.id]/totalWeight)]));
 
   for (let b=0; b<blocks; b++) {
+    if (startsNewHalf(b, blockMinutes)) {
+      players.forEach(p => { consecutive[p.id] = 0; });
+    }
     const closing = b === blocks-1;
     const remaining = blocks - b; // blocks left, including this one
 
@@ -142,9 +150,12 @@ function buildRotation(players, blockMinutes, intensity, rng) {
     if (!closing) {
       eligibleCombos = eligibleCombos.filter(lineup => {
         const ids = new Set(lineup.map(p => p.id));
+        const halftimeBeforeNextBlock = startsNewHalf(b + 1, blockMinutes);
         const nextEligibleCount = players.filter(p => {
           const nextPlayedBlocks = playedBlocks[p.id] + (ids.has(p.id) ? 1 : 0);
-          const nextConsecutive = ids.has(p.id) ? consecutive[p.id] + 1 : 0;
+          const nextConsecutive = halftimeBeforeNextBlock
+            ? 0
+            : (ids.has(p.id) ? consecutive[p.id] + 1 : 0);
           return nextPlayedBlocks < maxBlocks[p.id]
             && nextConsecutive < maxConsecutiveBlocksFor(p);
         }).length;

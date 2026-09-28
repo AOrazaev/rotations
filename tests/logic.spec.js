@@ -104,16 +104,44 @@ test('buildRotation() guarantees a hard maximum-minutes ceiling', async ({ page 
 
 test('buildRotation() guarantees a hard maximum-consecutive-block limit', async ({ page }) => {
   const players = makePlayers(8);
+  const blockMinutes = 4;
   players.forEach(p => { p.maxConsecutiveBlocks = 2; });
-  const output = await page.evaluate(players => buildRotation(players, 4, 50), players);
+  const output = await page.evaluate(
+    ({ players, blockMinutes }) => buildRotation(players, blockMinutes, 50),
+    { players, blockMinutes }
+  );
 
   for (const player of players) {
     let consecutive = 0;
-    for (const block of output.result) {
+    for (let i = 0; i < output.result.length; i++) {
+      if (i > 0 && i * blockMinutes >= 20 && (i - 1) * blockMinutes < 20) consecutive = 0;
+      const block = output.result[i];
       consecutive = block.lineup.some(p => p.id === player.id) ? consecutive + 1 : 0;
       expect(consecutive).toBeLessThanOrEqual(2);
     }
   }
+});
+
+test('halftime resets the maximum-consecutive-block limit', async ({ page }) => {
+  const players = makePlayers(6);
+  players[5].maxConsecutiveBlocks = 2;
+  const result = await page.evaluate(players => {
+    const withPlayer = [players[5], ...players.slice(1, 5)];
+    const withoutPlayer = players.slice(0, 5);
+    const rotation = {
+      result: Array.from({ length: 10 }, (_, i) => ({
+        lineup: i >= 3 && i <= 6 ? withPlayer : withoutPlayer,
+        bench: i >= 3 && i <= 6 ? [players[0]] : [players[5]],
+      })),
+      blockMinutes: 4,
+    };
+    return {
+      crossesHalftime: exceedsConsecutiveLimit(rotation, players[5], 3, true),
+      halfBoundary: startsNewHalf(5, 4),
+    };
+  }, players);
+  expect(result.halfBoundary).toBe(true);
+  expect(result.crossesHalftime).toBe(false);
 });
 
 test('buildRotation() reports when consecutive-block limits make a block impossible', async ({ page }) => {
