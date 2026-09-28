@@ -316,3 +316,27 @@ test('timeline filters combine side, type, player, and coach comment selections'
   await expect(page.locator('#eventFilterCount')).toBeHidden();
   await page.locator('#cancelEventFilters').click();
 });
+
+test('timeline can filter coach comments that mention the whole team', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]', 20);
+  await page.locator('[data-action="comment-event"]').click();
+  await page.locator('#coachCommentText').fill('@team Review our defensive spacing.');
+  await page.locator('#coachCommentForm button[type="submit"]').click();
+
+  await addTeamEvent(page, '[data-event-type="assist"]', 30);
+  await page.locator('.event-list-item').filter({ hasText: 'assist' })
+    .locator('[data-action="comment-event"]').click();
+  await page.locator('#coachCommentText').fill('Good pass.');
+  await page.locator('#coachCommentForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(2);
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('#filterTeamMention').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await expect(page.locator('.event-description')).toContainText('steal');
+  await expect(page.locator('.coach-comment')).toHaveText('@team Review our defensive spacing.');
+  await expect(page.locator('#openEventFilters')).toHaveAttribute('aria-label', 'Filter timeline, 1 active');
+});

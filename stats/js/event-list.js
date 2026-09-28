@@ -80,6 +80,7 @@ export function createEventListController({
   const filterDialog = documentObject.querySelector('#eventFilterDialog');
   const filterForm = documentObject.querySelector('#eventFilterForm');
   const filterPlayers = documentObject.querySelector('#eventFilterPlayers');
+  const filterTeamMention = documentObject.querySelector('#filterTeamMention');
   const cancelFilters = documentObject.querySelector('#cancelEventFilters');
   const clearFilters = documentObject.querySelector('#clearEventFilters');
   const orderButton = documentObject.querySelector('#toggleEventOrder');
@@ -95,6 +96,7 @@ export function createEventListController({
     sides: new Set(),
     types: new Set(),
     players: new Set(),
+    teamMention: false,
     comment: 'any'
   };
 
@@ -144,7 +146,7 @@ export function createEventListController({
   function activeFilterCount() {
     return Number(filters.sides.size > 0)
       + Number(filters.types.size > 0)
-      + Number(filters.players.size > 0)
+      + Number(filters.players.size > 0 || filters.teamMention)
       + Number(filters.comment !== 'any');
   }
 
@@ -186,6 +188,7 @@ export function createEventListController({
     setCheckedValues('filterSide', filters.sides);
     setCheckedValues('filterType', filters.types);
     populateFilterPlayers();
+    filterTeamMention.checked = filters.teamMention;
     const comment = filterForm.querySelector(`input[name="filterComment"][value="${filters.comment}"]`);
     if (comment) comment.checked = true;
   }
@@ -193,9 +196,13 @@ export function createEventListController({
   function eventMatchesFilters(event) {
     if (filters.sides.size && !filters.sides.has(event.side)) return false;
     if (filters.types.size && !filters.types.has(event.type)) return false;
-    if (filters.players.size) {
+    if (filters.players.size || filters.teamMention) {
       const eventPlayerIds = [event.playerId, event.playerInId, event.playerOutId].filter(Boolean);
-      if (!eventPlayerIds.some(playerId => filters.players.has(playerId))) return false;
+      const matchesPlayer = eventPlayerIds.some(playerId => filters.players.has(playerId));
+      const mentionsTeam = filters.teamMention
+        && [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+          .some(match => match[1].toLowerCase() === 'team');
+      if (!matchesPlayer && !mentionsTeam) return false;
     }
     const hasComment = Boolean(String(event.coachComment || '').trim());
     if (filters.comment === 'with' && !hasComment) return false;
@@ -369,6 +376,7 @@ export function createEventListController({
       sides: new Set(),
       types: new Set(),
       players: new Set(),
+      teamMention: false,
       comment: 'any'
     };
     syncFilterForm();
@@ -380,6 +388,7 @@ export function createEventListController({
       sides: checkedValues('filterSide'),
       types: checkedValues('filterType'),
       players: checkedValues('filterPlayer'),
+      teamMention: filterTeamMention.checked,
       comment: filterForm.querySelector('input[name="filterComment"]:checked')?.value || 'any'
     };
     filterDialog.close();
