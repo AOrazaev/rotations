@@ -82,12 +82,15 @@ export function createEventListController({
   const filterPlayers = documentObject.querySelector('#eventFilterPlayers');
   const cancelFilters = documentObject.querySelector('#cancelEventFilters');
   const clearFilters = documentObject.querySelector('#clearEventFilters');
+  const orderButton = documentObject.querySelector('#toggleEventOrder');
+  const orderDescription = documentObject.querySelector('#eventOrderDescription');
 
   let game = null;
   let editingEventId = null;
   let commentEventId = null;
   let editingSeconds = 0;
   let busy = false;
+  let earliestFirst = false;
   let filters = {
     sides: new Set(),
     types: new Set(),
@@ -153,6 +156,14 @@ export function createEventListController({
     const label = count ? `Filter timeline, ${count} active` : 'Filter timeline';
     filterButton.setAttribute('aria-label', label);
     filterButton.title = label;
+  }
+
+  function updateOrderControl() {
+    const action = earliestFirst ? 'Show latest events first' : 'Show earliest events first';
+    orderButton.setAttribute('aria-label', action);
+    orderButton.title = action;
+    orderButton.classList.toggle('earliest-first', earliestFirst);
+    orderDescription.textContent = earliestFirst ? 'Earliest first.' : 'Latest first.';
   }
 
   function populateFilterPlayers() {
@@ -271,13 +282,15 @@ export function createEventListController({
     eventList.innerHTML = '';
     populateFilterPlayers();
     updateFilterButton();
+    updateOrderControl();
     if (!game) {
       emptyEvents.textContent = 'No events recorded.';
       emptyEvents.classList.remove('hidden');
       return;
     }
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
-    const events = orderGameEvents(game.events).reverse().filter(eventMatchesFilters);
+    const orderedEvents = orderGameEvents(game.events);
+    const events = (earliestFirst ? orderedEvents : orderedEvents.reverse()).filter(eventMatchesFilters);
     emptyEvents.textContent = game.events.length && !events.length
       ? 'No events match the current filters.'
       : 'No events recorded.';
@@ -342,6 +355,10 @@ export function createEventListController({
   });
   typeInput.addEventListener('change', updateDependentFields);
   cancelButton.addEventListener('click', () => dialog.close());
+  orderButton.addEventListener('click', () => {
+    earliestFirst = !earliestFirst;
+    render(game);
+  });
   filterButton.addEventListener('click', () => {
     syncFilterForm();
     filterDialog.showModal();

@@ -106,6 +106,25 @@ test('using current video time reorders display without changing insertion seque
   await expect(page.locator('.event-time')).toHaveText(['0:50.0', '0:40.0']);
 });
 
+test('timeline ordering toggles between latest and earliest events first', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]', 20);
+  await addTeamEvent(page, '[data-event-type="assist"]', 40);
+
+  await expect(page.locator('.event-time')).toHaveText(['0:40.0', '0:20.0']);
+  await expect(page.locator('#eventOrderDescription')).toHaveText('Latest first.');
+  await expect(page.locator('#toggleEventOrder')).toHaveAttribute('aria-label', 'Show earliest events first');
+
+  await page.locator('#toggleEventOrder').click();
+  await expect(page.locator('.event-time')).toHaveText(['0:20.0', '0:40.0']);
+  await expect(page.locator('#eventOrderDescription')).toHaveText('Earliest first.');
+  await expect(page.locator('#toggleEventOrder')).toHaveAttribute('aria-label', 'Show latest events first');
+
+  await page.locator('#toggleEventOrder').click();
+  await expect(page.locator('.event-time')).toHaveText(['0:40.0', '0:20.0']);
+  await expect(page.locator('#eventOrderDescription')).toHaveText('Latest first.');
+});
+
 test('event type can be corrected with type-specific fields', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="steal"]');

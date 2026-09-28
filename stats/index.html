@@ -182,9 +182,14 @@
           <div class="section-head">
             <div>
               <h2>Event timeline</h2>
-              <p>Newest first. Play, correct, or remove recorded events.</p>
+              <p><span id="eventOrderDescription">Latest first.</span> Play, correct, or remove recorded events.</p>
             </div>
             <div class="timeline-actions">
+              <button id="toggleEventOrder" class="secondary icon-button order-button" type="button" aria-label="Show earliest events first" title="Show earliest events first">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 5v14m0 0-4-4m4 4 4-4M16 19V5m0 0-4 4m4-4 4 4" />
+                </svg>
+              </button>
               <button id="openEventFilters" class="secondary icon-button filter-button" type="button" aria-label="Filter timeline" title="Filter timeline">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 5h16l-6 7v5l-4 2v-7L4 5Z" />

@@ -213,6 +213,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .icon-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .filter-button { position: relative; }
 .filter-button.active { color: var(--accent2); border-color: var(--accent2); }
+.order-button.earliest-first { color: var(--accent2); border-color: var(--accent2); }
 .filter-count { position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; color: #fff; background: var(--accent); border: 2px solid var(--card); border-radius: 999px; font-size: .65rem; font-weight: 700; line-height: 13px; text-align: center; }
 .coach-comment { grid-column: 1 / -1; margin: 2px 4px 2px 58px; padding: 8px 10px; color: #dce2ff; background: rgba(109, 124, 255, .08); border-left: 3px solid var(--accent2); border-radius: 0 8px 8px 0; font-size: .85rem; line-height: 1.4; white-space: pre-wrap; }
 .event-list-item.has-comment [data-action="comment-event"] { color: var(--accent2); border-color: var(--accent2); }
