@@ -1,20 +1,5 @@
 import { buildGameAnalysis } from './event-reducer.js';
-import { orderGameEvents } from './game-model.js';
-import { formatVideoTime } from './youtube-player.js';
-
-function describeEvent(event, playersById) {
-  const subject = event.side === 'opponent'
-    ? 'Opponent'
-    : playersById[event.playerId]?.name || 'Our team';
-  if (event.type === 'shot') {
-    const shot = event.shotValue === 1 ? 'FT' : `${event.shotValue}PT`;
-    return `${subject} ${event.made ? 'made' : 'missed'} ${shot}`;
-  }
-  if (event.type === 'rebound') {
-    return `${subject} ${event.reboundKind} rebound`;
-  }
-  return `${subject} ${event.type}`;
-}
+import { createEventListController } from './event-list.js';
 
 export function createEventEntryController({
   documentObject = document,
@@ -24,6 +9,7 @@ export function createEventEntryController({
   onGameChanged = () => {}
 }) {
   const gameStatus = documentObject.querySelector('#eventGameStatus');
+  const lockMessage = documentObject.querySelector('#eventLockMessage');
   const teamScore = documentObject.querySelector('#teamScore');
   const opponentScore = documentObject.querySelector('#opponentScore');
   const teamFieldGoals = documentObject.querySelector('#teamFieldGoals');
@@ -33,13 +19,11 @@ export function createEventEntryController({
   const eventButtons = documentObject.querySelector('#eventButtons');
   const eventError = documentObject.querySelector('#eventError');
   const undoButton = documentObject.querySelector('#undoEvent');
-  const eventList = documentObject.querySelector('#eventList');
-  const emptyEvents = documentObject.querySelector('#emptyEvents');
-  const eventTemplate = documentObject.querySelector('#eventListItemTemplate');
 
   let game = null;
   let side = 'team';
   let busy = false;
+  let eventListController;
 
   function setError(message = '') {
     eventError.textContent = message;
@@ -48,7 +32,7 @@ export function createEventEntryController({
 
   function setControlsEnabled(enabled) {
     eventButtons.querySelectorAll('button').forEach(button => { button.disabled = !enabled; });
-    undoButton.disabled = !enabled || !game?.events.length;
+    undoButton.disabled = !game?.events.length;
   }
 
   function renderPlayerOptions() {
@@ -76,15 +60,15 @@ export function createEventEntryController({
       opponentScore.textContent = '0';
       teamFieldGoals.textContent = '0/0';
       opponentFieldGoals.textContent = '0/0';
-      eventList.innerHTML = '';
-      emptyEvents.classList.remove('hidden');
+      lockMessage.textContent = 'Save or open a game before recording statistics.';
+      lockMessage.classList.remove('hidden');
       renderPlayerOptions();
       setControlsEnabled(false);
+      eventListController.render(null);
       return;
     }
 
     const analysis = buildGameAnalysis(game);
-    const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
     gameStatus.textContent = `${game.title} · ${game.startingLineupIds.length} players on court`;
     teamScore.textContent = String(analysis.report.score.team);
     opponentScore.textContent = String(analysis.report.score.opponent);
@@ -93,18 +77,11 @@ export function createEventEntryController({
     teamFieldGoals.textContent = `${ourFg.made}/${ourFg.attempted}`;
     opponentFieldGoals.textContent = `${theirFg.made}/${theirFg.attempted}`;
     renderPlayerOptions();
-
-    eventList.innerHTML = '';
-    const events = orderGameEvents(game.events);
-    emptyEvents.classList.toggle('hidden', events.length > 0);
-    for (const event of events) {
-      const item = eventTemplate.content.firstElementChild.cloneNode(true);
-      item.dataset.eventId = event.id;
-      item.querySelector('.event-time').textContent = formatVideoTime(event.videoSeconds);
-      item.querySelector('.event-description').textContent = describeEvent(event, playersById);
-      eventList.appendChild(item);
-    }
-    setControlsEnabled(true);
+    const videoReady = videoController.isReady();
+    lockMessage.textContent = videoReady ? '' : 'Load this game’s recording before adding a new event.';
+    lockMessage.classList.toggle('hidden', videoReady);
+    eventListController.render(game);
+    setControlsEnabled(videoReady);
   }
 
   async function persist(nextGame) {
@@ -113,6 +90,16 @@ export function createEventEntryController({
     render();
     await onGameChanged(game);
   }
+
+  eventListController = createEventListController({
+    documentObject,
+    videoController,
+    saveGame: persist,
+    now,
+    onError(error) {
+      setError(error.message || 'Could not review the event.');
+    }
+  });
 
   async function addEvent(button) {
     if (!game || busy) return;
@@ -186,6 +173,7 @@ export function createEventEntryController({
   });
 
   render();
+  const unsubscribeReady = videoController.subscribeReady(render);
 
   return {
     setGame(nextGame) {
@@ -195,5 +183,8 @@ export function createEventEntryController({
       render();
     },
     getGame: () => game ? structuredClone(game) : null,
+    destroy() {
+      unsubscribeReady();
+    },
   };
 }

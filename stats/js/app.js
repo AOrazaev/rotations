@@ -26,6 +26,11 @@ export function createStatsSpikeApp({
 
   let player = null;
   let timer = null;
+  const readyListeners = new Set();
+
+  function notifyReady() {
+    readyListeners.forEach(listener => listener(!!player));
+  }
 
   function setError(message = '') {
     videoError.textContent = message;
@@ -65,6 +70,7 @@ export function createStatsSpikeApp({
     if (timer) clearIntervalFn(timer);
     if (player?.destroy) player.destroy();
     player = null;
+    notifyReady();
     const playerElement = createPlayerMount();
     workspace.classList.add('hidden');
 
@@ -78,10 +84,12 @@ export function createStatsSpikeApp({
       workspace.classList.remove('hidden');
       videoStatus.textContent = `Video ${videoId} is ready.`;
       startClock();
+      notifyReady();
     } catch (error) {
       setError(error.message || 'Could not load the YouTube video.');
       videoStatus.textContent = 'Video failed to load.';
       workspace.classList.remove('hidden');
+      notifyReady();
     } finally {
       loadVideoButton.disabled = false;
     }
@@ -97,6 +105,13 @@ export function createStatsSpikeApp({
   return {
     loadVideo,
     isReady: () => !!player,
+    showWorkspace() {
+      workspace.classList.remove('hidden');
+    },
+    subscribeReady(listener) {
+      readyListeners.add(listener);
+      return () => readyListeners.delete(listener);
+    },
     getCurrentSeconds() {
       if (!player) throw new Error('Load the game recording before adding events.');
       return player.getCurrentSeconds();
@@ -137,6 +152,7 @@ setupController = createGameSetupController({
   onGameOpened(game) {
     document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
     document.querySelector('#videoUrl').value = game.video.sourceUrl;
+    videoController.showWorkspace();
     eventController.setGame(game);
   }
 });
@@ -147,6 +163,7 @@ window.__statsApp = {
   store,
   destroy() {
     videoController.destroy();
+    eventController.destroy();
     store.close();
   }
 };

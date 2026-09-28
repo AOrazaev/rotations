@@ -105,6 +105,7 @@
           </div>
           <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
         </div>
+        <div id="eventLockMessage" class="locked-message">Save or open a game, then load its recording.</div>
         <div class="scoreboard">
           <div><span>Our team</span><strong id="teamScore">0</strong></div>
           <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
@@ -146,10 +147,86 @@
 
   <template id="eventListItemTemplate">
     <li class="event-list-item">
-      <time class="event-time"></time>
+      <button class="event-time link-button" type="button" data-action="seek-event"></button>
       <span class="event-description"></span>
+      <div class="event-row-actions">
+        <button class="secondary small" type="button" data-action="preview-event">Preview</button>
+        <button class="secondary small" type="button" data-action="edit-event">Edit</button>
+        <button class="danger small" type="button" data-action="delete-event">Delete</button>
+      </div>
     </li>
   </template>
+
+  <dialog id="eventEditDialog" class="event-dialog">
+    <form id="eventEditForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Edit event</h2>
+          <p>Corrections immediately recalculate every derived statistic.</p>
+        </div>
+        <button id="cancelEventEdit" class="secondary small" type="button">Close</button>
+      </div>
+      <div class="edit-event-grid">
+        <label>Side
+          <select id="editEventSide">
+            <option value="team">Our team</option>
+            <option value="opponent">Opponent</option>
+          </select>
+        </label>
+        <label>Player
+          <select id="editEventPlayer"></select>
+        </label>
+        <label>Event
+          <select id="editEventType">
+            <option value="shot">Shot</option>
+            <option value="rebound">Rebound</option>
+            <option value="assist">Assist</option>
+            <option value="steal">Steal</option>
+            <option value="block">Block</option>
+            <option value="turnover">Turnover</option>
+            <option value="foul">Foul</option>
+          </select>
+        </label>
+        <div id="editShotFields" class="edit-dependent-fields">
+          <label>Value
+            <select id="editShotValue">
+              <option value="1">Free throw</option>
+              <option value="2">2 points</option>
+              <option value="3">3 points</option>
+            </select>
+          </label>
+          <label>Result
+            <select id="editShotMade">
+              <option value="true">Made</option>
+              <option value="false">Missed</option>
+            </select>
+          </label>
+        </div>
+        <div id="editReboundFields" class="edit-dependent-fields hidden">
+          <label>Rebound
+            <select id="editReboundKind">
+              <option value="offensive">Offensive</option>
+              <option value="defensive">Defensive</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="timestamp-editor">
+        <span>Timestamp <strong id="editEventTimestamp">0:00.0</strong></span>
+        <div class="marker-actions">
+          <button class="secondary small" type="button" data-time-adjust="-5">−5s</button>
+          <button class="secondary small" type="button" data-time-adjust="-1">−1s</button>
+          <button id="useCurrentEventTime" class="secondary small" type="button">Use current time</button>
+          <button class="secondary small" type="button" data-time-adjust="1">+1s</button>
+          <button class="secondary small" type="button" data-time-adjust="5">+5s</button>
+        </div>
+      </div>
+      <p id="eventEditError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Save correction</button>
+      </div>
+    </form>
+  </dialog>
 
   <template id="setupPlayerTemplate">
     <div class="setup-player">

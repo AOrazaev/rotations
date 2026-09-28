@@ -345,6 +345,8 @@ Verification:
 
 ### Milestone 6: Event review and video navigation
 
+**Status: complete.** Implemented by `stats/js/event-list.js`, the event-entry/video-controller integration, and `tests/stats-event-review.spec.js`.
+
 Deliver:
 
 - Chronological event list

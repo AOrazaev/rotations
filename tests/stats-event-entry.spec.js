@@ -131,10 +131,8 @@ test('editing game setup after event entry preserves the event log', async ({ pa
 test('player load failures cannot create partial events', async ({ page }) => {
   await openEventEntry(page, { playerFails: true });
   await expect(page.locator('#videoError')).toContainText('Simulated player failure');
-  const playerId = await page.locator('#eventPlayer option').nth(1).getAttribute('value');
-  await page.locator('#eventPlayer').selectOption(playerId);
-  await page.locator('[data-event-type="shot"][data-shot-value="2"][data-made="true"]').click();
-  await expect(page.locator('#eventError')).toContainText('Load the game recording');
+  await expect(page.locator('#eventLockMessage')).toContainText('Load this game’s recording');
+  await expect(page.locator('[data-event-type="shot"]').first()).toBeDisabled();
   const stored = await page.evaluate(async () => (await window.__statsApp.store.listGames())[0]);
   expect(stored.events).toHaveLength(0);
 });
