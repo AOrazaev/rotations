@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <title>Stats & Video Review</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Basketball Tools</p>
+        <h1>Stats &amp; Video Review</h1>
+        <p class="subtitle">Create a game, preserve its roster, and review the recording with timestamp-linked statistics.</p>
+      </div>
+      <a class="nav-link" href="../">Rotation Planner</a>
+    </header>
+
+    <div id="statsShell" class="app-shell">
+      <button id="showGamePanel" class="sidebar-reopen hidden" type="button" aria-controls="gamePanel" aria-expanded="false">Games</button>
+      <aside id="gamePanel" class="panel-stack side-panel game-panel">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>Games</h2>
+              <p>Saved only in this browser.</p>
+            </div>
+            <button id="hideGamePanel" class="secondary small" type="button" aria-controls="gamePanel" aria-expanded="true">Hide</button>
+          </div>
+          <div class="game-actions">
+            <button id="importPlannerRoster" class="secondary small" type="button">Import planner roster</button>
+            <button id="importGameBackup" class="secondary small" type="button">Import game backup</button>
+            <input id="importGameBackupFile" class="hidden" type="file" accept=".json,application/json" />
+            <button id="newStandaloneGame" class="primary small" type="button">New standalone game</button>
+          </div>
+          <p id="gamesStatus" class="message" aria-live="polite"></p>
+          <div id="emptyGames" class="empty-state compact">No saved games yet.</div>
+          <ul id="gamesList" class="games-list"></ul>
+        </section>
+
+        <details id="gameEditorDetails" class="card game-editor" open>
+          <summary>Game editor</summary>
+          <section id="gameSetupCard" class="game-setup-content">
+            <div class="section-head">
+              <div>
+                <h2 id="gameSetupTitle">New game</h2>
+                <p>Choose the roster, recording, and exactly five starters.</p>
+              </div>
+            </div>
+            <form id="gameSetupForm">
+              <div class="setup-fields">
+                <label>Game title<input id="gameTitle" type="text" required /></label>
+                <label>Opponent<input id="opponentName" type="text" /></label>
+                <label class="wide-field">YouTube URL<input id="gameVideoUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." /></label>
+              </div>
+              <div class="section-head roster-heading">
+                <div>
+                  <h3>Roster</h3>
+                  <p><span id="starterCount">5</span>/5 starters selected</p>
+                </div>
+                <button id="addSetupPlayer" class="secondary small" type="button">+ Add player</button>
+              </div>
+              <div id="setupRoster" class="setup-roster"></div>
+              <p id="setupError" class="message error hidden" role="alert"></p>
+              <div class="form-actions">
+                <button id="saveGame" class="primary" type="submit">Save game</button>
+              </div>
+            </form>
+          </section>
+        </details>
+      </aside>
+
+      <div id="reviewShell" class="review-shell">
+      <div class="panel-stack center-panel">
+        <section id="workspace" class="workspace hidden">
+          <section class="card video-card">
+            <div class="section-head">
+              <div>
+                <h2>Recording</h2>
+                <p>Current position: <strong id="currentTime">0:00.0</strong></p>
+              </div>
+              <div class="recording-controls">
+                <div class="playback-actions">
+                  <button id="playVideo" class="secondary" type="button">Play</button>
+                  <button id="pauseVideo" class="secondary" type="button">Pause</button>
+                </div>
+                <div class="video-size-actions" role="group" aria-label="Video size">
+                  <button id="decreaseVideoSize" class="secondary small" type="button" aria-label="Decrease video size">-</button>
+                  <output id="videoSizeValue" aria-live="polite">70%</output>
+                  <button id="increaseVideoSize" class="secondary small" type="button" aria-label="Increase video size">+</button>
+                  <button id="resetVideoSize" class="secondary small" type="button">Reset</button>
+                </div>
+              </div>
+            </div>
+            <div class="recording-status">
+              <p id="videoStatus" class="message" aria-live="polite">Open a game to load its recording.</p>
+              <button id="retryVideo" class="secondary small hidden" type="button">Retry video</button>
+            </div>
+            <p id="videoError" class="message error hidden" role="alert"></p>
+            <div id="playerFrame" class="player-frame">
+              <div id="youtubePlayer"></div>
+            </div>
+            <p class="video-shortcuts" aria-label="Video keyboard shortcuts">
+              Shortcuts:
+              <span><kbd>Space</kbd> play / pause</span>
+              <span><kbd>←</kbd> −3s</span>
+              <span><kbd>→</kbd> +3s</span>
+            </p>
+            <button
+              id="videoResizeHandle"
+              class="video-resize-handle"
+              type="button"
+              role="slider"
+              aria-label="Resize video"
+              aria-valuemin="55"
+              aria-valuemax="75"
+              aria-valuenow="70"
+              aria-valuetext="70 percent"
+            ></button>
+          </section>
+
+        </section>
+      </div>
+
+      <aside class="panel-stack side-panel capture-panel">
+        <section id="eventEntryPanel" class="card event-entry-card hidden">
+            <div class="section-head">
+              <div>
+                <h2>Event entry</h2>
+                <p id="eventGameStatus">Save or open a game to record events.</p>
+              </div>
+            </div>
+            <div id="eventLockMessage" class="locked-message">Save or open a game to load its recording.</div>
+            <div class="scoreboard">
+              <div><span>Our team</span><strong id="teamScore">0</strong></div>
+              <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
+            </div>
+            <div class="lineup-panel">
+              <div class="lineup-heading">
+                <div>
+                  <h3>Current lineup</h3>
+                  <p>Selecting a player switches event entry to our team.</p>
+                </div>
+                <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
+              </div>
+              <div id="currentLineup" class="player-chips" aria-label="Current lineup"></div>
+              <p class="bench-label">Bench</p>
+              <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
+            </div>
+            <div class="event-side" role="group" aria-label="Event side">
+              <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
+              <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
+            </div>
+            <div id="eventButtons" class="event-buttons">
+              <div class="shot-buttons">
+                <div class="shot-button-pair">
+                  <button class="event-action made" type="button" data-event-type="shot" data-shot-value="2" data-made="true">2PT made</button>
+                  <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="2" data-made="false">2PT missed</button>
+                </div>
+                <div class="shot-button-pair">
+                  <button class="event-action made" type="button" data-event-type="shot" data-shot-value="3" data-made="true">3PT made</button>
+                  <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="3" data-made="false">3PT missed</button>
+                </div>
+                <div class="shot-button-pair">
+                  <button class="event-action made" type="button" data-event-type="shot" data-shot-value="1" data-made="true">FT made</button>
+                  <button class="event-action missed" type="button" data-event-type="shot" data-shot-value="1" data-made="false">FT missed</button>
+                </div>
+              </div>
+              <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="offensive">Offensive rebound</button>
+              <button class="event-action" type="button" data-event-type="rebound" data-rebound-kind="defensive">Defensive rebound</button>
+              <button class="event-action" type="button" data-event-type="assist">Assist</button>
+              <button class="event-action" type="button" data-event-type="steal">Steal</button>
+              <button class="event-action" type="button" data-event-type="block">Block</button>
+              <button class="event-action" type="button" data-event-type="turnover">Turnover</button>
+              <button class="event-action" type="button" data-event-type="foul">Foul</button>
+              <button class="event-action" type="button" data-event-type="timeout">Timeout</button>
+              <button id="openPeriodEnd" class="event-action" type="button">Period end</button>
+              <button id="openNote" class="event-action" type="button">Note</button>
+            </div>
+            <p id="eventError" class="message error hidden" role="alert"></p>
+            <div class="quick-totals">
+              <span>FG <strong id="teamFieldGoals">0/0</strong></span>
+              <span>Opponent FG <strong id="opponentFieldGoals">0/0</strong></span>
+            </div>
+        </section>
+
+        <section id="eventLogPanel" class="card event-log-panel hidden">
+          <div class="section-head">
+            <div>
+              <h2>Event timeline</h2>
+              <p><span id="eventOrderDescription">Latest first.</span> Play, correct, or remove recorded events.</p>
+            </div>
+            <div class="timeline-actions">
+              <button id="toggleEventOrder" class="secondary icon-button order-button" type="button" aria-label="Show earliest events first" title="Show earliest events first">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 5v14m0 0-4-4m4 4 4-4M16 19V5m0 0-4 4m4-4 4 4" />
+                </svg>
+              </button>
+              <button id="openEventFilters" class="secondary icon-button filter-button" type="button" aria-label="Filter timeline" title="Filter timeline">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 5h16l-6 7v5l-4 2v-7L4 5Z" />
+                </svg>
+                <span id="eventFilterCount" class="filter-count hidden" aria-hidden="true"></span>
+              </button>
+              <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
+            </div>
+          </div>
+          <div id="emptyEvents" class="empty-state">No events recorded.</div>
+          <ol id="eventList" class="event-list"></ol>
+        </section>
+      </aside>
+      </div>
+    </div>
+
+    <section id="reportCard" class="card hidden">
+      <div class="section-head">
+        <div>
+          <h2>Game report</h2>
+          <p>Derived from the event timeline. Participation is video elapsed time, not official minutes.</p>
+        </div>
+        <strong id="reportFinalScore" class="report-final-score">0–0</strong>
+      </div>
+
+      <div class="report-section">
+        <h3>Team comparison</h3>
+        <div class="report-table-wrap">
+          <table class="report-table team-comparison-table">
+            <thead id="teamComparisonHead"></thead>
+            <tbody id="teamComparisonBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="report-section">
+        <h3>Player box scores</h3>
+        <div class="report-table-wrap">
+          <table class="report-table player-report-table">
+            <thead>
+              <tr>
+                <th>Player</th><th>PTS</th><th>FG</th><th>3PT</th><th>FT</th><th>ORB</th><th>DRB</th>
+                <th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>+/-</th><th>EFF</th><th>TS%</th><th>Video time</th>
+              </tr>
+            </thead>
+            <tbody id="playerReportBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="report-section player-feedback">
+        <div class="section-head">
+          <div>
+            <h3>Player feedback</h3>
+            <p>Share commented moments through direct links or a YouTube timestamp comment.</p>
+          </div>
+          <div class="feedback-actions">
+            <label for="feedbackPlayer">Player</label>
+            <select id="feedbackPlayer"></select>
+            <button id="copyPlayerFeedback" class="primary small" type="button">Copy for Telegram</button>
+            <button id="copyYouTubeFeedback" class="secondary small" type="button">Copy for YouTube</button>
+          </div>
+        </div>
+        <div id="emptyPlayerFeedback" class="empty-state compact">No coach-commented events for this player.</div>
+        <ol id="playerFeedbackList" class="player-feedback-list"></ol>
+        <p id="playerFeedbackStatus" class="message" role="status"></p>
+      </div>
+
+      <div class="report-grid">
+        <div class="report-section">
+          <h3>Lineups</h3>
+          <div class="report-table-wrap">
+            <table class="report-table">
+              <thead><tr><th>Players</th><th>PF</th><th>PA</th><th>+/-</th><th>Video time</th></tr></thead>
+              <tbody id="lineupReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="report-section">
+          <h3>Score progression</h3>
+          <div id="emptyScoreProgression" class="empty-state compact">No made shots recorded.</div>
+          <ol id="scoreProgression" class="report-event-list"></ol>
+        </div>
+      </div>
+
+      <div class="report-section source-plays">
+        <h3 id="reportSourceTitle">Source plays</h3>
+        <p id="reportSourceEmpty" class="message">Select a linked report value to inspect its source events.</p>
+        <ol id="reportSourceList" class="report-event-list"></ol>
+        <p id="reportError" class="message error hidden" role="alert"></p>
+      </div>
+    </section>
+  </main>
+
+  <template id="eventListItemTemplate">
+    <li class="event-list-item">
+      <button class="event-time link-button" type="button" data-action="play-event"></button>
+      <span class="event-description"></span>
+      <div class="event-row-actions">
+        <button class="secondary icon-button" type="button" data-action="comment-event" aria-label="Add coach comment" title="Add coach comment">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5h14v10H9l-4 4V5Z" />
+          </svg>
+        </button>
+        <button class="secondary icon-button" type="button" data-action="edit-event" aria-label="Edit event" title="Edit event">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20h4l11-11-4-4L4 16v4Zm10-13 4 4" />
+          </svg>
+        </button>
+        <button class="danger icon-button" type="button" data-action="delete-event" aria-label="Delete event" title="Delete event">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" />
+          </svg>
+        </button>
+      </div>
+      <blockquote class="coach-comment hidden"></blockquote>
+    </li>
+  </template>
+
+  <dialog id="eventFilterDialog" class="event-dialog">
+    <form id="eventFilterForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Filter timeline</h2>
+          <p>Selections across groups combine. An empty group includes all.</p>
+        </div>
+        <button id="cancelEventFilters" class="secondary small" type="button">Close</button>
+      </div>
+      <div class="filter-groups">
+        <fieldset>
+          <legend>Side</legend>
+          <label><input type="checkbox" name="filterSide" value="team" /> Our team</label>
+          <label><input type="checkbox" name="filterSide" value="opponent" /> Opponent</label>
+          <label><input type="checkbox" name="filterSide" value="system" /> System</label>
+        </fieldset>
+        <fieldset>
+          <legend>Event type</legend>
+          <label><input type="checkbox" name="filterType" value="shot" /> Shot</label>
+          <label><input type="checkbox" name="filterType" value="rebound" /> Rebound</label>
+          <label><input type="checkbox" name="filterType" value="assist" /> Assist</label>
+          <label><input type="checkbox" name="filterType" value="steal" /> Steal</label>
+          <label><input type="checkbox" name="filterType" value="block" /> Block</label>
+          <label><input type="checkbox" name="filterType" value="turnover" /> Turnover</label>
+          <label><input type="checkbox" name="filterType" value="foul" /> Foul</label>
+          <label><input type="checkbox" name="filterType" value="substitution" /> Substitution</label>
+          <label><input type="checkbox" name="filterType" value="timeout" /> Timeout</label>
+          <label><input type="checkbox" name="filterType" value="period_end" /> Period end</label>
+          <label><input type="checkbox" name="filterType" value="note" /> Note</label>
+        </fieldset>
+        <fieldset>
+          <legend>Our player</legend>
+          <label><input id="filterTeamMention" type="checkbox" /> @team comments</label>
+          <div id="eventFilterPlayers" class="filter-options"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Coach comment</legend>
+          <label><input type="radio" name="filterComment" value="any" checked /> Any</label>
+          <label><input type="radio" name="filterComment" value="with" /> With comment</label>
+          <label><input type="radio" name="filterComment" value="without" /> Without comment</label>
+        </fieldset>
+      </div>
+      <div class="dialog-actions">
+        <button id="clearEventFilters" class="secondary" type="button">Clear filters</button>
+        <button class="primary" type="submit">Apply filters</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="coachCommentDialog" class="event-dialog">
+    <form id="coachCommentForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Coach comment</h2>
+          <p>Add context or feedback. Use @NUMBER for a player or @team for everyone.</p>
+        </div>
+        <button id="cancelCoachComment" class="secondary small" type="button">Close</button>
+      </div>
+      <label class="dialog-field">Comment
+        <textarea id="coachCommentText" maxlength="500" required placeholder="Add coaching feedback, optionally mentioning @12 or @team"></textarea>
+      </label>
+      <p id="coachCommentError" class="message error hidden" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="removeCoachComment" class="danger hidden" type="button">Remove comment</button>
+        <button class="primary" type="submit">Save comment</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="eventEditDialog" class="event-dialog">
+    <form id="eventEditForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Edit event</h2>
+          <p>Corrections immediately recalculate every derived statistic.</p>
+        </div>
+        <button id="cancelEventEdit" class="secondary small" type="button">Close</button>
+      </div>
+      <div class="edit-event-grid">
+        <label>Side
+          <select id="editEventSide">
+            <option value="team">Our team</option>
+            <option value="opponent">Opponent</option>
+          </select>
+        </label>
+        <label>Player
+          <select id="editEventPlayer"></select>
+        </label>
+        <label>Event
+          <select id="editEventType">
+            <option value="shot">Shot</option>
+            <option value="rebound">Rebound</option>
+            <option value="assist">Assist</option>
+            <option value="steal">Steal</option>
+            <option value="block">Block</option>
+            <option value="turnover">Turnover</option>
+            <option value="foul">Foul</option>
+            <option value="substitution">Substitution</option>
+            <option value="timeout">Timeout</option>
+            <option value="period_end">Period end</option>
+            <option value="note">Custom</option>
+          </select>
+        </label>
+        <div id="editShotFields" class="edit-dependent-fields">
+          <label>Value
+            <select id="editShotValue">
+              <option value="1">Free throw</option>
+              <option value="2">2 points</option>
+              <option value="3">3 points</option>
+            </select>
+          </label>
+          <label>Result
+            <select id="editShotMade">
+              <option value="true">Made</option>
+              <option value="false">Missed</option>
+            </select>
+          </label>
+        </div>
+        <div id="editReboundFields" class="edit-dependent-fields hidden">
+          <label>Rebound
+            <select id="editReboundKind">
+              <option value="offensive">Offensive</option>
+              <option value="defensive">Defensive</option>
+            </select>
+          </label>
+        </div>
+        <div id="editSubstitutionFields" class="edit-dependent-fields hidden">
+          <label>Player out
+            <select id="editPlayerOut"></select>
+          </label>
+          <label>Player in
+            <select id="editPlayerIn"></select>
+          </label>
+        </div>
+        <div id="editPeriodEndFields" class="edit-dependent-fields hidden">
+          <label>Label
+            <input id="editPeriodLabel" type="text" maxlength="80" placeholder="End of Q1" />
+          </label>
+        </div>
+        <div id="editNoteFields" class="edit-dependent-fields hidden">
+          <label>Timeline text
+            <input id="editNote" type="text" maxlength="160" placeholder="Describe what happened" />
+          </label>
+        </div>
+      </div>
+      <div class="timestamp-editor">
+        <span>Timestamp <strong id="editEventTimestamp">0:00.0</strong></span>
+        <div class="marker-actions">
+          <button class="secondary small" type="button" data-time-adjust="-5">−5s</button>
+          <button class="secondary small" type="button" data-time-adjust="-1">−1s</button>
+          <button id="useCurrentEventTime" class="secondary small" type="button">Use current time</button>
+          <button class="secondary small" type="button" data-time-adjust="1">+1s</button>
+          <button class="secondary small" type="button" data-time-adjust="5">+5s</button>
+        </div>
+      </div>
+      <p id="eventEditError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Save correction</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="substitutionDialog" class="event-dialog">
+    <form id="substitutionForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Make substitution</h2>
+          <p>At <strong id="substitutionTimestamp">0:00.0</strong> in the recording.</p>
+        </div>
+        <button id="cancelSubstitution" class="secondary small" type="button">Close</button>
+      </div>
+      <div class="edit-event-grid">
+        <label>Player out
+          <select id="substitutionPlayerOut"></select>
+        </label>
+        <label>Player in
+          <select id="substitutionPlayerIn"></select>
+        </label>
+      </div>
+      <p id="substitutionError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Save substitution</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="periodEndDialog" class="event-dialog">
+    <form id="periodEndForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Add period end</h2>
+          <p>At <strong id="periodEndTimestamp">0:00.0</strong> in the recording.</p>
+        </div>
+        <button id="cancelPeriodEnd" class="secondary small" type="button">Close</button>
+      </div>
+      <label class="dialog-field">Label
+        <input id="periodEndLabel" type="text" required maxlength="80" placeholder="End of Q1, Halftime, End of overtime…" />
+      </label>
+      <p id="periodEndError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Save period end</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="noteDialog" class="event-dialog">
+    <form id="noteForm" method="dialog">
+      <div class="section-head">
+        <div>
+          <h2>Add note</h2>
+          <p>At <strong id="noteTimestamp">0:00.0</strong> in the recording.</p>
+        </div>
+        <button id="cancelNote" class="secondary small" type="button">Close</button>
+      </div>
+      <label class="dialog-field">Timeline text
+        <input id="noteText" type="text" maxlength="160" required placeholder="Describe what happened" />
+      </label>
+      <p id="noteError" class="message error hidden" role="alert"></p>
+      <div class="form-actions">
+        <button class="primary" type="submit">Add to timeline</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="setupPlayerTemplate">
+    <div class="setup-player">
+      <label class="starter-toggle"><input class="setup-starter" type="checkbox" />Starter</label>
+      <input class="setup-number" type="text" maxlength="3" inputmode="numeric" placeholder="#" aria-label="Jersey number" />
+      <input class="setup-name" type="text" required aria-label="Player name" />
+      <button class="danger small setup-delete" type="button">Remove</button>
+    </div>
+  </template>
+
+  <template id="gameListItemTemplate">
+    <li class="game-list-item">
+      <div>
+        <strong class="game-list-title"></strong>
+        <span class="game-list-detail"></span>
+      </div>
+      <div class="marker-actions">
+        <button class="secondary small" type="button" data-action="open-game">Open</button>
+        <button class="secondary small" type="button" data-action="export-game">Export</button>
+        <button class="secondary small" type="button" data-action="archive-game">Archive</button>
+        <button class="danger small" type="button" data-action="delete-game">Delete</button>
+      </div>
+    </li>
+  </template>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

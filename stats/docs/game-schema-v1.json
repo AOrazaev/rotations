@@ -1,0 +1,566 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/basketball-stats/game-schema-v1.json",
+  "title": "Basketball Stats Game v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "opponentName",
+    "createdAt",
+    "updatedAt",
+    "source",
+    "video",
+    "players",
+    "startingLineupIds",
+    "events"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "opponentName": {
+      "type": "string"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "archivedAt": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "planner",
+        "standalone"
+      ]
+    },
+    "video": {
+      "$ref": "#/$defs/video"
+    },
+    "players": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/$defs/player"
+      }
+    },
+    "startingLineupIds": {
+      "$ref": "#/$defs/lineup"
+    },
+    "plannedRotation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/plannedRotation"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lineup": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "player": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "number"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "number": {
+          "type": "string"
+        },
+        "positions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "G",
+              "F",
+              "C"
+            ]
+          }
+        },
+        "skill": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "video": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "videoId",
+        "sourceUrl",
+        "startSeconds",
+        "endSeconds"
+      ],
+      "properties": {
+        "provider": {
+          "const": "youtube"
+        },
+        "videoId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "endSeconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "plannedRotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blockMinutes",
+        "blocks"
+      ],
+      "properties": {
+        "blockMinutes": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "lineupIds"
+            ],
+            "properties": {
+              "lineupIds": {
+                "$ref": "#/$defs/lineup"
+              }
+            }
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sequence",
+        "videoSeconds",
+        "side",
+        "type",
+        "playerId",
+        "lineupIds",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "videoSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "side": {
+          "type": "string",
+          "enum": [
+            "team",
+            "opponent",
+            "system"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "shot",
+            "rebound",
+            "assist",
+            "steal",
+            "block",
+            "turnover",
+            "foul",
+            "substitution",
+            "timeout",
+            "period_end",
+            "note"
+          ]
+        },
+        "playerId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shotValue": {
+          "type": "integer",
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "made": {
+          "type": "boolean"
+        },
+        "reboundKind": {
+          "type": "string",
+          "enum": [
+            "offensive",
+            "defensive"
+          ]
+        },
+        "playerOutId": {
+          "$ref": "#/$defs/id"
+        },
+        "playerInId": {
+          "$ref": "#/$defs/id"
+        },
+        "relatedEventId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coachComment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "periodLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lineupIds": {
+          "$ref": "#/$defs/lineup"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "updatedAt": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "timeout"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "side": {
+                "enum": [
+                  "team",
+                  "opponent"
+                ]
+              },
+              "playerId": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "period_end"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "periodLabel"
+            ],
+            "properties": {
+              "side": {
+                "const": "system"
+              },
+              "playerId": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "shot"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "shotValue",
+              "made"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "rebound"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "reboundKind"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "substitution"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "playerOutId",
+              "playerInId"
+            ],
+            "properties": {
+              "side": {
+                "const": "team"
+              },
+              "playerId": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "note"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "note"
+            ],
+            "properties": {
+              "side": {
+                "const": "system"
+              },
+              "playerId": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "shot",
+                  "rebound",
+                  "assist",
+                  "steal",
+                  "block",
+                  "turnover",
+                  "foul"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "side": {
+                "type": "string",
+                "enum": [
+                  "team",
+                  "opponent"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "shot",
+                  "rebound",
+                  "assist",
+                  "steal",
+                  "block",
+                  "turnover",
+                  "foul"
+                ]
+              },
+              "side": {
+                "const": "team"
+              }
+            },
+            "required": [
+              "type",
+              "side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "side": {
+                "type": "string",
+                "enum": [
+                  "team",
+                  "opponent"
+                ]
+              },
+              "playerId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "shot",
+                  "rebound",
+                  "assist",
+                  "steal",
+                  "block",
+                  "turnover",
+                  "foul"
+                ]
+              },
+              "side": {
+                "const": "opponent"
+              }
+            },
+            "required": [
+              "type",
+              "side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "side": {
+                "type": "string",
+                "enum": [
+                  "team",
+                  "opponent"
+                ]
+              },
+              "playerId": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
