@@ -416,6 +416,8 @@ Verification:
 
 ### Milestone 10: GitHub Pages release
 
+**Status: complete.** Release hardening includes deterministic CI on every push and pull request, responsive and keyboard coverage, contextual accessible game actions, user and deployment documentation, and the complete browser release scenario in `tests/stats-release.spec.js`. GitHub Pages remains configured through the repository's existing branch-based deployment settings.
+
 Deliver:
 
 - Responsive UI

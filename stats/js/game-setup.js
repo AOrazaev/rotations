@@ -229,6 +229,9 @@ export function createGameSetupController({
       const archiveButton = item.querySelector('[data-action="archive-game"]');
       archiveButton.dataset.action = game.archivedAt ? 'restore-game' : 'archive-game';
       archiveButton.textContent = game.archivedAt ? 'Restore' : 'Archive';
+      item.querySelectorAll('button[data-action]').forEach(button => {
+        button.setAttribute('aria-label', `${button.textContent} ${game.title}`);
+      });
       gamesList.appendChild(item);
     }
   }
