@@ -31,6 +31,8 @@ The review workspace is the primary MVP experience. Event entry and correction h
 
 Each game has a stable ID and owns a complete player snapshot. A game created from the planner copies player data; it does not retain live references to planner state.
 
+An archived game has an optional ISO timestamp in `archivedAt`. Archiving changes only archive/update metadata; restoring removes `archivedAt`.
+
 Required player fields:
 
 - `id`: stable within the game
@@ -243,7 +245,21 @@ Invalid imported or stored games must produce an actionable error and must not r
 
 - Stats games are stored in IndexedDB database `basketball-stats`.
 - Every persisted and exported game includes `schemaVersion: 1`.
-- JSON import validates before writing.
+- Game backups use a separate versioned envelope:
+
+```js
+{
+  backupVersion: 1,
+  application: "basketball-stats",
+  exportedAt: "2026-09-28T16:00:00Z",
+  game: { /* exact validated game snapshot */ }
+}
+```
+
+- JSON import validates the envelope and complete game before writing.
+- Import rejects unsupported versions, files from another application, malformed games, and IDs that already exist.
+- Invalid or conflicting imports never modify existing games.
+- Exported backups preserve events, lineup snapshots, coach comments, video references, report inputs, and archive state.
 - Planner handoff uses the temporary key `basketball-stats-handoff-v1`.
 - Consuming a handoff creates an independent game snapshot and removes the temporary record.
 

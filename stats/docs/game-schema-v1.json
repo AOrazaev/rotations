@@ -37,6 +37,9 @@
     "updatedAt": {
       "$ref": "#/$defs/timestamp"
     },
+    "archivedAt": {
+      "$ref": "#/$defs/timestamp"
+    },
     "source": {
       "type": "string",
       "enum": [

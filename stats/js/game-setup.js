@@ -1,6 +1,11 @@
 import { validateGame } from './game-model.js';
 import { parseYouTubeVideoId } from './youtube-player.js';
 import { consumePlannerHandoff } from './roster-transfer.js';
+import {
+  gameBackupFileName,
+  parseGameBackup,
+  serializeGameBackup
+} from './game-backup.js';
 
 function newPlayer(index) {
   return {
@@ -68,6 +73,7 @@ export function createGameSetupController({
   storage = localStorage,
   locationObject = location,
   historyObject = history,
+  now = () => new Date().toISOString(),
   onGameOpened = () => {}
 }) {
   const gamesStatus = documentObject.querySelector('#gamesStatus');
@@ -76,6 +82,8 @@ export function createGameSetupController({
   const gameListItemTemplate = documentObject.querySelector('#gameListItemTemplate');
   const newStandaloneButton = documentObject.querySelector('#newStandaloneGame');
   const importPlannerButton = documentObject.querySelector('#importPlannerRoster');
+  const importBackupButton = documentObject.querySelector('#importGameBackup');
+  const importBackupFile = documentObject.querySelector('#importGameBackupFile');
   const setupForm = documentObject.querySelector('#gameSetupForm');
   const gameEditorDetails = documentObject.querySelector('#gameEditorDetails');
   const setupTitle = documentObject.querySelector('#gameSetupTitle');
@@ -210,10 +218,55 @@ export function createGameSetupController({
     for (const game of savedGames) {
       const item = gameListItemTemplate.content.firstElementChild.cloneNode(true);
       item.dataset.gameId = game.id;
+      item.classList.toggle('archived', Boolean(game.archivedAt));
       item.querySelector('.game-list-title').textContent = game.title;
-      item.querySelector('.game-list-detail').textContent = `${game.opponentName || 'No opponent'} · ${game.players.length} players`;
+      item.querySelector('.game-list-detail').textContent = [
+        game.opponentName || 'No opponent',
+        `${game.players.length} players`,
+        game.archivedAt ? 'Archived' : null
+      ].filter(Boolean).join(' · ');
+      item.querySelector('[data-action="open-game"]').classList.toggle('hidden', Boolean(game.archivedAt));
+      const archiveButton = item.querySelector('[data-action="archive-game"]');
+      archiveButton.dataset.action = game.archivedAt ? 'restore-game' : 'archive-game';
+      archiveButton.textContent = game.archivedAt ? 'Restore' : 'Archive';
       gamesList.appendChild(item);
     }
+  }
+
+  async function exportGame(gameId) {
+    const game = await store.getGame(gameId);
+    if (!game) throw new Error('That saved game no longer exists.');
+    const blob = new Blob([serializeGameBackup(game, now())], { type: 'application/json' });
+    const url = documentObject.defaultView.URL.createObjectURL(blob);
+    const anchor = documentObject.createElement('a');
+    anchor.href = url;
+    anchor.download = gameBackupFileName(game);
+    anchor.click();
+    documentObject.defaultView.URL.revokeObjectURL(url);
+    setStatus(`Exported ${game.title}.`);
+  }
+
+  async function importGameBackup(file) {
+    if (!file) return;
+    const game = parseGameBackup(await file.text());
+    if (await store.getGame(game.id)) {
+      throw new Error(`A game with ID ${game.id} already exists. Delete it before importing this backup.`);
+    }
+    await store.saveGame(game);
+    await renderGames();
+    setStatus(`Imported ${game.title} from backup.`);
+  }
+
+  async function setArchived(gameId, archived) {
+    const game = await store.getGame(gameId);
+    if (!game) throw new Error('That saved game no longer exists.');
+    const timestamp = now();
+    if (archived) game.archivedAt = timestamp;
+    else delete game.archivedAt;
+    game.updatedAt = timestamp;
+    await store.saveGame(game);
+    await renderGames();
+    setStatus(`${archived ? 'Archived' : 'Restored'} ${game.title}.`);
   }
 
   async function openGame(gameId) {
@@ -280,6 +333,16 @@ export function createGameSetupController({
 
   newStandaloneButton.addEventListener('click', createStandaloneDraft);
   importPlannerButton.addEventListener('click', importPlannerDraft);
+  importBackupButton.addEventListener('click', () => importBackupFile.click());
+  importBackupFile.addEventListener('change', async () => {
+    try {
+      await importGameBackup(importBackupFile.files?.[0]);
+    } catch (error) {
+      setStatus(error.message || 'Could not import the game backup.', true);
+    } finally {
+      importBackupFile.value = '';
+    }
+  });
   addPlayerButton.addEventListener('click', () => {
     syncDraftFromForm();
     draft.players.push(newPlayer(draft.players.length + 1));
@@ -289,12 +352,22 @@ export function createGameSetupController({
     const button = event.target.closest('button[data-action]');
     const item = event.target.closest('[data-game-id]');
     if (!button || !item) return;
-    if (button.dataset.action === 'open-game') {
-      await openGame(item.dataset.gameId);
-    } else if (button.dataset.action === 'delete-game') {
-      await store.deleteGame(item.dataset.gameId);
-      await renderGames();
-      setStatus('Game deleted.');
+    try {
+      if (button.dataset.action === 'open-game') {
+        await openGame(item.dataset.gameId);
+      } else if (button.dataset.action === 'export-game') {
+        await exportGame(item.dataset.gameId);
+      } else if (button.dataset.action === 'archive-game') {
+        await setArchived(item.dataset.gameId, true);
+      } else if (button.dataset.action === 'restore-game') {
+        await setArchived(item.dataset.gameId, false);
+      } else if (button.dataset.action === 'delete-game') {
+        await store.deleteGame(item.dataset.gameId);
+        await renderGames();
+        setStatus('Game deleted.');
+      }
+    } catch (error) {
+      setStatus(error.message || 'Could not update the saved game.', true);
     }
   });
 

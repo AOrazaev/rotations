@@ -152,3 +152,109 @@ test('saved games render in stable updated-time and ID order', async ({ page }) 
 
   await expect(page.locator('.game-list-title')).toHaveText(['Newer A', 'Newer C', 'Older']);
 });
+
+test('export, delete, and import recover an identical game and report', async ({ page }) => {
+  await openIsolatedStats(page);
+  const fixture = await page.evaluate(async () => {
+    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    await window.__statsApp.store.saveGame(game);
+    await window.__statsApp.setupController.refreshGames();
+    return game;
+  });
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('[data-action="export-game"]').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('mvp-contract-verification-game-backup.json');
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const backupText = Buffer.concat(chunks).toString('utf8');
+
+  await page.locator('[data-action="delete-game"]').click();
+  await expect(page.locator('.game-list-item')).toHaveCount(0);
+  await page.locator('#importGameBackupFile').setInputFiles({
+    name: download.suggestedFilename(),
+    mimeType: 'application/json',
+    buffer: Buffer.from(backupText)
+  });
+
+  await expect(page.locator('#gamesStatus')).toContainText('Imported MVP contract verification game from backup');
+  await expect(page.locator('.game-list-item')).toHaveCount(1);
+  const restored = await page.evaluate(() => window.__statsApp.store.getGame('game-representative-v1'));
+  expect(restored).toEqual(fixture);
+
+  await page.locator('[data-action="open-game"]').click();
+  await expect(page.locator('#reportFinalScore')).toHaveText('5–3');
+  await expect(page.locator('#playerReportBody tr[data-player-id="p1"] .player-points')).toHaveText('2');
+});
+
+test('invalid and conflicting backup imports preserve existing games', async ({ page }) => {
+  await openIsolatedStats(page);
+  const fixture = await page.evaluate(async () => {
+    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    await window.__statsApp.store.saveGame(game);
+    await window.__statsApp.setupController.refreshGames();
+    return game;
+  });
+
+  const invalidBackup = {
+    backupVersion: 1,
+    application: 'basketball-stats',
+    exportedAt: '2026-09-28T16:00:00Z',
+    game: { ...fixture, startingLineupIds: ['p1', 'p1', 'p2', 'p3', 'p4'] }
+  };
+  await page.locator('#importGameBackupFile').setInputFiles({
+    name: 'invalid.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(invalidBackup))
+  });
+  await expect(page.locator('#gamesStatus')).toContainText('Game data is invalid');
+
+  const validBackup = {
+    backupVersion: 1,
+    application: 'basketball-stats',
+    exportedAt: '2026-09-28T16:00:00Z',
+    game: fixture
+  };
+  await page.locator('#importGameBackupFile').setInputFiles({
+    name: 'conflict.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(validBackup))
+  });
+  await expect(page.locator('#gamesStatus')).toContainText('already exists');
+  await expect(page.locator('.game-list-item')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__statsApp.store.getGame('game-representative-v1'))).toEqual(fixture);
+});
+
+test('games can be archived and restored without changing their contents', async ({ page }) => {
+  await openIsolatedStats(page);
+  const fixture = await page.evaluate(async () => {
+    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    await window.__statsApp.store.saveGame(game);
+    await window.__statsApp.setupController.refreshGames();
+    return game;
+  });
+
+  await page.locator('[data-action="archive-game"]').click();
+  const row = page.locator('.game-list-item');
+  await expect(row).toHaveClass(/archived/);
+  await expect(row.locator('.game-list-detail')).toContainText('Archived');
+  await expect(row.locator('[data-action="open-game"]')).toBeHidden();
+  await expect(row.locator('[data-action="restore-game"]')).toHaveText('Restore');
+
+  const archived = await page.evaluate(() => window.__statsApp.store.getGame('game-representative-v1'));
+  expect(archived).toEqual({
+    ...fixture,
+    updatedAt: archived.updatedAt,
+    archivedAt: archived.archivedAt
+  });
+  expect(archived.archivedAt).toEqual(expect.any(String));
+
+  await row.locator('[data-action="restore-game"]').click();
+  await expect(row).not.toHaveClass(/archived/);
+  await expect(row.locator('[data-action="open-game"]')).toBeVisible();
+  const restored = await page.evaluate(() => window.__statsApp.store.getGame('game-representative-v1'));
+  expect(restored).toEqual({ ...fixture, updatedAt: restored.updatedAt });
+  expect(restored).not.toHaveProperty('archivedAt');
+});

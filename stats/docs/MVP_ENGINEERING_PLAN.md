@@ -400,6 +400,8 @@ Verification:
 
 ### Milestone 9: Backup and recovery
 
+**Status: complete.** Implemented by the versioned backup helpers in `stats/js/game-backup.js`, game-management integration in `stats/js/game-setup.js`, archive metadata support, and recovery coverage in `tests/stats-store.spec.js` and `tests/stats-setup.spec.js`.
+
 Deliver:
 
 - JSON export

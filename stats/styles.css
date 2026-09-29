@@ -93,6 +93,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .form-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
 .games-list { margin-top: 10px; }
 .game-list-item { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
+.game-list-item.archived { opacity: .72; border-style: dashed; }
 .game-list-item > div:first-child { display: grid; gap: 3px; }
 .game-list-detail { color: var(--muted); font-size: .85rem; }
 .input-row { display: flex; gap: 10px; }

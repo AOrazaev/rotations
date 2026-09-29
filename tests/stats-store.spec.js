@@ -233,3 +233,82 @@ test('storage initialization failures expose an actionable error code', async ({
     cause: 'simulated failure'
   });
 });
+
+test('game backups round-trip exact validated snapshots and reject invalid envelopes', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const {
+      createGameBackup,
+      parseGameBackup,
+      serializeGameBackup,
+      gameBackupFileName
+    } = await import('/stats/js/game-backup.js');
+    const exportedAt = '2026-09-28T16:00:00Z';
+    const serialized = serializeGameBackup(game, exportedAt);
+    const backup = createGameBackup(game, exportedAt);
+    const restored = parseGameBackup(serialized);
+    const failures = [];
+    for (const value of [
+      '{broken',
+      { ...backup, backupVersion: 99 },
+      { ...backup, application: 'another-app' },
+      { ...backup, game: { ...backup.game, startingLineupIds: ['p1', 'p1', 'p2', 'p3', 'p4'] } }
+    ]) {
+      try {
+        parseGameBackup(value);
+      } catch (error) {
+        failures.push({ name: error.name, code: error.code });
+      }
+    }
+    return {
+      backup,
+      restored,
+      filename: gameBackupFileName(game),
+      failures
+    };
+  });
+
+  const fixture = await page.evaluate(() => fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json()));
+  expect(result.backup).toMatchObject({
+    backupVersion: 1,
+    application: 'basketball-stats',
+    exportedAt: '2026-09-28T16:00:00Z'
+  });
+  expect(result.restored).toEqual(fixture);
+  expect(result.filename).toBe('mvp-contract-verification-game-backup.json');
+  expect(result.failures).toEqual([
+    { name: 'GameBackupError', code: 'malformed-json' },
+    { name: 'GameBackupError', code: 'unsupported-version' },
+    { name: 'GameBackupError', code: 'wrong-application' },
+    { name: 'GameBackupError', code: 'invalid-game' }
+  ]);
+});
+
+test('archived games validate and sort after active games', async ({ page }) => {
+  const result = await runWithFixture(page, `async ({ game, store }) => {
+    const archived = structuredClone(game);
+    archived.id = 'archived-game';
+    archived.title = 'Archived';
+    archived.archivedAt = '2026-09-28T10:00:00Z';
+    archived.updatedAt = '2026-09-28T10:00:00Z';
+    const active = structuredClone(game);
+    active.id = 'active-game';
+    active.title = 'Active';
+    await store.saveGame(archived);
+    await store.saveGame(active);
+    const games = await store.listGames();
+    const invalid = structuredClone(active);
+    invalid.id = 'invalid-archive';
+    invalid.archivedAt = 'not-a-date';
+    let invalidIssues = [];
+    try { await store.saveGame(invalid); }
+    catch (error) { invalidIssues = error.issues; }
+    return { games: games.map(item => ({ id: item.id, archivedAt: item.archivedAt })), invalidIssues };
+  }`);
+
+  expect(result.games).toEqual([
+    { id: 'active-game', archivedAt: undefined },
+    { id: 'archived-game', archivedAt: '2026-09-28T10:00:00Z' }
+  ]);
+  expect(result.invalidIssues).toContain('Archived time must be a valid timestamp when present.');
+});

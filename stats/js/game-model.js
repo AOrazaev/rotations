@@ -83,6 +83,10 @@ export function collectGameValidationIssues(game) {
   }
   if (!isNonEmptyString(game.id)) issues.push('Game ID is required.');
   if (!isNonEmptyString(game.title)) issues.push('Game title is required.');
+  if (game.archivedAt !== undefined
+    && (typeof game.archivedAt !== 'string' || !Number.isFinite(Date.parse(game.archivedAt)))) {
+    issues.push('Archived time must be a valid timestamp when present.');
+  }
 
   const videoStart = Number(game.video?.startSeconds);
   const videoEnd = game.video?.endSeconds == null ? null : Number(game.video.endSeconds);

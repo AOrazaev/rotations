@@ -201,7 +201,9 @@ export class GameStore {
     }
     return games
       .map(clone)
-      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.id.localeCompare(b.id));
+      .sort((a, b) => Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt))
+        || Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
+        || a.id.localeCompare(b.id));
   }
 
   async deleteGame(gameId) {

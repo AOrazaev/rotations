@@ -31,6 +31,8 @@
           </div>
           <div class="game-actions">
             <button id="importPlannerRoster" class="secondary small" type="button">Import planner roster</button>
+            <button id="importGameBackup" class="secondary small" type="button">Import game backup</button>
+            <input id="importGameBackupFile" class="hidden" type="file" accept=".json,application/json" />
             <button id="newStandaloneGame" class="primary small" type="button">New standalone game</button>
           </div>
           <p id="gamesStatus" class="message" aria-live="polite"></p>
@@ -556,6 +558,8 @@
       </div>
       <div class="marker-actions">
         <button class="secondary small" type="button" data-action="open-game">Open</button>
+        <button class="secondary small" type="button" data-action="export-game">Export</button>
+        <button class="secondary small" type="button" data-action="archive-game">Archive</button>
         <button class="danger small" type="button" data-action="delete-game">Delete</button>
       </div>
     </li>
