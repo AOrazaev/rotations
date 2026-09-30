@@ -47,6 +47,30 @@ test('complete Review workflow remains read-only across reload and tracker retur
       contexts: ['second_chance'],
       creation: 'cut'
     };
+    game.events.find(event => event.id === 'e2').shotDetails = {
+      location: { x: 0.06, y: 0.2128 },
+      pressure: 'heavily_contested',
+      phase: 'transition',
+      creation: 'pull_up'
+    };
+    game.events.find(event => event.id === 'e5').shotDetails = {
+      pressure: 'contested',
+      phase: 'transition',
+      creation: 'drive'
+    };
+    game.events.find(event => event.id === 'e8').shotDetails = {
+      location: { x: 0.94, y: 0.2128 },
+      pressure: 'lightly_contested',
+      phase: 'half_court',
+      creation: 'catch_and_shoot'
+    };
+    const periodMarker = game.events.find(event => event.id === 'e14');
+    periodMarker.type = 'period_end';
+    periodMarker.side = 'system';
+    periodMarker.playerId = null;
+    periodMarker.videoSeconds = 145;
+    periodMarker.periodLabel = 'Halftime';
+    delete periodMarker.note;
     return game;
   });
   await page.locator('#importGameBackupFile').setInputFiles({
@@ -82,7 +106,7 @@ test('complete Review workflow remains read-only across reload and tracker retur
 
   await page.locator('#toggleEventOrder').click();
   await expect(page.locator('#eventOrderDescription')).toHaveText('Latest first.');
-  await expect(page.locator('.event-list-item').first()).toHaveAttribute('data-event-id', 'e14');
+  await expect(page.locator('.event-list-item').first()).toHaveAttribute('data-event-id', 'e13');
   await page.locator('#openEventFilters').click();
   await page.locator('input[name="filterComment"][value="with"]').check();
   await page.locator('#eventFilterForm button[type="submit"]').click();
@@ -112,12 +136,28 @@ test('complete Review workflow remains read-only across reload and tracker retur
   await expect(page.locator('#playerReportSection')).toBeVisible();
   await expect(page.locator('#playerReportBody tr')).toHaveCount(6);
   await page.locator('[data-review-section="shots"]').click();
-  await expect(page.locator('#shotReportSummary')).toContainText('1 plotted');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('2/3 FG (66.7%) · 1.67 points per attempt · 2 plotted · 1 without location');
+  await expect(page.locator('#shotChartPlot [data-report-event-id]')).toHaveCount(2);
+  await page.locator('#shotReportPeriod').selectOption('1');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('1/2 FG (50%) · 1.00 points per attempt · 1 plotted · 1 without location');
+  await page.locator('#shotReportPeriod').selectOption('__any__');
   await page.locator('#shotReportPressure').selectOption('open');
   await expect(page.locator('#shotReportSummary')).toContainText('1/1 FG');
+  await page.locator('#clearShotReportFilters').click();
+  await page.locator('#shotReportScope').selectOption('opponent');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('1/2 FG (50%) · 1.00 points per attempt · 1 plotted · 1 without location');
+  await page.locator('#shotReportScope').selectOption('player:p1');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('1/1 FG (100%) · 2.00 points per attempt · 1 plotted · 0 without location');
+  await page.locator('#shotReportScope').selectOption('team');
+  await page.locator('#shotZonePlot [data-shot-zone="restricted_area"]').click();
+  await expect(page.locator('#reportSourceList [data-report-event-id]')).toHaveCount(1);
   await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
-  await page.locator('#shotChartPlot [data-report-event-id="e1"]').click();
-  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([['seek', 107]]);
+  await page.locator('#shotChartPlot [data-report-event-id="e8"]').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([['seek', 147]]);
   await page.locator('[data-review-section="lineups"]').click();
   await expect(page.locator('#lineupReportSection')).toBeVisible();
   await expect(page.locator('#lineupReportBody tr')).toHaveCount(2);
@@ -142,6 +182,14 @@ test('complete Review workflow remains read-only across reload and tracker retur
   await page.evaluate(() => window.__statsApp.ready);
   await expect(page.locator('#reviewModeTitle')).toHaveText('Review view verification game');
   await expect(page.locator('#reportFinalScore')).toHaveText('5–3');
+  await page.locator('[data-review-section="shots"]').click();
+  await expect(page.locator('#shotChartPlot [data-report-event-id]')).toHaveCount(2);
+  await expect(page.locator('.event-list-item[data-event-id="e8"] .event-detail-badge')).toHaveText([
+    'Right corner 3',
+    'Lightly contested',
+    'Half court',
+    'Catch-and-shoot'
+  ]);
   expect(new URL(page.url()).searchParams.get('game')).toBe(fixture.id);
   expect(await page.evaluate(() => Number(sessionStorage.getItem('reviewWriteCount')))).toBe(0);
 

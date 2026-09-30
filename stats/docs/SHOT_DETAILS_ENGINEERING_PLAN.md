@@ -341,6 +341,8 @@ Verification:
 
 ### Milestone 5: Release hardening
 
+**Status:** Implementation complete; deployed-site verification pending. Automated coverage includes the integrated tracker workflow in `tests/stats-shot-details-release.spec.js`, the raw IndexedDB zero-write Review gate in `tests/stats-review-release.spec.js`, and the focused pointer, keyboard, correction, mismatch, responsive, migration, and report suites. User workflow and deployment verification are documented in `stats/docs/SHOT_DETAILS.md`.
+
 Deliver:
 
 - Complete shot-details release scenario.
