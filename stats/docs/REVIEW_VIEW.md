@@ -20,9 +20,10 @@ Reloading that URL reopens the same game. Choose **Exit review** to return to no
 
 - Play, pause, and seek the attached YouTube recording.
 - Use Space to play or pause and Left/Right Arrow to seek three seconds.
-- Follow the current event as playback advances.
-- Manually scroll the event list; this pauses automatic scrolling until **Follow playback** is selected.
-- Filter the timeline and switch between earliest-first and latest-first ordering.
+- Follow the current event as playback advances. Desktop layouts scroll within the timeline automatically.
+- Manually scroll the desktop event list; this pauses automatic scrolling until **Follow playback** is selected.
+- Keep the video in place on mobile while the active event continues to update, then choose **Jump to current event** to scroll there explicitly.
+- Filter the timeline, remove applied filters directly from the chips above it, and switch between earliest-first and latest-first ordering. Less common shot dimensions are grouped under **Detailed shot filters**.
 - Inspect team, player, lineup, score-progression, shot-analysis, and source-event reports.
 - Filter team, opponent, and player shot maps by period, result, pressure, phase, context, and creation.
 - Select shot markers, efficiency zones, and linked split values to navigate to source plays.
@@ -100,7 +101,7 @@ The application uses checked-in HTML, CSS, and JavaScript directly; Review view 
 1. Open `/stats/` and load or import a game with an embeddable YouTube recording.
 2. Choose **View** and confirm real video playback.
 3. Play timeline and feedback moments.
-4. Inspect shot badges and team, opponent, and player shot reports.
+4. Inspect timeline shot details and team, opponent, and player shot reports.
 5. Exercise period and detail filters, then select a marker or zone and confirm three-second pre-roll.
 6. Reload the Review URL and confirm the same game and shot details return.
 7. Exit Review and reopen the game in tracker mode.

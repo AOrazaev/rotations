@@ -171,6 +171,8 @@ test('shot-detail filters combine stored and derived dimensions including untagg
   await expect(page.locator('.event-list-item')).toHaveCount(4);
 
   await page.locator('#openEventFilters').click();
+  await expect(page.locator('#shotFilterDetails')).not.toHaveAttribute('open', '');
+  await page.locator('#shotFilterDetails summary').click();
   await page.locator('input[name="filterShotZone"][value="left_corner_three"]').check();
   await page.locator('input[name="filterShotPressure"][value="open"]').check();
   await page.locator('input[name="filterShotPhase"][value="half_court"]').check();
@@ -182,7 +184,11 @@ test('shot-detail filters combine stored and derived dimensions including untagg
   await expect(page.locator('#eventFilterCount')).toHaveText('5');
 
   await page.locator('#openEventFilters').click();
+  await expect(page.locator('#shotFilterDetails')).toHaveAttribute('open', '');
+  await expect(page.locator('#shotFilterSelectionCount')).toHaveText('5 selected');
   await page.locator('#clearEventFilters').click();
+  await expect(page.locator('#shotFilterDetails')).not.toHaveAttribute('open', '');
+  await page.locator('#shotFilterDetails summary').click();
   await page.locator('input[name="filterShotPressure"][value="__untagged__"]').check();
   await page.locator('#eventFilterForm button[type="submit"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(1);
@@ -190,6 +196,7 @@ test('shot-detail filters combine stored and derived dimensions including untagg
 
   await page.locator('#openEventFilters').click();
   await page.locator('#clearEventFilters').click();
+  await page.locator('#shotFilterDetails summary').click();
   await page.locator('input[name="filterShotZone"][value="__untagged__"]').check();
   await page.locator('input[name="filterShotPressure"][value="contested"]').check();
   await page.locator('#eventFilterForm button[type="submit"]').click();
@@ -540,6 +547,15 @@ test('timeline filters combine side, type, player, and coach comment selections'
   await expect(page.locator('.event-description')).toContainText('steal');
   await expect(page.locator('#openEventFilters')).toHaveAttribute('aria-label', 'Filter timeline, 4 active');
   await expect(page.locator('#eventFilterCount')).toHaveText('4');
+  await expect(page.locator('#activeEventFilters .filter-chip-label')).toHaveText([
+    'Our team',
+    'Steal',
+    'Player 1',
+    'With comment'
+  ]);
+  await page.locator('.filter-chip[data-filter-group="types"][data-filter-value="steal"]').click();
+  await expect(page.locator('#eventFilterCount')).toHaveText('3');
+  await expect(page.locator('#activeEventFilters .filter-chip-label', { hasText: 'Steal' })).toHaveCount(0);
 
   await page.locator('#openEventFilters').click();
   await page.locator('#clearEventFilters').click();

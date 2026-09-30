@@ -240,6 +240,7 @@
               <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
             </div>
           </div>
+          <div id="activeEventFilters" class="active-filter-chips hidden" aria-label="Applied timeline filters"></div>
           <div id="emptyEvents" class="empty-state">No events recorded.</div>
           <ol id="eventList" class="event-list"></ol>
         </section>
@@ -456,7 +457,7 @@
           </svg>
         </button>
       </div>
-      <ul class="event-detail-badges hidden" aria-label="Shot details"></ul>
+      <p class="event-detail-badges hidden" aria-label="Shot details"></p>
       <blockquote class="coach-comment hidden"></blockquote>
     </li>
   </template>
@@ -502,49 +503,57 @@
           <label><input type="radio" name="filterComment" value="with" /> With comment</label>
           <label><input type="radio" name="filterComment" value="without" /> Without comment</label>
         </fieldset>
-        <fieldset>
-          <legend>Shot zone</legend>
-          <label><input type="checkbox" name="filterShotZone" value="restricted_area" /> Restricted area</label>
-          <label><input type="checkbox" name="filterShotZone" value="paint_non_restricted" /> Paint</label>
-          <label><input type="checkbox" name="filterShotZone" value="short_midrange" /> Short midrange</label>
-          <label><input type="checkbox" name="filterShotZone" value="long_midrange" /> Long midrange</label>
-          <label><input type="checkbox" name="filterShotZone" value="left_corner_three" /> Left corner 3</label>
-          <label><input type="checkbox" name="filterShotZone" value="right_corner_three" /> Right corner 3</label>
-          <label><input type="checkbox" name="filterShotZone" value="above_break_three_left" /> Left above-break 3</label>
-          <label><input type="checkbox" name="filterShotZone" value="above_break_three_center" /> Center above-break 3</label>
-          <label><input type="checkbox" name="filterShotZone" value="above_break_three_right" /> Right above-break 3</label>
-          <label><input type="checkbox" name="filterShotZone" value="__untagged__" /> No location</label>
-        </fieldset>
-        <fieldset>
-          <legend>Shot pressure</legend>
-          <label><input type="checkbox" name="filterShotPressure" value="open" /> Open</label>
-          <label><input type="checkbox" name="filterShotPressure" value="lightly_contested" /> Lightly contested</label>
-          <label><input type="checkbox" name="filterShotPressure" value="contested" /> Contested</label>
-          <label><input type="checkbox" name="filterShotPressure" value="heavily_contested" /> Heavily contested</label>
-          <label><input type="checkbox" name="filterShotPressure" value="__untagged__" /> Not tagged</label>
-        </fieldset>
-        <fieldset>
-          <legend>Shot phase</legend>
-          <label><input type="checkbox" name="filterShotPhase" value="half_court" /> Half court</label>
-          <label><input type="checkbox" name="filterShotPhase" value="transition" /> Transition</label>
-          <label><input type="checkbox" name="filterShotPhase" value="__untagged__" /> Not tagged</label>
-        </fieldset>
-        <fieldset>
-          <legend>Shot context</legend>
-          <label><input type="checkbox" name="filterShotContext" value="second_chance" /> Second chance</label>
-          <label><input type="checkbox" name="filterShotContext" value="__untagged__" /> Not tagged</label>
-        </fieldset>
-        <fieldset>
-          <legend>Shot creation</legend>
-          <label><input type="checkbox" name="filterShotCreation" value="catch_and_shoot" /> Catch-and-shoot</label>
-          <label><input type="checkbox" name="filterShotCreation" value="pull_up" /> Pull-up</label>
-          <label><input type="checkbox" name="filterShotCreation" value="drive" /> Drive</label>
-          <label><input type="checkbox" name="filterShotCreation" value="cut" /> Cut</label>
-          <label><input type="checkbox" name="filterShotCreation" value="post_up" /> Post-up</label>
-          <label><input type="checkbox" name="filterShotCreation" value="putback" /> Putback</label>
-          <label><input type="checkbox" name="filterShotCreation" value="other" /> Other</label>
-          <label><input type="checkbox" name="filterShotCreation" value="__untagged__" /> Not tagged</label>
-        </fieldset>
+        <details id="shotFilterDetails" class="shot-filter-details">
+          <summary>
+            <span>Detailed shot filters</span>
+            <span id="shotFilterSelectionCount" class="shot-filter-selection-count">None selected</span>
+          </summary>
+          <div class="shot-filter-groups">
+            <fieldset>
+              <legend>Shot zone</legend>
+              <label><input type="checkbox" name="filterShotZone" value="restricted_area" /> Restricted area</label>
+              <label><input type="checkbox" name="filterShotZone" value="paint_non_restricted" /> Paint</label>
+              <label><input type="checkbox" name="filterShotZone" value="short_midrange" /> Short midrange</label>
+              <label><input type="checkbox" name="filterShotZone" value="long_midrange" /> Long midrange</label>
+              <label><input type="checkbox" name="filterShotZone" value="left_corner_three" /> Left corner 3</label>
+              <label><input type="checkbox" name="filterShotZone" value="right_corner_three" /> Right corner 3</label>
+              <label><input type="checkbox" name="filterShotZone" value="above_break_three_left" /> Left above-break 3</label>
+              <label><input type="checkbox" name="filterShotZone" value="above_break_three_center" /> Center above-break 3</label>
+              <label><input type="checkbox" name="filterShotZone" value="above_break_three_right" /> Right above-break 3</label>
+              <label><input type="checkbox" name="filterShotZone" value="__untagged__" /> No location</label>
+            </fieldset>
+            <fieldset>
+              <legend>Shot pressure</legend>
+              <label><input type="checkbox" name="filterShotPressure" value="open" /> Open</label>
+              <label><input type="checkbox" name="filterShotPressure" value="lightly_contested" /> Lightly contested</label>
+              <label><input type="checkbox" name="filterShotPressure" value="contested" /> Contested</label>
+              <label><input type="checkbox" name="filterShotPressure" value="heavily_contested" /> Heavily contested</label>
+              <label><input type="checkbox" name="filterShotPressure" value="__untagged__" /> Not tagged</label>
+            </fieldset>
+            <fieldset>
+              <legend>Shot phase</legend>
+              <label><input type="checkbox" name="filterShotPhase" value="half_court" /> Half court</label>
+              <label><input type="checkbox" name="filterShotPhase" value="transition" /> Transition</label>
+              <label><input type="checkbox" name="filterShotPhase" value="__untagged__" /> Not tagged</label>
+            </fieldset>
+            <fieldset>
+              <legend>Shot context</legend>
+              <label><input type="checkbox" name="filterShotContext" value="second_chance" /> Second chance</label>
+              <label><input type="checkbox" name="filterShotContext" value="__untagged__" /> Not tagged</label>
+            </fieldset>
+            <fieldset>
+              <legend>Shot creation</legend>
+              <label><input type="checkbox" name="filterShotCreation" value="catch_and_shoot" /> Catch-and-shoot</label>
+              <label><input type="checkbox" name="filterShotCreation" value="pull_up" /> Pull-up</label>
+              <label><input type="checkbox" name="filterShotCreation" value="drive" /> Drive</label>
+              <label><input type="checkbox" name="filterShotCreation" value="cut" /> Cut</label>
+              <label><input type="checkbox" name="filterShotCreation" value="post_up" /> Post-up</label>
+              <label><input type="checkbox" name="filterShotCreation" value="putback" /> Putback</label>
+              <label><input type="checkbox" name="filterShotCreation" value="other" /> Other</label>
+              <label><input type="checkbox" name="filterShotCreation" value="__untagged__" /> Not tagged</label>
+            </fieldset>
+          </div>
+        </details>
       </div>
       <div class="dialog-actions">
         <button id="clearEventFilters" class="secondary" type="button">Clear filters</button>

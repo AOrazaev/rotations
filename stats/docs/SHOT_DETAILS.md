@@ -24,9 +24,9 @@ Choose **Edit event** from a field goal in the timeline. Location and structured
 
 Changing an enriched field goal into a free throw or non-shot event requires confirmation because those event types cannot retain shot details.
 
-## Timeline badges and filters
+## Timeline details and filters
 
-Enriched field goals show compact badges in this order:
+Enriched field goals show a compact secondary metadata line in this order:
 
 1. Derived court zone
 2. Pressure
@@ -34,7 +34,7 @@ Enriched field goals show compact badges in this order:
 4. Context
 5. Creation
 
-Timeline filters can combine shot zone, pressure, phase, context, and creation with the existing side, event-type, player, and comment filters. Values within one group use OR; different groups use AND. **No location** and **Not tagged** choices keep partially tagged and legacy shots visible.
+Timeline filters can combine shot zone, pressure, phase, context, and creation with the existing side, event-type, player, and comment filters. Open **Detailed shot filters** to access the shot dimensions; the section expands automatically when any are active. Applied filters appear as removable chips above the timeline. Values within one group use OR; different groups use AND. **No location** and **Not tagged** choices keep partially tagged and legacy shots visible.
 
 ## Shot reports
 
@@ -61,7 +61,7 @@ Periods are derived from ordered **Period end** timeline markers. Without period
 
 Shot details are stored in the game backup as schema version 2. Version-1 games and backups remain supported and are upgraded in memory when read. Merely opening a legacy game or Review route does not rewrite it; a later normal tracker mutation persists the current schema.
 
-Review mode displays badges, filters, charts, and source navigation without exposing editing controls or writing to IndexedDB.
+Review mode displays timeline details, filters, charts, and source navigation without exposing editing controls or writing to IndexedDB.
 
 ## GitHub Pages release checklist
 
@@ -73,7 +73,7 @@ After deploying the branch from the repository root:
 4. Add a location with pointer input and another with keyboard input.
 5. Add and correct structured tags, then reload and confirm they persist.
 6. Exercise both choices in a clear 2PT/3PT location mismatch.
-7. Export the game, delete it, re-import the backup, and confirm badges and reports return.
+7. Export the game, delete it, re-import the backup, and confirm timeline details and reports return.
 8. Filter the timeline by a tagged value and an untagged value.
 9. Inspect team, opponent, and player shot reports, including period filtering and no-location totals.
 10. Open Review mode and confirm editing controls are absent.

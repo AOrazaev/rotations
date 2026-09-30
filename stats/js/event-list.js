@@ -99,6 +99,9 @@ export function createEventListController({
   const orderButton = documentObject.querySelector('#toggleEventOrder');
   const orderDescription = documentObject.querySelector('#eventOrderDescription');
   const followPlaybackButton = documentObject.querySelector('#followTimelinePlayback');
+  const activeFilters = documentObject.querySelector('#activeEventFilters');
+  const shotFilterDetails = documentObject.querySelector('#shotFilterDetails');
+  const shotFilterSelectionCount = documentObject.querySelector('#shotFilterSelectionCount');
   const timelineScrollContainer = eventList;
 
   let game = null;
@@ -186,6 +189,88 @@ export function createEventListController({
       + Number(filters.shotCreations.size > 0);
   }
 
+  function selectedShotFilterCount() {
+    return filters.shotZones.size
+      + filters.shotPressures.size
+      + filters.shotPhases.size
+      + filters.shotContexts.size
+      + filters.shotCreations.size;
+  }
+
+  function draftShotFilterCount() {
+    return filterForm.querySelectorAll(
+      'input[name^="filterShot"]:checked'
+    ).length;
+  }
+
+  function updateShotFilterSummary(count = draftShotFilterCount()) {
+    shotFilterSelectionCount.textContent = count
+      ? `${count} selected`
+      : 'None selected';
+  }
+
+  function filterInputLabel(input, group) {
+    const label = input?.closest('label')?.textContent.trim() || input?.value || '';
+    if (input?.value === UNTAGGED_SHOT_DETAIL) {
+      const legend = input.closest('fieldset')?.querySelector('legend')?.textContent.trim();
+      return legend ? `${legend.replace(/^Shot /, '')}: ${label}` : label;
+    }
+    if (group === 'players') return label;
+    return label;
+  }
+
+  function appendFilterChip(group, value, input) {
+    const label = filterInputLabel(input, group);
+    if (!label) return;
+    const button = documentObject.createElement('button');
+    button.type = 'button';
+    button.className = 'filter-chip';
+    button.dataset.filterGroup = group;
+    button.dataset.filterValue = value;
+    button.setAttribute('aria-label', `Remove ${label} filter`);
+    const text = documentObject.createElement('span');
+    text.className = 'filter-chip-label';
+    text.textContent = label;
+    const remove = documentObject.createElement('span');
+    remove.className = 'filter-chip-remove';
+    remove.setAttribute('aria-hidden', 'true');
+    remove.textContent = '×';
+    button.append(text, remove);
+    activeFilters.appendChild(button);
+  }
+
+  function updateActiveFilterChips() {
+    activeFilters.innerHTML = '';
+    const inputGroups = [
+      ['sides', 'filterSide'],
+      ['types', 'filterType'],
+      ['players', 'filterPlayer'],
+      ['shotZones', 'filterShotZone'],
+      ['shotPressures', 'filterShotPressure'],
+      ['shotPhases', 'filterShotPhase'],
+      ['shotContexts', 'filterShotContext'],
+      ['shotCreations', 'filterShotCreation']
+    ];
+    for (const [group, inputName] of inputGroups) {
+      for (const value of filters[group]) {
+        const input = filterForm.querySelector(
+          `input[name="${inputName}"][value="${CSS.escape(value)}"]`
+        );
+        appendFilterChip(group, value, input);
+      }
+    }
+    if (filters.teamMention) {
+      appendFilterChip('teamMention', 'true', filterTeamMention);
+    }
+    if (filters.comment !== 'any') {
+      const input = filterForm.querySelector(
+        `input[name="filterComment"][value="${filters.comment}"]`
+      );
+      appendFilterChip('comment', filters.comment, input);
+    }
+    activeFilters.classList.toggle('hidden', !activeFilters.childElementCount);
+  }
+
   function updateFilterButton() {
     const count = activeFilterCount();
     filterButton.classList.toggle('active', count > 0);
@@ -204,9 +289,24 @@ export function createEventListController({
     orderDescription.textContent = earliestFirst ? 'Earliest first.' : 'Latest first.';
   }
 
+  function timelineScrollsPage() {
+    return documentObject.defaultView.getComputedStyle(timelineScrollContainer).overflowY === 'visible';
+  }
+
+  function updatePlaybackFollowControl() {
+    const pageScroll = timelineScrollsPage();
+    const label = pageScroll ? 'Jump to current event' : 'Follow playback';
+    followPlaybackButton.textContent = label;
+    followPlaybackButton.title = label;
+    followPlaybackButton.classList.toggle(
+      'hidden',
+      !followPlayback || (!pageScroll && playbackFollowing)
+    );
+  }
+
   function setPlaybackFollowing(following) {
     playbackFollowing = following;
-    followPlaybackButton.classList.toggle('hidden', !followPlayback || following);
+    updatePlaybackFollowControl();
   }
 
   function setActiveEvent(eventId) {
@@ -219,14 +319,17 @@ export function createEventListController({
     }
   }
 
-  function scrollActiveEventIntoView() {
-    if (!activeEventId || !playbackFollowing || !videoController.isPlaying()) return;
+  function scrollActiveEventIntoView({ allowPageScroll = false } = {}) {
+    if (!activeEventId || !videoController.isPlaying()) return;
     const item = eventList.querySelector(`[data-event-id="${CSS.escape(activeEventId)}"]`);
     if (!item) return;
-    if (documentObject.defaultView.getComputedStyle(timelineScrollContainer).overflowY === 'visible') {
+    if (timelineScrollsPage()) {
+      setPlaybackFollowing(false);
+      if (!allowPageScroll) return;
       item.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
     }
+    if (!playbackFollowing) return;
     const panelBox = timelineScrollContainer.getBoundingClientRect();
     const itemBox = item.getBoundingClientRect();
     const top = timelineScrollContainer.scrollTop
@@ -237,8 +340,12 @@ export function createEventListController({
     timelineScrollContainer.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   }
 
-  function updatePlaybackPosition(seconds, { forceScroll = false } = {}) {
+  function updatePlaybackPosition(seconds, {
+    forceScroll = false,
+    allowPageScroll = false
+  } = {}) {
     lastPlaybackSeconds = seconds;
+    if (followPlayback) updatePlaybackFollowControl();
     const orderedEvents = orderGameEvents(game?.events || []);
     let currentEvent = null;
     for (const event of orderedEvents) {
@@ -248,7 +355,9 @@ export function createEventListController({
     const nextEventId = currentEvent?.id || null;
     const changed = nextEventId !== activeEventId;
     setActiveEvent(nextEventId);
-    if (followPlayback && (changed || forceScroll)) scrollActiveEventIntoView();
+    if (followPlayback && (changed || forceScroll)) {
+      scrollActiveEventIntoView({ allowPageScroll });
+    }
   }
 
   function pausePlaybackFollowing() {
@@ -287,6 +396,9 @@ export function createEventListController({
     filterTeamMention.checked = filters.teamMention;
     const comment = filterForm.querySelector(`input[name="filterComment"][value="${filters.comment}"]`);
     if (comment) comment.checked = true;
+    const shotCount = selectedShotFilterCount();
+    shotFilterDetails.open = shotCount > 0;
+    updateShotFilterSummary(shotCount);
   }
 
   function eventMatchesFilters(event) {
@@ -405,6 +517,7 @@ export function createEventListController({
     eventList.innerHTML = '';
     populateFilterPlayers();
     updateFilterButton();
+    updateActiveFilterChips();
     updateOrderControl();
     if (!game) {
       emptyEvents.textContent = 'No events recorded.';
@@ -435,7 +548,10 @@ export function createEventListController({
       const detailBadges = item.querySelector('.event-detail-badges');
       const badges = getShotDetailBadges(event);
       for (const badge of badges) {
-        const badgeItem = documentObject.createElement('li');
+        if (detailBadges.childElementCount) {
+          detailBadges.append(documentObject.createTextNode(' · '));
+        }
+        const badgeItem = documentObject.createElement('span');
         badgeItem.className = 'event-detail-badge';
         badgeItem.dataset.shotDetailKind = badge.kind;
         badgeItem.dataset.value = badge.value;
@@ -498,6 +614,15 @@ export function createEventListController({
       busy = false;
     }
   });
+  activeFilters.addEventListener('click', event => {
+    const chip = event.target.closest('.filter-chip');
+    if (!chip) return;
+    const { filterGroup: group, filterValue: value } = chip.dataset;
+    if (group === 'teamMention') filters.teamMention = false;
+    else if (group === 'comment') filters.comment = 'any';
+    else filters[group]?.delete(value);
+    render(game);
+  });
 
   if (!readOnly) {
     sideInput.addEventListener('change', () => {
@@ -514,6 +639,13 @@ export function createEventListController({
   });
   if (followPlayback) {
     followPlaybackButton.addEventListener('click', () => {
+      if (timelineScrollsPage()) {
+        updatePlaybackPosition(videoController.getCurrentSeconds(), {
+          forceScroll: true,
+          allowPageScroll: true
+        });
+        return;
+      }
       setPlaybackFollowing(true);
       updatePlaybackPosition(videoController.getCurrentSeconds(), { forceScroll: true });
     });
@@ -524,6 +656,9 @@ export function createEventListController({
   filterButton.addEventListener('click', () => {
     syncFilterForm();
     filterDialog.showModal();
+  });
+  filterForm.addEventListener('change', event => {
+    if (event.target.matches('input[name^="filterShot"]')) updateShotFilterSummary();
   });
   cancelFilters.addEventListener('click', () => filterDialog.close());
   clearFilters.addEventListener('click', () => {

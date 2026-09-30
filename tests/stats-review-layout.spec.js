@@ -259,7 +259,11 @@ for (const width of [1024, 600]) {
         window.__statsFakePlayer.current = 170;
       });
       await expect(page.locator('.event-list-item[data-event-id="e11"]')).toHaveAttribute('aria-current', 'true');
-      await expect.poll(() => page.evaluate(() => window.__mobileFollowCalls.length)).toBeGreaterThan(0);
+      expect(await page.evaluate(() => window.__mobileFollowCalls.length)).toBe(0);
+      await expect(page.locator('#followTimelinePlayback')).toBeVisible();
+      await expect(page.locator('#followTimelinePlayback')).toHaveText('Jump to current event');
+      await page.locator('#followTimelinePlayback').click();
+      await expect.poll(() => page.evaluate(() => window.__mobileFollowCalls.length)).toBe(1);
     }
     const dimensions = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
