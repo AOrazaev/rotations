@@ -9,7 +9,7 @@
 </head>
 <body>
   <main class="container">
-    <header class="hero">
+    <header id="statsHero" class="hero">
       <div>
         <p class="eyebrow">Basketball Tools</p>
         <h1>Stats &amp; Video Review</h1>
@@ -18,11 +18,28 @@
       <a class="nav-link" href="../">Rotation Planner</a>
     </header>
 
+    <section id="reviewModeHeader" class="card review-mode-header hidden" aria-labelledby="reviewModeTitle">
+      <div>
+        <p class="eyebrow">Read-only review</p>
+        <h2 id="reviewModeTitle"></h2>
+        <p id="reviewModeOpponent" class="subtitle"></p>
+      </div>
+      <div class="review-header-actions">
+        <a class="nav-link" href="./">Exit review</a>
+      </div>
+    </section>
+
+    <section id="reviewRouteState" class="card review-route-state hidden" aria-labelledby="reviewRouteTitle">
+      <h2 id="reviewRouteTitle">Review unavailable</h2>
+      <p id="reviewRouteMessage"></p>
+      <a class="nav-link" href="./">Exit review</a>
+    </section>
+
     <div id="statsShell" class="app-shell">
       <button id="showGamePanel" class="sidebar-reopen hidden" type="button" aria-controls="gamePanel" aria-expanded="false">Games</button>
       <aside id="gamePanel" class="panel-stack side-panel game-panel">
         <section class="card">
-          <div class="section-head">
+          <div id="reportSummary" class="section-head">
             <div>
               <h2>Games</h2>
               <p>Saved only in this browser.</p>
@@ -101,6 +118,11 @@
             <p id="videoError" class="message error hidden" role="alert"></p>
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
+            </div>
+            <div id="reviewVideoScore" class="review-score review-video-score hidden" role="status" aria-live="polite" aria-label="Current score: Our team 0, Opponent 0">
+              <span class="review-score-team">Our team</span>
+              <strong id="reviewModeScore">0–0</strong>
+              <span id="reviewScoreOpponent" class="review-score-opponent">Opponent</span>
             </div>
             <p class="video-shortcuts" aria-label="Video keyboard shortcuts">
               Shortcuts:
@@ -190,9 +212,10 @@
           <div class="section-head">
             <div>
               <h2>Event timeline</h2>
-              <p><span id="eventOrderDescription">Latest first.</span> Play, correct, or remove recorded events.</p>
+              <p><span id="eventOrderDescription">Latest first.</span> <span id="eventTimelineInstruction">Play, correct, or remove recorded events.</span></p>
             </div>
             <div class="timeline-actions">
+              <button id="followTimelinePlayback" class="secondary small hidden" type="button">Follow playback</button>
               <button id="toggleEventOrder" class="secondary icon-button order-button" type="button" aria-label="Show earliest events first" title="Show earliest events first">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M8 5v14m0 0-4-4m4 4 4-4M16 19V5m0 0-4 4m4-4 4 4" />
@@ -214,6 +237,13 @@
       </div>
     </div>
 
+    <nav id="reviewNavigation" class="review-navigation hidden" aria-label="Review reports" role="tablist">
+      <button id="reviewTabTeam" class="review-tab active" type="button" role="tab" aria-selected="true" aria-controls="teamReportSection" data-review-section="team">Team</button>
+      <button id="reviewTabPlayers" class="review-tab" type="button" role="tab" aria-selected="false" aria-controls="playerReportSection" data-review-section="players" tabindex="-1">Players</button>
+      <button id="reviewTabLineups" class="review-tab" type="button" role="tab" aria-selected="false" aria-controls="lineupReportSection" data-review-section="lineups" tabindex="-1">Lineups</button>
+      <button id="reviewTabFeedback" class="review-tab" type="button" role="tab" aria-selected="false" aria-controls="feedbackReportSection" data-review-section="feedback" tabindex="-1">Feedback</button>
+    </nav>
+
     <section id="reportCard" class="card hidden">
       <div class="section-head">
         <div>
@@ -223,7 +253,7 @@
         <strong id="reportFinalScore" class="report-final-score">0–0</strong>
       </div>
 
-      <div class="report-section">
+      <div id="teamReportSection" class="report-section">
         <h3>Team comparison</h3>
         <div class="report-table-wrap">
           <table class="report-table team-comparison-table">
@@ -233,7 +263,7 @@
         </div>
       </div>
 
-      <div class="report-section">
+      <div id="playerReportSection" class="report-section">
         <h3>Player box scores</h3>
         <div class="report-table-wrap">
           <table class="report-table player-report-table">
@@ -248,7 +278,7 @@
         </div>
       </div>
 
-      <div class="report-section player-feedback">
+      <div id="feedbackReportSection" class="report-section player-feedback">
         <div class="section-head">
           <div>
             <h3>Player feedback</h3>
@@ -261,13 +291,19 @@
             <button id="copyYouTubeFeedback" class="secondary small" type="button">Copy for YouTube</button>
           </div>
         </div>
+        <dl id="feedbackPlayerSummary" class="player-review-summary hidden" aria-label="Selected player statistics"></dl>
+        <div id="feedbackMomentNavigation" class="feedback-moment-navigation hidden" aria-label="Feedback moment navigation">
+          <button id="previousFeedbackMoment" class="secondary small" type="button" aria-label="Previous feedback moment">Previous</button>
+          <strong id="feedbackMomentPosition" aria-live="polite">No feedback moments</strong>
+          <button id="nextFeedbackMoment" class="secondary small" type="button" aria-label="Next feedback moment">Next</button>
+        </div>
         <div id="emptyPlayerFeedback" class="empty-state compact">No coach-commented events for this player.</div>
         <ol id="playerFeedbackList" class="player-feedback-list"></ol>
         <p id="playerFeedbackStatus" class="message" role="status"></p>
       </div>
 
       <div class="report-grid">
-        <div class="report-section">
+        <div id="lineupReportSection" class="report-section">
           <h3>Lineups</h3>
           <div class="report-table-wrap">
             <table class="report-table">
@@ -276,14 +312,14 @@
             </table>
           </div>
         </div>
-        <div class="report-section">
+        <div id="scoreProgressionSection" class="report-section">
           <h3>Score progression</h3>
           <div id="emptyScoreProgression" class="empty-state compact">No made shots recorded.</div>
-          <ol id="scoreProgression" class="report-event-list"></ol>
+          <div id="scoreProgression" class="score-chart hidden"></div>
         </div>
       </div>
 
-      <div class="report-section source-plays">
+      <div id="reportSourceSection" class="report-section source-plays">
         <h3 id="reportSourceTitle">Source plays</h3>
         <p id="reportSourceEmpty" class="message">Select a linked report value to inspect its source events.</p>
         <ol id="reportSourceList" class="report-event-list"></ol>
@@ -557,6 +593,7 @@
         <span class="game-list-detail"></span>
       </div>
       <div class="marker-actions">
+        <button class="primary small" type="button" data-action="view-game">View</button>
         <button class="secondary small" type="button" data-action="open-game">Open</button>
         <button class="secondary small" type="button" data-action="export-game">Export</button>
         <button class="secondary small" type="button" data-action="archive-game">Archive</button>

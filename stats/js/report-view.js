@@ -15,6 +15,15 @@ const COMPARISON_METRICS = [
   ['fouls', 'Fouls']
 ];
 const FEEDBACK_PREVIEW_SECONDS = 3;
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const SCORE_CHART = {
+  width: 600,
+  height: 180,
+  left: 38,
+  right: 14,
+  top: 14,
+  bottom: 28
+};
 
 function lineupKey(playerIds) {
   return [...playerIds].sort().join('|');
@@ -45,7 +54,9 @@ function addCell(row, content, className = '') {
 
 export function createReportController({
   documentObject = document,
-  videoController
+  videoController,
+  previewSeconds = 0,
+  playerReview = false
 }) {
   const reportCard = documentObject.querySelector('#reportCard');
   const finalScore = documentObject.querySelector('#reportFinalScore');
@@ -60,6 +71,11 @@ export function createReportController({
   const sourceEmpty = documentObject.querySelector('#reportSourceEmpty');
   const reportError = documentObject.querySelector('#reportError');
   const feedbackPlayer = documentObject.querySelector('#feedbackPlayer');
+  const feedbackSummary = documentObject.querySelector('#feedbackPlayerSummary');
+  const feedbackNavigation = documentObject.querySelector('#feedbackMomentNavigation');
+  const previousFeedbackButton = documentObject.querySelector('#previousFeedbackMoment');
+  const nextFeedbackButton = documentObject.querySelector('#nextFeedbackMoment');
+  const feedbackPosition = documentObject.querySelector('#feedbackMomentPosition');
   const feedbackList = documentObject.querySelector('#playerFeedbackList');
   const emptyFeedback = documentObject.querySelector('#emptyPlayerFeedback');
   const copyFeedbackButton = documentObject.querySelector('#copyPlayerFeedback');
@@ -68,6 +84,8 @@ export function createReportController({
 
   let game = null;
   let analysis = null;
+  let selectedFeedbackPlayerId = null;
+  let activeFeedbackEventId = null;
 
   function setError(message = '') {
     reportError.textContent = message;
@@ -117,6 +135,73 @@ export function createReportController({
       : `${minutes}:${remainingSeconds}`;
   }
 
+  function renderFeedbackSummary(player) {
+    feedbackSummary.innerHTML = '';
+    feedbackSummary.classList.toggle('hidden', !playerReview || !player);
+    if (!playerReview || !player) return;
+    const stats = analysis.report.players[player.id];
+    const metrics = [
+      ['points', 'Points', stats.points],
+      ['fieldGoals', 'FG', `${stats.fieldGoalsMade}/${stats.fieldGoalsAttempted}`],
+      ['threePoint', '3PT', `${stats.threePointMade}/${stats.threePointAttempted}`],
+      ['freeThrows', 'FT', `${stats.freeThrowsMade}/${stats.freeThrowsAttempted}`],
+      ['rebounds', 'Rebounds', stats.offensiveRebounds + stats.defensiveRebounds],
+      ['assists', 'Assists', stats.assists],
+      ['steals', 'Steals', stats.steals],
+      ['blocks', 'Blocks', stats.blocks],
+      ['turnovers', 'Turnovers', stats.turnovers],
+      ['plusMinus', '+/-', signed(stats.plusMinus)],
+      ['efficiency', 'EFF', stats.efficiency],
+      ['trueShooting', 'TS%', formatPercentage(stats.trueShootingPercentage)],
+      ['videoTime', 'Video time', formatVideoTime(stats.videoSeconds)]
+    ];
+    for (const [key, label, value] of metrics) {
+      const item = documentObject.createElement('div');
+      item.className = 'player-review-stat';
+      item.dataset.playerStat = key;
+      const term = documentObject.createElement('dt');
+      term.textContent = label;
+      const description = documentObject.createElement('dd');
+      description.textContent = value;
+      item.append(term, description);
+      feedbackSummary.appendChild(item);
+    }
+  }
+
+  function updateFeedbackMoment(events, { seek = false } = {}) {
+    const index = events.findIndex(event => event.id === activeFeedbackEventId);
+    for (const item of feedbackList.querySelectorAll('[data-event-id]')) {
+      const active = playerReview && item.dataset.eventId === activeFeedbackEventId;
+      item.classList.toggle('current-feedback', active);
+      if (active) item.setAttribute('aria-current', 'true');
+      else item.removeAttribute('aria-current');
+    }
+    feedbackNavigation.classList.toggle('hidden', !playerReview || index < 0);
+    feedbackPosition.textContent = index < 0 ? 'No feedback moments' : `${index + 1} of ${events.length}`;
+    previousFeedbackButton.disabled = index <= 0;
+    nextFeedbackButton.disabled = index < 0 || index >= events.length - 1;
+    if (!seek || index < 0) return;
+    try {
+      videoController.seekTo(feedbackSeconds(events[index]));
+      videoController.play();
+      setFeedbackStatus();
+      feedbackList.querySelector(`[data-event-id="${CSS.escape(activeFeedbackEventId)}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } catch (error) {
+      setFeedbackStatus(error.message || 'Could not play the feedback moment.', true);
+    }
+  }
+
+  function moveFeedbackMoment(offset) {
+    const player = game.players.find(item => item.id === feedbackPlayer.value);
+    const events = player ? feedbackEvents(player) : [];
+    const currentIndex = events.findIndex(event => event.id === activeFeedbackEventId);
+    const nextIndex = Math.min(events.length - 1, Math.max(0, currentIndex + offset));
+    if (nextIndex < 0 || nextIndex === currentIndex) return;
+    activeFeedbackEventId = events[nextIndex].id;
+    updateFeedbackMoment(events, { seek: true });
+  }
+
   function renderFeedback() {
     const previousPlayerId = feedbackPlayer.value;
     feedbackPlayer.innerHTML = '';
@@ -135,6 +220,12 @@ export function createReportController({
     const player = game.players.find(item => item.id === feedbackPlayer.value);
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
     const events = player ? feedbackEvents(player) : [];
+    const playerChanged = player?.id !== selectedFeedbackPlayerId;
+    selectedFeedbackPlayerId = player?.id || null;
+    if (playerChanged || !events.some(event => event.id === activeFeedbackEventId)) {
+      activeFeedbackEventId = events[0]?.id || null;
+    }
+    renderFeedbackSummary(player);
     emptyFeedback.classList.toggle('hidden', events.length > 0);
     copyFeedbackButton.disabled = events.length === 0;
     copyYouTubeFeedbackButton.disabled = events.length === 0;
@@ -166,6 +257,7 @@ export function createReportController({
       item.append(include, content);
       feedbackList.appendChild(item);
     }
+    updateFeedbackMoment(events);
   }
 
   function selectedFeedback() {
@@ -338,20 +430,131 @@ export function createReportController({
 
   function renderProgression() {
     progression.innerHTML = '';
-    emptyProgression.classList.toggle('hidden', analysis.scoreProgression.length > 0);
-    for (const point of analysis.scoreProgression) {
-      const item = documentObject.createElement('li');
-      item.dataset.eventId = point.eventId;
+    const points = analysis.scoreProgression;
+    emptyProgression.classList.toggle('hidden', points.length > 0);
+    progression.classList.toggle('hidden', points.length === 0);
+    if (!points.length) return;
+
+    const opponentName = game.opponentName?.trim() || 'Opponent';
+    const legend = documentObject.createElement('div');
+    legend.className = 'score-chart-legend';
+    for (const [className, label] of [['team', 'Our team'], ['opponent', opponentName]]) {
+      const item = documentObject.createElement('span');
+      item.className = className;
+      item.textContent = label;
+      legend.appendChild(item);
+    }
+
+    const plot = documentObject.createElement('div');
+    plot.className = 'score-chart-plot';
+    const svg = documentObject.createElementNS(SVG_NAMESPACE, 'svg');
+    svg.classList.add('score-chart-svg');
+    svg.setAttribute('viewBox', `0 0 ${SCORE_CHART.width} ${SCORE_CHART.height}`);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute(
+      'aria-label',
+      `Score progression: Our team ${analysis.report.score.team}, ${opponentName} ${analysis.report.score.opponent}, ${points.length} scoring events.`
+    );
+
+    const startSeconds = Number(game.video.startSeconds) || 0;
+    const endSeconds = Math.max(
+      startSeconds + 1,
+      Number(game.video.endSeconds) || analysis.reportEndSeconds || points.at(-1).videoSeconds
+    );
+    const maxScore = Math.max(1, ...points.flatMap(point => [point.team, point.opponent]));
+    const plotWidth = SCORE_CHART.width - SCORE_CHART.left - SCORE_CHART.right;
+    const plotHeight = SCORE_CHART.height - SCORE_CHART.top - SCORE_CHART.bottom;
+    const x = seconds => SCORE_CHART.left
+      + ((Math.min(endSeconds, Math.max(startSeconds, seconds)) - startSeconds)
+        / (endSeconds - startSeconds)) * plotWidth;
+    const y = score => SCORE_CHART.top + plotHeight - (score / maxScore) * plotHeight;
+
+    const tickStep = maxScore <= 10 ? 1 : Math.ceil(maxScore / 5);
+    const ticks = new Set([0, maxScore]);
+    for (let value = tickStep; value < maxScore; value += tickStep) ticks.add(value);
+    for (const value of [...ticks].sort((a, b) => a - b)) {
+      const line = documentObject.createElementNS(SVG_NAMESPACE, 'line');
+      line.classList.add('score-chart-grid');
+      line.setAttribute('x1', SCORE_CHART.left);
+      line.setAttribute('x2', SCORE_CHART.width - SCORE_CHART.right);
+      line.setAttribute('y1', y(value));
+      line.setAttribute('y2', y(value));
+      const label = documentObject.createElementNS(SVG_NAMESPACE, 'text');
+      label.classList.add('score-chart-axis-label');
+      label.setAttribute('x', SCORE_CHART.left - 7);
+      label.setAttribute('y', y(value) + 4);
+      label.setAttribute('text-anchor', 'end');
+      label.textContent = value;
+      svg.append(line, label);
+    }
+
+    for (const [seconds, anchor] of [[startSeconds, 'start'], [endSeconds, 'end']]) {
+      const label = documentObject.createElementNS(SVG_NAMESPACE, 'text');
+      label.classList.add('score-chart-axis-label');
+      label.setAttribute('x', x(seconds));
+      label.setAttribute('y', SCORE_CHART.height - 6);
+      label.setAttribute('text-anchor', anchor);
+      label.textContent = formatVideoTime(seconds);
+      svg.appendChild(label);
+    }
+
+    const eventsById = Object.fromEntries(game.events.map(event => [event.id, event]));
+    const periodEnds = analysis.orderedEventIds
+      .map(eventId => eventsById[eventId])
+      .filter(event => event?.type === 'period_end');
+    for (const event of periodEnds) {
+      const eventX = x(event.videoSeconds);
+      const line = documentObject.createElementNS(SVG_NAMESPACE, 'line');
+      line.classList.add('score-chart-period-line');
+      line.dataset.eventId = event.id;
+      line.setAttribute('x1', eventX);
+      line.setAttribute('x2', eventX);
+      line.setAttribute('y1', SCORE_CHART.top);
+      line.setAttribute('y2', SCORE_CHART.top + plotHeight);
+      const title = documentObject.createElementNS(SVG_NAMESPACE, 'title');
+      title.textContent = `${event.periodLabel || 'Period end'} at ${formatVideoTime(event.videoSeconds)}`;
+      line.appendChild(title);
+
+      const label = documentObject.createElementNS(SVG_NAMESPACE, 'text');
+      label.classList.add('score-chart-period-label');
+      label.setAttribute('x', eventX + (eventX > SCORE_CHART.width - 100 ? -4 : 4));
+      label.setAttribute('y', SCORE_CHART.top + 11);
+      label.setAttribute('text-anchor', eventX > SCORE_CHART.width - 100 ? 'end' : 'start');
+      label.textContent = event.periodLabel || 'Period end';
+      svg.append(line, label);
+    }
+
+    for (const side of ['team', 'opponent']) {
+      let pathData = `M ${x(startSeconds)} ${y(0)}`;
+      for (const point of points) {
+        pathData += ` H ${x(point.videoSeconds)} V ${y(point[side])}`;
+      }
+      pathData += ` H ${x(endSeconds)}`;
+      const path = documentObject.createElementNS(SVG_NAMESPACE, 'path');
+      path.classList.add('score-chart-line', side);
+      path.dataset.side = side;
+      path.setAttribute('d', pathData);
+      svg.appendChild(path);
+    }
+
+    let previousTeam = 0;
+    for (const point of points) {
+      const scoringSide = point.team !== previousTeam ? 'team' : 'opponent';
       const button = documentObject.createElement('button');
       button.type = 'button';
-      button.className = 'link-button';
+      button.className = `score-chart-point ${scoringSide}`;
+      button.dataset.eventId = point.eventId;
       button.dataset.reportEventId = point.eventId;
-      button.textContent = formatVideoTime(point.videoSeconds);
-      const score = documentObject.createElement('strong');
-      score.textContent = `${point.team}–${point.opponent}`;
-      item.append(button, score);
-      progression.appendChild(item);
+      button.style.left = `${(x(point.videoSeconds) / SCORE_CHART.width) * 100}%`;
+      button.style.top = `${(y(point[scoringSide]) / SCORE_CHART.height) * 100}%`;
+      const label = `${formatVideoTime(point.videoSeconds)}, Our team ${point.team}, ${opponentName} ${point.opponent}`;
+      button.setAttribute('aria-label', label);
+      button.title = label;
+      plot.appendChild(button);
+      previousTeam = point.team;
     }
+    plot.prepend(svg);
+    progression.append(legend, plot);
   }
 
   function renderSources(eventIds = []) {
@@ -380,7 +583,7 @@ export function createReportController({
     const event = game.events.find(item => item.id === eventId);
     if (!event) return;
     try {
-      videoController.seekTo(event.videoSeconds);
+      videoController.seekTo(Math.max(0, event.videoSeconds - previewSeconds));
       setError();
     } catch (error) {
       setError(error.message || 'Could not navigate to the source play.');
@@ -397,6 +600,8 @@ export function createReportController({
     if (eventLink) seekToEvent(eventLink.dataset.reportEventId);
   });
   feedbackPlayer.addEventListener('change', renderFeedback);
+  previousFeedbackButton.addEventListener('click', () => moveFeedbackMoment(-1));
+  nextFeedbackButton.addEventListener('click', () => moveFeedbackMoment(1));
   feedbackList.addEventListener('change', () => {
     const hasSelection = Boolean(feedbackList.querySelector('.feedback-event-select:checked'));
     copyFeedbackButton.disabled = !hasSelection;

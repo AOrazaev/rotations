@@ -74,7 +74,9 @@ export function createGameSetupController({
   locationObject = location,
   historyObject = history,
   now = () => new Date().toISOString(),
-  onGameOpened = () => {}
+  onGameOpened = () => {},
+  onReviewRequested = () => {},
+  initializeDraft = true
 }) {
   const gamesStatus = documentObject.querySelector('#gamesStatus');
   const gamesList = documentObject.querySelector('#gamesList');
@@ -225,6 +227,7 @@ export function createGameSetupController({
         `${game.players.length} players`,
         game.archivedAt ? 'Archived' : null
       ].filter(Boolean).join(' · ');
+      item.querySelector('[data-action="view-game"]').classList.toggle('hidden', Boolean(game.archivedAt));
       item.querySelector('[data-action="open-game"]').classList.toggle('hidden', Boolean(game.archivedAt));
       const archiveButton = item.querySelector('[data-action="archive-game"]');
       archiveButton.dataset.action = game.archivedAt ? 'restore-game' : 'archive-game';
@@ -358,6 +361,8 @@ export function createGameSetupController({
     try {
       if (button.dataset.action === 'open-game') {
         await openGame(item.dataset.gameId);
+      } else if (button.dataset.action === 'view-game') {
+        onReviewRequested(item.dataset.gameId);
       } else if (button.dataset.action === 'export-game') {
         await exportGame(item.dataset.gameId);
       } else if (button.dataset.action === 'archive-game') {
@@ -377,13 +382,13 @@ export function createGameSetupController({
   const ready = (async () => {
     try {
       await renderGames();
-      if (new URLSearchParams(locationObject.search).get('import') === 'planner') {
+      if (initializeDraft && new URLSearchParams(locationObject.search).get('import') === 'planner') {
         importPlannerDraft();
         historyObject.replaceState({}, '', locationObject.pathname);
-      } else createStandaloneDraft();
+      } else if (initializeDraft) createStandaloneDraft();
     } catch (error) {
       setStatus(error.message || 'Could not initialize saved games.', true);
-      createStandaloneDraft();
+      if (initializeDraft) createStandaloneDraft();
     }
   })();
 

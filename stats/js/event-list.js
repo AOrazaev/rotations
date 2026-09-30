@@ -19,13 +19,14 @@ const EDITABLE_TYPES = new Set([
   'note'
 ]);
 
-export function describeEvent(event, playersById) {
+export function describeEvent(event, playersById, score = null) {
   const subject = event.side === 'opponent'
     ? 'Opponent'
     : playersById[event.playerId]?.name || 'Our team';
   if (event.type === 'shot') {
     const shot = event.shotValue === 1 ? 'FT' : `${event.shotValue}PT`;
-    return `${subject} ${event.made ? 'made' : 'missed'} ${shot}`;
+    const scoreLabel = event.made && score ? ` - ${score.team}:${score.opponent}` : '';
+    return `${subject} ${event.made ? 'made' : 'missed'} ${shot}${scoreLabel}`;
   }
   if (event.type === 'rebound') return `${subject} ${event.reboundKind} rebound`;
   if (event.type === 'substitution') {
@@ -41,6 +42,9 @@ export function createEventListController({
   documentObject = document,
   videoController,
   saveGame,
+  readOnly = false,
+  initialEarliestFirst = false,
+  followPlayback = false,
   now = () => new Date().toISOString(),
   confirmFn = message => confirm(message),
   onError = () => {}
@@ -85,13 +89,19 @@ export function createEventListController({
   const clearFilters = documentObject.querySelector('#clearEventFilters');
   const orderButton = documentObject.querySelector('#toggleEventOrder');
   const orderDescription = documentObject.querySelector('#eventOrderDescription');
+  const followPlaybackButton = documentObject.querySelector('#followTimelinePlayback');
+  const timelineScrollContainer = eventList;
 
   let game = null;
   let editingEventId = null;
   let commentEventId = null;
   let editingSeconds = 0;
   let busy = false;
-  let earliestFirst = false;
+  let earliestFirst = initialEarliestFirst;
+  let activeEventId = null;
+  let lastPlaybackSeconds = 0;
+  let playbackFollowing = true;
+  let suppressManualScrollUntil = 0;
   let filters = {
     sides: new Set(),
     types: new Set(),
@@ -166,6 +176,61 @@ export function createEventListController({
     orderButton.title = action;
     orderButton.classList.toggle('earliest-first', earliestFirst);
     orderDescription.textContent = earliestFirst ? 'Earliest first.' : 'Latest first.';
+  }
+
+  function setPlaybackFollowing(following) {
+    playbackFollowing = following;
+    followPlaybackButton.classList.toggle('hidden', !followPlayback || following);
+  }
+
+  function setActiveEvent(eventId) {
+    activeEventId = eventId;
+    for (const item of eventList.querySelectorAll('[data-event-id]')) {
+      const active = item.dataset.eventId === eventId;
+      item.classList.toggle('current-event', active);
+      if (active) item.setAttribute('aria-current', 'true');
+      else item.removeAttribute('aria-current');
+    }
+  }
+
+  function scrollActiveEventIntoView() {
+    if (!activeEventId || !playbackFollowing || !videoController.isPlaying()) return;
+    const item = eventList.querySelector(`[data-event-id="${CSS.escape(activeEventId)}"]`);
+    if (!item) return;
+    if (documentObject.defaultView.getComputedStyle(timelineScrollContainer).overflowY === 'visible') {
+      item.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    const panelBox = timelineScrollContainer.getBoundingClientRect();
+    const itemBox = item.getBoundingClientRect();
+    const top = timelineScrollContainer.scrollTop
+      + itemBox.top
+      - panelBox.top
+      - (timelineScrollContainer.clientHeight - itemBox.height) / 2;
+    suppressManualScrollUntil = Date.now() + 500;
+    timelineScrollContainer.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }
+
+  function updatePlaybackPosition(seconds, { forceScroll = false } = {}) {
+    lastPlaybackSeconds = seconds;
+    const orderedEvents = orderGameEvents(game?.events || []);
+    let currentEvent = null;
+    for (const event of orderedEvents) {
+      if (event.videoSeconds > seconds) break;
+      currentEvent = event;
+    }
+    const nextEventId = currentEvent?.id || null;
+    const changed = nextEventId !== activeEventId;
+    setActiveEvent(nextEventId);
+    if (followPlayback && (changed || forceScroll)) scrollActiveEventIntoView();
+  }
+
+  function pausePlaybackFollowing() {
+    if (followPlayback && playbackFollowing) setPlaybackFollowing(false);
+  }
+
+  function handleTimelineScroll() {
+    if (Date.now() >= suppressManualScrollUntil) pausePlaybackFollowing();
   }
 
   function populateFilterPlayers() {
@@ -297,6 +362,13 @@ export function createEventListController({
     }
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
     const orderedEvents = orderGameEvents(game.events);
+    const scoreByEventId = new Map();
+    const score = { team: 0, opponent: 0 };
+    for (const event of orderedEvents) {
+      if (event.type !== 'shot' || !event.made) continue;
+      score[event.side] += event.shotValue;
+      scoreByEventId.set(event.id, { ...score });
+    }
     const events = (earliestFirst ? orderedEvents : orderedEvents.reverse()).filter(eventMatchesFilters);
     emptyEvents.textContent = game.events.length && !events.length
       ? 'No events match the current filters.'
@@ -306,7 +378,7 @@ export function createEventListController({
       const item = eventTemplate.content.firstElementChild.cloneNode(true);
       item.dataset.eventId = event.id;
       item.querySelector('.event-time').textContent = formatVideoTime(event.videoSeconds);
-      const description = describeEvent(event, playersById);
+      const description = describeEvent(event, playersById, scoreByEventId.get(event.id));
       item.querySelector('.event-description').textContent = description;
       item.querySelector('.event-description').title = description;
       const comment = String(event.coachComment || '').trim();
@@ -314,6 +386,11 @@ export function createEventListController({
       item.classList.toggle('has-comment', !!comment);
       commentBlock.textContent = comment;
       commentBlock.classList.toggle('hidden', !comment);
+      if (readOnly) {
+        item.querySelector('.event-row-actions').remove();
+        eventList.appendChild(item);
+        continue;
+      }
       const commentButton = item.querySelector('[data-action="comment-event"]');
       const commentLabel = comment ? 'Edit coach comment' : 'Add coach comment';
       commentButton.setAttribute('aria-label', commentLabel);
@@ -324,6 +401,7 @@ export function createEventListController({
   }
 
   async function commit(nextGame) {
+    if (readOnly) throw new Error('Review view cannot modify game data.');
     await saveGame(nextGame);
     game = nextGame;
   }
@@ -336,8 +414,11 @@ export function createEventListController({
     if (!selected) return;
     try {
       if (button.dataset.action === 'play-event') {
+        setPlaybackFollowing(true);
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
+      } else if (readOnly) {
+        return;
       } else if (button.dataset.action === 'comment-event') {
         openCommentEditor(selected);
       } else if (button.dataset.action === 'edit-event') {
@@ -356,16 +437,27 @@ export function createEventListController({
     }
   });
 
-  sideInput.addEventListener('change', () => {
-    playerInput.disabled = sideInput.value === 'opponent';
-    if (sideInput.value === 'opponent') playerInput.value = '';
-  });
-  typeInput.addEventListener('change', updateDependentFields);
-  cancelButton.addEventListener('click', () => dialog.close());
+  if (!readOnly) {
+    sideInput.addEventListener('change', () => {
+      playerInput.disabled = sideInput.value === 'opponent';
+      if (sideInput.value === 'opponent') playerInput.value = '';
+    });
+    typeInput.addEventListener('change', updateDependentFields);
+    cancelButton.addEventListener('click', () => dialog.close());
+  }
   orderButton.addEventListener('click', () => {
     earliestFirst = !earliestFirst;
     render(game);
   });
+  if (followPlayback) {
+    followPlaybackButton.addEventListener('click', () => {
+      setPlaybackFollowing(true);
+      updatePlaybackPosition(videoController.getCurrentSeconds(), { forceScroll: true });
+    });
+    timelineScrollContainer.addEventListener('wheel', pausePlaybackFollowing, { passive: true });
+    timelineScrollContainer.addEventListener('touchstart', pausePlaybackFollowing, { passive: true });
+    timelineScrollContainer.addEventListener('scroll', handleTimelineScroll, { passive: true });
+  }
   filterButton.addEventListener('click', () => {
     syncFilterForm();
     filterDialog.showModal();
@@ -394,125 +486,141 @@ export function createEventListController({
     filterDialog.close();
     render(game);
   });
-  cancelComment.addEventListener('click', () => commentDialog.close());
-  commentForm.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!game || !commentEventId || busy) return;
-    setCommentError();
-    busy = true;
-    try {
-      const value = commentText.value.trim();
-      if (!value) throw new Error('Enter a coach comment.');
-      const next = structuredClone(game);
-      const commented = next.events.find(item => item.id === commentEventId);
-      commented.coachComment = value;
-      commented.updatedAt = now();
-      next.updatedAt = now();
-      await commit(next);
-      commentDialog.close();
-    } catch (error) {
-      setCommentError(error.message || 'Could not save the coach comment.');
-    } finally {
-      busy = false;
-    }
-  });
-  removeComment.addEventListener('click', async () => {
-    if (!game || !commentEventId || busy) return;
-    setCommentError();
-    busy = true;
-    try {
-      const next = structuredClone(game);
-      const commented = next.events.find(item => item.id === commentEventId);
-      delete commented.coachComment;
-      commented.updatedAt = now();
-      next.updatedAt = now();
-      await commit(next);
-      commentDialog.close();
-    } catch (error) {
-      setCommentError(error.message || 'Could not remove the coach comment.');
-    } finally {
-      busy = false;
-    }
-  });
-  dialog.querySelectorAll('[data-time-adjust]').forEach(button => button.addEventListener('click', () => {
-    editingSeconds = Math.max(0, editingSeconds + Number(button.dataset.timeAdjust));
-    timestampDisplay.textContent = formatVideoTime(editingSeconds);
-    refreshEditorLineupOptions();
-  }));
-  useCurrentButton.addEventListener('click', () => {
-    try {
-      editingSeconds = videoController.getCurrentSeconds();
+  if (!readOnly) {
+    cancelComment.addEventListener('click', () => commentDialog.close());
+    commentForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!game || !commentEventId || busy) return;
+      setCommentError();
+      busy = true;
+      try {
+        const value = commentText.value.trim();
+        if (!value) throw new Error('Enter a coach comment.');
+        const next = structuredClone(game);
+        const commented = next.events.find(item => item.id === commentEventId);
+        commented.coachComment = value;
+        commented.updatedAt = now();
+        next.updatedAt = now();
+        await commit(next);
+        commentDialog.close();
+      } catch (error) {
+        setCommentError(error.message || 'Could not save the coach comment.');
+      } finally {
+        busy = false;
+      }
+    });
+    removeComment.addEventListener('click', async () => {
+      if (!game || !commentEventId || busy) return;
+      setCommentError();
+      busy = true;
+      try {
+        const next = structuredClone(game);
+        const commented = next.events.find(item => item.id === commentEventId);
+        delete commented.coachComment;
+        commented.updatedAt = now();
+        next.updatedAt = now();
+        await commit(next);
+        commentDialog.close();
+      } catch (error) {
+        setCommentError(error.message || 'Could not remove the coach comment.');
+      } finally {
+        busy = false;
+      }
+    });
+    dialog.querySelectorAll('[data-time-adjust]').forEach(button => button.addEventListener('click', () => {
+      editingSeconds = Math.max(0, editingSeconds + Number(button.dataset.timeAdjust));
       timestampDisplay.textContent = formatVideoTime(editingSeconds);
       refreshEditorLineupOptions();
-      setEditError();
-    } catch (error) {
-      setEditError(error.message);
-    }
-  });
-
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!game || !editingEventId || busy) return;
-    setEditError();
-    busy = true;
-    try {
-      const next = structuredClone(game);
-      const edited = next.events.find(item => item.id === editingEventId);
-      edited.videoSeconds = editingSeconds;
-      edited.updatedAt = now();
-      delete edited.shotValue;
-      delete edited.made;
-      delete edited.reboundKind;
-      delete edited.playerOutId;
-      delete edited.playerInId;
-      delete edited.periodLabel;
-      delete edited.note;
-      if (typeInput.value === 'substitution') {
-        edited.side = 'team';
-        edited.type = 'substitution';
-        edited.playerId = null;
-        edited.playerOutId = playerOutInput.value;
-        edited.playerInId = playerInInput.value;
-        if (!edited.playerOutId || !edited.playerInId) {
-          throw new Error('Select one on-court player and one bench player.');
-        }
-      } else if (typeInput.value === 'timeout') {
-        edited.side = sideInput.value;
-        edited.type = 'timeout';
-        edited.playerId = null;
-      } else if (typeInput.value === 'period_end') {
-        edited.side = 'system';
-        edited.type = 'period_end';
-        edited.playerId = null;
-        edited.periodLabel = periodLabelInput.value.trim();
-        if (!edited.periodLabel) throw new Error('Enter a period label.');
-      } else if (typeInput.value === 'note') {
-        edited.side = 'system';
-        edited.type = 'note';
-        edited.playerId = null;
-        edited.note = noteInput.value.trim();
-        if (!edited.note) throw new Error('Enter note text.');
-      } else {
-        edited.side = sideInput.value;
-        edited.playerId = edited.side === 'team' ? playerInput.value : null;
-        if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
-        edited.type = typeInput.value;
-        if (edited.type === 'shot') {
-          edited.shotValue = Number(shotValueInput.value);
-          edited.made = shotMadeInput.value === 'true';
-        } else if (edited.type === 'rebound') {
-          edited.reboundKind = reboundKindInput.value;
-        }
+    }));
+    useCurrentButton.addEventListener('click', () => {
+      try {
+        editingSeconds = videoController.getCurrentSeconds();
+        timestampDisplay.textContent = formatVideoTime(editingSeconds);
+        refreshEditorLineupOptions();
+        setEditError();
+      } catch (error) {
+        setEditError(error.message);
       }
-      next.updatedAt = now();
-      await commit(next);
-      dialog.close();
-    } catch (error) {
-      setEditError(error.message || 'Could not save the correction.');
-    } finally {
-      busy = false;
-    }
-  });
+    });
 
-  return { render };
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!game || !editingEventId || busy) return;
+      setEditError();
+      busy = true;
+      try {
+        const next = structuredClone(game);
+        const edited = next.events.find(item => item.id === editingEventId);
+        edited.videoSeconds = editingSeconds;
+        edited.updatedAt = now();
+        delete edited.shotValue;
+        delete edited.made;
+        delete edited.reboundKind;
+        delete edited.playerOutId;
+        delete edited.playerInId;
+        delete edited.periodLabel;
+        delete edited.note;
+        if (typeInput.value === 'substitution') {
+          edited.side = 'team';
+          edited.type = 'substitution';
+          edited.playerId = null;
+          edited.playerOutId = playerOutInput.value;
+          edited.playerInId = playerInInput.value;
+          if (!edited.playerOutId || !edited.playerInId) {
+            throw new Error('Select one on-court player and one bench player.');
+          }
+        } else if (typeInput.value === 'timeout') {
+          edited.side = sideInput.value;
+          edited.type = 'timeout';
+          edited.playerId = null;
+        } else if (typeInput.value === 'period_end') {
+          edited.side = 'system';
+          edited.type = 'period_end';
+          edited.playerId = null;
+          edited.periodLabel = periodLabelInput.value.trim();
+          if (!edited.periodLabel) throw new Error('Enter a period label.');
+        } else if (typeInput.value === 'note') {
+          edited.side = 'system';
+          edited.type = 'note';
+          edited.playerId = null;
+          edited.note = noteInput.value.trim();
+          if (!edited.note) throw new Error('Enter note text.');
+        } else {
+          edited.side = sideInput.value;
+          edited.playerId = edited.side === 'team' ? playerInput.value : null;
+          if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
+          edited.type = typeInput.value;
+          if (edited.type === 'shot') {
+            edited.shotValue = Number(shotValueInput.value);
+            edited.made = shotMadeInput.value === 'true';
+          } else if (edited.type === 'rebound') {
+            edited.reboundKind = reboundKindInput.value;
+          }
+        }
+        next.updatedAt = now();
+        await commit(next);
+        dialog.close();
+      } catch (error) {
+        setEditError(error.message || 'Could not save the correction.');
+      } finally {
+        busy = false;
+      }
+    });
+  }
+
+  setPlaybackFollowing(true);
+  const unsubscribeTime = followPlayback
+    ? videoController.subscribeTime(seconds => updatePlaybackPosition(seconds))
+    : () => {};
+
+  return {
+    render,
+    destroy() {
+      unsubscribeTime();
+      if (!followPlayback) return;
+      timelineScrollContainer.removeEventListener('wheel', pausePlaybackFollowing);
+      timelineScrollContainer.removeEventListener('touchstart', pausePlaybackFollowing);
+      timelineScrollContainer.removeEventListener('scroll', handleTimelineScroll);
+    }
+  };
 }

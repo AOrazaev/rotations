@@ -3,9 +3,17 @@ import {
   formatVideoTime,
   parseYouTubeVideoId
 } from './youtube-player.js';
-import { GameStore } from './game-store.js';
+import {
+  GameStore,
+  StoredGameCorruptionError
+} from './game-store.js';
 import { createGameSetupController } from './game-setup.js';
 import { createEventEntryController } from './event-entry.js';
+import { createReviewController } from './review-controller.js';
+import {
+  buildReviewUrl,
+  parseStatsRoute
+} from './review-route.js';
 
 export function createStatsSpikeApp({
   documentObject = document,
@@ -28,6 +36,7 @@ export function createStatsSpikeApp({
   let loadSequence = 0;
   let playbackActive = false;
   const readyListeners = new Set();
+  const timeListeners = new Set();
 
   function notifyReady() {
     readyListeners.forEach(listener => listener(!!player));
@@ -40,7 +49,9 @@ export function createStatsSpikeApp({
 
   function refreshCurrentTime() {
     if (!player) return;
-    currentTime.textContent = formatVideoTime(player.getCurrentSeconds());
+    const seconds = player.getCurrentSeconds();
+    currentTime.textContent = formatVideoTime(seconds);
+    timeListeners.forEach(listener => listener(seconds));
   }
 
   function startClock() {
@@ -160,6 +171,16 @@ export function createStatsSpikeApp({
       readyListeners.add(listener);
       return () => readyListeners.delete(listener);
     },
+    subscribeTime(listener) {
+      timeListeners.add(listener);
+      if (player) listener(player.getCurrentSeconds());
+      return () => timeListeners.delete(listener);
+    },
+    isPlaying() {
+      return player
+        ? (typeof player.isPlaying === 'function' ? player.isPlaying() : playbackActive)
+        : false;
+    },
     getCurrentSeconds() {
       if (!player) throw new Error('The game recording is unavailable for adding events.');
       return player.getCurrentSeconds();
@@ -167,6 +188,7 @@ export function createStatsSpikeApp({
     seekTo(seconds) {
       if (!player) throw new Error('The game recording is unavailable for seeking.');
       player.seekTo(seconds);
+      refreshCurrentTime();
     },
     play() {
       if (!player) throw new Error('The game recording is unavailable for playback.');
@@ -184,6 +206,14 @@ export function createStatsSpikeApp({
 
 const playerFactory = window.__STATS_PLAYER_FACTORY__ || createYouTubePlayer;
 const videoController = createStatsSpikeApp({ playerFactory });
+const route = parseStatsRoute(location.search);
+const reviewMode = route.mode === 'review';
+const reviewModeHeader = document.querySelector('#reviewModeHeader');
+const reviewModeTitle = document.querySelector('#reviewModeTitle');
+const reviewModeOpponent = document.querySelector('#reviewModeOpponent');
+const reviewRouteState = document.querySelector('#reviewRouteState');
+const reviewRouteTitle = document.querySelector('#reviewRouteTitle');
+const reviewRouteMessage = document.querySelector('#reviewRouteMessage');
 const statsShell = document.querySelector('#statsShell');
 const gamePanel = document.querySelector('#gamePanel');
 const hideGamePanelButton = document.querySelector('#hideGamePanel');
@@ -210,9 +240,11 @@ function setGamePanelCollapsed(collapsed, { moveFocus = false } = {}) {
   if (moveFocus) (collapsed ? showGamePanelButton : hideGamePanelButton).focus();
 }
 
-hideGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(true, { moveFocus: true }));
-showGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(false, { moveFocus: true }));
-setGamePanelCollapsed(localStorage.getItem(gamePanelStorageKey) === 'true');
+if (!reviewMode) {
+  hideGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(true, { moveFocus: true }));
+  showGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(false, { moveFocus: true }));
+  setGamePanelCollapsed(localStorage.getItem(gamePanelStorageKey) === 'true');
+}
 
 function setVideoSize(value) {
   const size = Math.min(75, Math.max(55, Number(value) || 70));
@@ -276,32 +308,117 @@ const store = new GameStore({
   databaseName: window.__STATS_DATABASE_NAME__ || 'basketball-stats'
 });
 let setupController;
-const eventController = createEventEntryController({
-  store,
-  videoController,
-  onGameChanged: async game => {
-    if (setupController) {
-      setupController.syncGame(game);
-      await setupController.refreshGames();
+let eventController;
+let reviewController;
+
+function openGameWorkspace(game) {
+  document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
+  videoController.loadVideo(game.video.sourceUrl);
+  eventController.setGame(game);
+}
+
+function removeReviewMutationSurfaces() {
+  [
+    '#gamePanel',
+    '#showGamePanel',
+    '#eventEntryPanel',
+    '#eventEditDialog',
+    '#coachCommentDialog',
+    '#substitutionDialog',
+    '#periodEndDialog',
+    '#noteDialog'
+  ].forEach(selector => document.querySelector(selector)?.remove());
+}
+
+function showReviewRouteState(title, message) {
+  reviewModeHeader.classList.add('hidden');
+  statsShell.classList.add('hidden');
+  reviewRouteTitle.textContent = title;
+  reviewRouteMessage.textContent = message;
+  reviewRouteState.classList.remove('hidden');
+}
+
+async function initializeReviewMode() {
+  document.body.classList.add('review-mode');
+  if (route.status === 'missing-game') {
+    showReviewRouteState('Select a game to review', 'This review link does not identify a saved game.');
+    return;
+  }
+  if (route.status === 'invalid-game') {
+    showReviewRouteState('Invalid review link', 'The game identifier in this review link is invalid.');
+    return;
+  }
+
+  let game;
+  try {
+    game = await store.getGame(route.gameId);
+  } catch (error) {
+    if (error instanceof StoredGameCorruptionError) {
+      showReviewRouteState('Game cannot be reviewed', 'The saved game is invalid and cannot be reviewed safely.');
+    } else {
+      showReviewRouteState('Local storage unavailable', error.message || 'The saved game could not be read.');
     }
+    return;
   }
-});
-setupController = createGameSetupController({
-  store,
-  onGameOpened(game) {
-    document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
-    videoController.loadVideo(game.video.sourceUrl);
-    eventController.setGame(game);
+  if (!game) {
+    showReviewRouteState('Game not found', 'This game is not available in this browser.');
+    return;
   }
-});
+  if (game.archivedAt) {
+    showReviewRouteState('Game is archived', `${game.title} must be restored in the normal stats workspace before reviewing it.`);
+    return;
+  }
+
+  const canonicalUrl = buildReviewUrl(game.id, location.pathname);
+  if (`${location.pathname}${location.search}` !== canonicalUrl) {
+    history.replaceState({}, '', canonicalUrl);
+  }
+  reviewRouteState.classList.add('hidden');
+  reviewModeTitle.textContent = game.title;
+  reviewModeOpponent.textContent = game.opponentName ? `vs ${game.opponentName}` : 'No opponent';
+  reviewModeHeader.classList.remove('hidden');
+  statsShell.classList.remove('hidden');
+  videoController.loadVideo(game.video.sourceUrl);
+  reviewController.setGame(game);
+}
+
+let ready;
+if (reviewMode) {
+  reviewController = createReviewController({ videoController });
+  removeReviewMutationSurfaces();
+  ready = initializeReviewMode();
+} else {
+  eventController = createEventEntryController({
+    store,
+    videoController,
+    onGameChanged: async game => {
+      if (setupController) {
+        setupController.syncGame(game);
+        await setupController.refreshGames();
+      }
+    }
+  });
+  setupController = createGameSetupController({
+    store,
+    onGameOpened: openGameWorkspace,
+    onReviewRequested(gameId) {
+      location.assign(buildReviewUrl(gameId, location.pathname));
+    },
+  });
+  ready = setupController.ready;
+}
 window.__statsApp = {
+  ready,
+  reviewMode,
   videoController,
   setupController,
   eventController,
+  reviewController,
   store,
   destroy() {
     videoController.destroy();
-    eventController.destroy();
+    eventController?.destroy();
+    reviewController?.destroy();
     store.close();
   }
 };
