@@ -108,6 +108,8 @@ Review-only coordination should remain small. It should load one game, initializ
 
 ### Milestone 0: Review contract and fixtures
 
+**Status: complete.** The finalized behavior contract is documented in [`REVIEW_VIEW_CONTRACT.md`](REVIEW_VIEW_CONTRACT.md), with a validated coaching fixture in [`fixtures/review-view-game-v1.json`](fixtures/review-view-game-v1.json) and automated contract coverage in `tests/stats-review-contract.spec.js`.
+
 Deliver:
 
 - Final visible-surface inventory.
