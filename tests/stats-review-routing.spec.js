@@ -123,6 +123,7 @@ test('Review view interactions expose no mutation workflow or game writes', asyn
   await page.locator('#eventFilterForm button[type="submit"]').click();
   await page.locator('#openEventFilters').click();
   await page.locator('#clearEventFilters').click();
+  await page.locator('#shotFilterDetails summary').click();
   await page.locator('input[name="filterShotPressure"][value="open"]').check();
   await page.locator('#eventFilterForm button[type="submit"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(1);

@@ -34,7 +34,7 @@ Enriched field goals show compact badges in this order:
 4. Context
 5. Creation
 
-Timeline filters can combine shot zone, pressure, phase, context, and creation with the existing side, event-type, player, and comment filters. Values within one group use OR; different groups use AND. **No location** and **Not tagged** choices keep partially tagged and legacy shots visible.
+Timeline filters can combine shot zone, pressure, phase, context, and creation with the existing side, event-type, player, and comment filters. Open **Detailed shot filters** to access the shot dimensions; the section expands automatically when any are active. Applied filters appear as removable chips above the timeline. Values within one group use OR; different groups use AND. **No location** and **Not tagged** choices keep partially tagged and legacy shots visible.
 
 ## Shot reports
 

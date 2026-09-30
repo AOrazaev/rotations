@@ -20,9 +20,10 @@ Reloading that URL reopens the same game. Choose **Exit review** to return to no
 
 - Play, pause, and seek the attached YouTube recording.
 - Use Space to play or pause and Left/Right Arrow to seek three seconds.
-- Follow the current event as playback advances.
-- Manually scroll the event list; this pauses automatic scrolling until **Follow playback** is selected.
-- Filter the timeline and switch between earliest-first and latest-first ordering.
+- Follow the current event as playback advances. Desktop layouts scroll within the timeline automatically.
+- Manually scroll the desktop event list; this pauses automatic scrolling until **Follow playback** is selected.
+- Keep the video in place on mobile while the active event continues to update, then choose **Jump to current event** to scroll there explicitly.
+- Filter the timeline, remove applied filters directly from the chips above it, and switch between earliest-first and latest-first ordering. Less common shot dimensions are grouped under **Detailed shot filters**.
 - Inspect team, player, lineup, score-progression, shot-analysis, and source-event reports.
 - Filter team, opponent, and player shot maps by period, result, pressure, phase, context, and creation.
 - Select shot markers, efficiency zones, and linked split values to navigate to source plays.

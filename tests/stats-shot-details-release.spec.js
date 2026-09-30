@@ -91,6 +91,7 @@ test('shot details survive correction, reload, backup recovery, filters, and rep
   await page.locator('[data-action="open-game"]').click();
 
   await page.locator('#openEventFilters').click();
+  await page.locator('#shotFilterDetails summary').click();
   await page.locator('input[name="filterShotPressure"][value="contested"]').check();
   await page.locator('#eventFilterForm button[type="submit"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(1);
