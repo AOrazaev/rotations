@@ -260,6 +260,8 @@ Verification:
 
 ### Milestone 1: Reusable court map
 
+**Status:** Complete.
+
 Deliver:
 
 - Responsive SVG half-court component.

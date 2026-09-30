@@ -141,7 +141,7 @@ test('undo removes and persists only the latest entered event', async ({ page })
     'made 2PT - 2:0'
   ]);
 
-  await page.locator('#undoEvent').click();
+  await page.locator('#undoEvent').dblclick();
   await expect(page.locator('#teamScore')).toHaveText('2');
   await expect(page.locator('#opponentScore')).toHaveText('0');
   await expect(page.locator('.event-list-item')).toHaveCount(1);

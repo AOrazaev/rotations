@@ -201,6 +201,19 @@
               <button id="openPeriodEnd" class="event-action" type="button">Period end</button>
               <button id="openNote" class="event-action" type="button">Note</button>
             </div>
+            <section id="shotLocationPanel" class="shot-location-panel hidden" aria-labelledby="shotLocationTitle">
+              <div class="shot-location-heading">
+                <div>
+                  <h3 id="shotLocationTitle">Shot location</h3>
+                  <p id="shotLocationDescription">Add an optional location for the saved shot.</p>
+                </div>
+                <button id="closeShotLocation" class="secondary small" type="button">Done</button>
+              </div>
+              <div id="shotCourtMap" class="shot-court"></div>
+              <div class="shot-location-actions">
+                <button id="clearShotLocation" class="secondary small" type="button">Clear location</button>
+              </div>
+            </section>
             <p id="eventError" class="message error hidden" role="alert"></p>
             <div class="quick-totals">
               <span>FG <strong id="teamFieldGoals">0/0</strong></span>
