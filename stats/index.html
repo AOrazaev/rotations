@@ -240,7 +240,11 @@
               <button id="undoEvent" class="secondary small" type="button" disabled>Undo latest</button>
             </div>
           </div>
-          <div id="activeEventFilters" class="active-filter-chips hidden" aria-label="Applied timeline filters"></div>
+          <div id="timelineFilterSummary" class="timeline-filter-summary hidden">
+            <div id="activeEventFilters" class="active-filter-chips" aria-label="Applied timeline filters"></div>
+            <button id="copyFilteredReviewLink" class="secondary small hidden" type="button">Copy filtered link</button>
+            <span id="copyFilteredReviewStatus" class="copy-filtered-review-status" role="status"></span>
+          </div>
           <div id="emptyEvents" class="empty-state">No events recorded.</div>
           <ol id="eventList" class="event-list"></ol>
         </section>

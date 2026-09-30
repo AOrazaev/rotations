@@ -345,6 +345,19 @@ function showReviewRouteState(title, message) {
   reviewRouteState.classList.remove('hidden');
 }
 
+function buildCurrentReviewUrl(timelineFilters = route.timelineFilters || null) {
+  return sharedMode
+    ? buildSharedReviewUrl(route.snapshotName, location.pathname, timelineFilters)
+    : buildReviewUrl(route.gameId, location.pathname, timelineFilters);
+}
+
+function syncReviewUrl(timelineFilters) {
+  const canonicalUrl = buildCurrentReviewUrl(timelineFilters);
+  if (`${location.pathname}${location.search}` !== canonicalUrl) {
+    history.replaceState({}, '', canonicalUrl);
+  }
+}
+
 async function initializeReviewMode() {
   document.body.classList.add('review-mode');
   if (route.status === 'missing-game') {
@@ -403,8 +416,8 @@ async function initializeReviewMode() {
   }
 
   const canonicalUrl = sharedMode
-    ? buildSharedReviewUrl(route.snapshotName, location.pathname)
-    : buildReviewUrl(game.id, location.pathname);
+    ? buildSharedReviewUrl(route.snapshotName, location.pathname, route.timelineFilters)
+    : buildReviewUrl(game.id, location.pathname, route.timelineFilters);
   if (`${location.pathname}${location.search}` !== canonicalUrl) {
     history.replaceState({}, '', canonicalUrl);
   }
@@ -420,7 +433,11 @@ async function initializeReviewMode() {
 
 let ready;
 if (reviewMode) {
-  reviewController = createReviewController({ videoController });
+  reviewController = createReviewController({
+    videoController,
+    initialTimelineFilters: route.timelineFilters,
+    onTimelineFiltersChanged: syncReviewUrl
+  });
   removeReviewMutationSurfaces();
   ready = initializeReviewMode();
 } else {

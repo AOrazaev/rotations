@@ -52,6 +52,8 @@ export function createEventListController({
   readOnly = false,
   initialEarliestFirst = false,
   followPlayback = false,
+  initialFilters = null,
+  onFiltersChanged = () => {},
   now = () => new Date().toISOString(),
   confirmFn = message => confirm(message),
   onError = () => {}
@@ -100,6 +102,9 @@ export function createEventListController({
   const orderDescription = documentObject.querySelector('#eventOrderDescription');
   const followPlaybackButton = documentObject.querySelector('#followTimelinePlayback');
   const activeFilters = documentObject.querySelector('#activeEventFilters');
+  const filterSummary = documentObject.querySelector('#timelineFilterSummary');
+  const copyFilteredReviewLink = documentObject.querySelector('#copyFilteredReviewLink');
+  const copyFilteredReviewStatus = documentObject.querySelector('#copyFilteredReviewStatus');
   const shotFilterDetails = documentObject.querySelector('#shotFilterDetails');
   const shotFilterSelectionCount = documentObject.querySelector('#shotFilterSelectionCount');
   const timelineScrollContainer = eventList;
@@ -114,18 +119,37 @@ export function createEventListController({
   let lastPlaybackSeconds = 0;
   let playbackFollowing = true;
   let suppressManualScrollUntil = 0;
-  let filters = {
-    sides: new Set(),
-    types: new Set(),
-    players: new Set(),
-    teamMention: false,
-    comment: 'any',
-    shotZones: new Set(),
-    shotPressures: new Set(),
-    shotPhases: new Set(),
-    shotContexts: new Set(),
-    shotCreations: new Set()
-  };
+  function createFilterState(source = {}) {
+    return {
+      sides: new Set(source.sides || []),
+      types: new Set(source.types || []),
+      players: new Set(source.players || []),
+      teamMention: Boolean(source.teamMention),
+      comment: ['with', 'without'].includes(source.comment) ? source.comment : 'any',
+      shotZones: new Set(source.shotZones || []),
+      shotPressures: new Set(source.shotPressures || []),
+      shotPhases: new Set(source.shotPhases || []),
+      shotContexts: new Set(source.shotContexts || []),
+      shotCreations: new Set(source.shotCreations || [])
+    };
+  }
+
+  function getFilterState() {
+    return {
+      sides: [...filters.sides],
+      types: [...filters.types],
+      players: [...filters.players],
+      teamMention: filters.teamMention,
+      comment: filters.comment,
+      shotZones: [...filters.shotZones],
+      shotPressures: [...filters.shotPressures],
+      shotPhases: [...filters.shotPhases],
+      shotContexts: [...filters.shotContexts],
+      shotCreations: [...filters.shotCreations]
+    };
+  }
+
+  let filters = createFilterState(initialFilters || {});
   const shotDetailsEditor = readOnly ? null : createShotDetailsEditor({
     element: shotDetailsHost,
     documentObject
@@ -268,7 +292,9 @@ export function createEventListController({
       );
       appendFilterChip('comment', filters.comment, input);
     }
-    activeFilters.classList.toggle('hidden', !activeFilters.childElementCount);
+    const hasFilters = activeFilters.childElementCount > 0;
+    filterSummary.classList.toggle('hidden', !hasFilters);
+    copyFilteredReviewLink.classList.toggle('hidden', !readOnly || !hasFilters);
   }
 
   function updateFilterButton() {
@@ -370,8 +396,13 @@ export function createEventListController({
 
   function populateFilterPlayers() {
     filterPlayers.innerHTML = '';
-    const validPlayerIds = new Set((game?.players || []).map(player => player.id));
-    filters.players = new Set([...filters.players].filter(playerId => validPlayerIds.has(playerId)));
+    if (game) {
+      filters.players = new Set(
+        game.players
+          .map(player => player.id)
+          .filter(playerId => filters.players.has(playerId))
+      );
+    }
     for (const player of game?.players || []) {
       const label = documentObject.createElement('label');
       const input = documentObject.createElement('input');
@@ -524,6 +555,9 @@ export function createEventListController({
       emptyEvents.classList.remove('hidden');
       return;
     }
+    copyFilteredReviewStatus.textContent = '';
+    copyFilteredReviewStatus.classList.remove('error');
+    onFiltersChanged(getFilterState());
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
     const orderedEvents = orderGameEvents(game.events);
     const scoreByEventId = new Map();
@@ -623,6 +657,19 @@ export function createEventListController({
     else filters[group]?.delete(value);
     render(game);
   });
+  copyFilteredReviewLink.addEventListener('click', async () => {
+    copyFilteredReviewStatus.textContent = '';
+    copyFilteredReviewStatus.classList.remove('error');
+    try {
+      const clipboard = documentObject.defaultView?.navigator?.clipboard;
+      if (!clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.');
+      await clipboard.writeText(documentObject.defaultView.location.href);
+      copyFilteredReviewStatus.textContent = 'Filtered link copied.';
+    } catch (error) {
+      copyFilteredReviewStatus.textContent = error.message || 'Could not copy the filtered link.';
+      copyFilteredReviewStatus.classList.add('error');
+    }
+  });
 
   if (!readOnly) {
     sideInput.addEventListener('change', () => {
@@ -662,18 +709,7 @@ export function createEventListController({
   });
   cancelFilters.addEventListener('click', () => filterDialog.close());
   clearFilters.addEventListener('click', () => {
-    filters = {
-      sides: new Set(),
-      types: new Set(),
-      players: new Set(),
-      teamMention: false,
-      comment: 'any',
-      shotZones: new Set(),
-      shotPressures: new Set(),
-      shotPhases: new Set(),
-      shotContexts: new Set(),
-      shotCreations: new Set()
-    };
+    filters = createFilterState();
     syncFilterForm();
     render(game);
   });
@@ -840,6 +876,7 @@ export function createEventListController({
 
   return {
     render,
+    getFilters: getFilterState,
     destroy() {
       unsubscribeTime();
       shotDetailsEditor?.destroy();
