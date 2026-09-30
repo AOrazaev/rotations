@@ -548,7 +548,10 @@ export function createEventListController({
       const detailBadges = item.querySelector('.event-detail-badges');
       const badges = getShotDetailBadges(event);
       for (const badge of badges) {
-        const badgeItem = documentObject.createElement('li');
+        if (detailBadges.childElementCount) {
+          detailBadges.append(documentObject.createTextNode(' · '));
+        }
+        const badgeItem = documentObject.createElement('span');
         badgeItem.className = 'event-detail-badge';
         badgeItem.dataset.shotDetailKind = badge.kind;
         badgeItem.dataset.value = badge.value;

@@ -101,7 +101,7 @@ The application uses checked-in HTML, CSS, and JavaScript directly; Review view 
 1. Open `/stats/` and load or import a game with an embeddable YouTube recording.
 2. Choose **View** and confirm real video playback.
 3. Play timeline and feedback moments.
-4. Inspect shot badges and team, opponent, and player shot reports.
+4. Inspect timeline shot details and team, opponent, and player shot reports.
 5. Exercise period and detail filters, then select a marker or zone and confirm three-second pre-roll.
 6. Reload the Review URL and confirm the same game and shot details return.
 7. Exit Review and reopen the game in tracker mode.
