@@ -24,6 +24,7 @@ A browser-only basketball toolkit designed for static hosting on GitHub Pages. I
 - Inspect team, opponent, and player shot maps with period filters, color-coded zone efficiency, detail splits, and source-play navigation.
 - Add coach comments and copy selected player feedback for Telegram or as a YouTube timestamp comment.
 - Open any active saved game in a read-only Review view with playback-following timeline navigation and player-focused feedback.
+- Publish a backup under `/games/` and share a read-only game URL that works across browsers and devices.
 - Export versioned JSON backups, import them without overwriting existing games, and archive or restore games.
 
 Video shortcuts are available outside form fields:
@@ -48,6 +49,27 @@ Review URLs identify a game in IndexedDB in the **same browser and site origin**
 
 Archived games cannot open in Review view. Return to normal tracker mode, restore the game, and choose **View** again. See [`stats/docs/REVIEW_VIEW.md`](stats/docs/REVIEW_VIEW.md) for the complete workflow and limitations.
 
+### Shared Review links
+
+To publish a game for link-only viewing:
+
+1. Export its JSON backup from tracker mode.
+2. Add the file as `games/<safe-name>.json`, where the name uses only lowercase letters, numbers, `_`, or `-`, starts with a letter or number, and is at most 80 characters.
+3. Commit and push the file so GitHub Pages deploys it.
+4. Share:
+
+```text
+https://aorazaev.github.io/rotations/stats/?mode=shared&game=<safe-name>
+```
+
+For example, `games/game-20260927.json` is opened by:
+
+```text
+https://aorazaev.github.io/rotations/stats/?mode=shared&game=game-20260927
+```
+
+The page downloads and validates the backup from the same deployment's `/games/` directory, then renders it entirely in memory using the read-only Review workspace. It does not import or save the game to IndexedDB. Published backups are public repository and GitHub Pages content; do not publish private player information or comments.
+
 See [`stats/docs/SHOT_DETAILS.md`](stats/docs/SHOT_DETAILS.md) for shot entry, correction, filters, reports, compatibility, and deployment verification.
 
 ## Run locally
@@ -65,13 +87,15 @@ Open:
 
 ## Storage, backups, and privacy
 
-All data remains in the current browser:
+By default, all working data remains in the current browser:
 
 - The planner stores its roster, settings, and latest rotation in `localStorage`.
 - Stats & Video Review stores games and event timelines in IndexedDB database `basketball-stats`.
 - A short-lived `localStorage` handoff transfers a planner roster into a new stats game.
 
 Nothing is uploaded to an application server. Clearing site data or using another browser/device removes access to local data, so export JSON backups for games that must be retained or moved. Imported backups are validated and never overwrite a game with the same ID.
+
+The exception is a backup you intentionally commit under `/games/` for Shared Review. That file becomes public static content and is downloaded by viewers without being persisted as a local game.
 
 ## Tests
 
@@ -83,7 +107,7 @@ npx playwright install --with-deps chromium
 npm test
 ```
 
-The suite covers the planner algorithm and UI, the stats data contract and IndexedDB store, YouTube integration through a fake player, event entry and correction, lineup replay, shot details and reports, responsive layout, backup recovery, the complete MVP workflow, and end-to-end tracker and read-only Review release gates. GitHub Actions runs the suite on every push and pull request.
+The suite covers the planner algorithm and UI, the stats data contract and IndexedDB store, YouTube integration through a fake player, event entry and correction, lineup replay, shot details and reports, responsive layout, backup recovery, shared static-game loading, the complete MVP workflow, and end-to-end tracker and read-only Review release gates. GitHub Actions runs the suite on every push and pull request.
 
 ## Deploy to GitHub Pages
 
@@ -97,5 +121,6 @@ After publishing, manually confirm:
 4. Shot entry works with pointer and keyboard input and survives reload plus backup recovery.
 5. Team, opponent, and player shot reports reconcile with the timeline and support period filtering.
 6. Timeline playback-following, source-play navigation, feedback navigation, and **Exit review** work.
+7. A published `/games/*.json` backup opens through `?mode=shared&game=<safe-name>` in a clean browser and survives reload.
 
 YouTube availability and embedding permissions are external to this application.

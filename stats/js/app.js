@@ -12,8 +12,13 @@ import { createEventEntryController } from './event-entry.js';
 import { createReviewController } from './review-controller.js';
 import {
   buildReviewUrl,
+  buildSharedReviewUrl,
   parseStatsRoute
 } from './review-route.js';
+import {
+  SharedGameError,
+  loadSharedGame
+} from './shared-game.js';
 
 export function createStatsSpikeApp({
   documentObject = document,
@@ -207,8 +212,10 @@ export function createStatsSpikeApp({
 const playerFactory = window.__STATS_PLAYER_FACTORY__ || createYouTubePlayer;
 const videoController = createStatsSpikeApp({ playerFactory });
 const route = parseStatsRoute(location.search);
-const reviewMode = route.mode === 'review';
+const reviewMode = ['review', 'shared'].includes(route.mode);
+const sharedMode = route.mode === 'shared';
 const reviewModeHeader = document.querySelector('#reviewModeHeader');
+const reviewModeLabel = document.querySelector('#reviewModeLabel');
 const reviewModeTitle = document.querySelector('#reviewModeTitle');
 const reviewModeOpponent = document.querySelector('#reviewModeOpponent');
 const reviewRouteState = document.querySelector('#reviewRouteState');
@@ -341,39 +348,68 @@ function showReviewRouteState(title, message) {
 async function initializeReviewMode() {
   document.body.classList.add('review-mode');
   if (route.status === 'missing-game') {
-    showReviewRouteState('Select a game to review', 'This review link does not identify a saved game.');
+    showReviewRouteState(
+      sharedMode ? 'Select a shared game' : 'Select a game to review',
+      sharedMode
+        ? 'This shared review link does not identify a published game.'
+        : 'This review link does not identify a saved game.'
+    );
     return;
   }
   if (route.status === 'invalid-game') {
-    showReviewRouteState('Invalid review link', 'The game identifier in this review link is invalid.');
+    showReviewRouteState(
+      sharedMode ? 'Invalid shared review link' : 'Invalid review link',
+      sharedMode
+        ? 'The published game name in this shared review link is invalid.'
+        : 'The game identifier in this review link is invalid.'
+    );
     return;
   }
 
   let game;
-  try {
-    game = await store.getGame(route.gameId);
-  } catch (error) {
-    if (error instanceof StoredGameCorruptionError) {
-      showReviewRouteState('Game cannot be reviewed', 'The saved game is invalid and cannot be reviewed safely.');
-    } else {
-      showReviewRouteState('Local storage unavailable', error.message || 'The saved game could not be read.');
+  if (sharedMode) {
+    try {
+      game = await loadSharedGame(route.snapshotName);
+    } catch (error) {
+      if (error instanceof SharedGameError) {
+        const title = error.code === 'not-found'
+          ? 'Shared game not found'
+          : 'Shared game cannot be reviewed';
+        showReviewRouteState(title, error.message);
+      } else {
+        showReviewRouteState('Shared game cannot be reviewed', 'The shared game could not be loaded safely.');
+      }
+      return;
     }
-    return;
-  }
-  if (!game) {
-    showReviewRouteState('Game not found', 'This game is not available in this browser.');
-    return;
-  }
-  if (game.archivedAt) {
-    showReviewRouteState('Game is archived', `${game.title} must be restored in the normal stats workspace before reviewing it.`);
-    return;
+  } else {
+    try {
+      game = await store.getGame(route.gameId);
+    } catch (error) {
+      if (error instanceof StoredGameCorruptionError) {
+        showReviewRouteState('Game cannot be reviewed', 'The saved game is invalid and cannot be reviewed safely.');
+      } else {
+        showReviewRouteState('Local storage unavailable', error.message || 'The saved game could not be read.');
+      }
+      return;
+    }
+    if (!game) {
+      showReviewRouteState('Game not found', 'This game is not available in this browser.');
+      return;
+    }
+    if (game.archivedAt) {
+      showReviewRouteState('Game is archived', `${game.title} must be restored in the normal stats workspace before reviewing it.`);
+      return;
+    }
   }
 
-  const canonicalUrl = buildReviewUrl(game.id, location.pathname);
+  const canonicalUrl = sharedMode
+    ? buildSharedReviewUrl(route.snapshotName, location.pathname)
+    : buildReviewUrl(game.id, location.pathname);
   if (`${location.pathname}${location.search}` !== canonicalUrl) {
     history.replaceState({}, '', canonicalUrl);
   }
   reviewRouteState.classList.add('hidden');
+  reviewModeLabel.textContent = sharedMode ? 'Shared read-only review' : 'Read-only review';
   reviewModeTitle.textContent = game.title;
   reviewModeOpponent.textContent = game.opponentName ? `vs ${game.opponentName}` : 'No opponent';
   reviewModeHeader.classList.remove('hidden');
@@ -410,6 +446,7 @@ if (reviewMode) {
 window.__statsApp = {
   ready,
   reviewMode,
+  sharedMode,
   videoController,
   setupController,
   eventController,
