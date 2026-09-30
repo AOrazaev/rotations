@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 2,
+  "id": "game-shot-details-v2",
+  "title": "Shot details contract game",
+  "opponentName": "Falcons",
+  "createdAt": "2026-09-30T08:00:00Z",
+  "updatedAt": "2026-09-30T08:05:00Z",
+  "source": "standalone",
+  "video": {
+    "provider": "youtube",
+    "videoId": "M7lc1UVf-VE",
+    "sourceUrl": "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+    "startSeconds": 0,
+    "endSeconds": 300
+  },
+  "players": [
+    {
+      "id": "p1",
+      "name": "Alex",
+      "number": "1",
+      "positions": ["G"],
+      "skill": 80
+    },
+    {
+      "id": "p2",
+      "name": "Blake",
+      "number": "2",
+      "positions": ["F"],
+      "skill": 75
+    },
+    {
+      "id": "p3",
+      "name": "Casey",
+      "number": "3",
+      "positions": ["G", "F"],
+      "skill": 70
+    },
+    {
+      "id": "p4",
+      "name": "Drew",
+      "number": "4",
+      "positions": ["C"],
+      "skill": 85
+    },
+    {
+      "id": "p5",
+      "name": "Emery",
+      "number": "5",
+      "positions": ["F"],
+      "skill": 65
+    }
+  ],
+  "startingLineupIds": ["p1", "p2", "p3", "p4", "p5"],
+  "plannedRotation": null,
+  "events": [
+    {
+      "id": "e1",
+      "sequence": 1,
+      "videoSeconds": 30,
+      "side": "team",
+      "type": "shot",
+      "playerId": "p1",
+      "shotValue": 3,
+      "made": true,
+      "shotDetails": {
+        "location": {
+          "x": 0.06,
+          "y": 0.2128
+        },
+        "pressure": "open",
+        "phase": "transition",
+        "contexts": ["after_timeout"],
+        "creation": "catch_and_shoot"
+      },
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-30T08:01:00Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e2",
+      "sequence": 2,
+      "videoSeconds": 45,
+      "side": "opponent",
+      "type": "shot",
+      "playerId": null,
+      "shotValue": 2,
+      "made": false,
+      "shotDetails": {
+        "pressure": "heavily_contested",
+        "phase": "half_court",
+        "contexts": ["second_chance"],
+        "creation": "putback"
+      },
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-30T08:01:15Z",
+      "updatedAt": null
+    },
+    {
+      "id": "e3",
+      "sequence": 3,
+      "videoSeconds": 60,
+      "side": "team",
+      "type": "shot",
+      "playerId": "p2",
+      "shotValue": 2,
+      "made": true,
+      "relatedEventId": null,
+      "lineupIds": ["p1", "p2", "p3", "p4", "p5"],
+      "createdAt": "2026-09-30T08:01:30Z",
+      "updatedAt": null
+    }
+  ]
+}

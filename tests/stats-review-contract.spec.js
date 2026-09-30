@@ -7,20 +7,20 @@ test('review fixture is valid and preserves the representative report', async ({
       fetch('/stats/docs/fixtures/review-view-game-v1.json').then(response => response.json()),
       fetch('/stats/docs/fixtures/representative-game-v1.expected.json').then(response => response.json())
     ]);
-    const [{ validateGame }, { buildGameReport }] = await Promise.all([
+    const [{ normalizeGame }, { buildGameReport }] = await Promise.all([
       import('/stats/js/game-model.js'),
       import('/stats/js/event-reducer.js')
     ]);
-    validateGame(game);
+    const normalizedGame = normalizeGame(game);
     return {
-      report: buildGameReport(game),
+      report: buildGameReport(normalizedGame),
       expected,
       comments: Object.fromEntries(
-        game.events
+        normalizedGame.events
           .filter(event => event.coachComment)
           .map(event => [event.id, event.coachComment])
       ),
-      substitution: game.events.find(event => event.type === 'substitution')
+      substitution: normalizedGame.events.find(event => event.type === 'substitution')
     };
   });
 

@@ -1,4 +1,4 @@
-import { validateGame } from './game-model.js';
+import { normalizeGame } from './game-model.js';
 
 export const GAME_BACKUP_VERSION = 1;
 export const GAME_BACKUP_APPLICATION = 'basketball-stats';
@@ -16,7 +16,7 @@ function isValidTimestamp(value) {
 }
 
 export function createGameBackup(game, exportedAt = new Date().toISOString()) {
-  validateGame(game);
+  const normalized = normalizeGame(game);
   if (!isValidTimestamp(exportedAt)) {
     throw new GameBackupError('Backup export time must be a valid timestamp.');
   }
@@ -24,7 +24,7 @@ export function createGameBackup(game, exportedAt = new Date().toISOString()) {
     backupVersion: GAME_BACKUP_VERSION,
     application: GAME_BACKUP_APPLICATION,
     exportedAt,
-    game: structuredClone(game)
+    game: normalized
   };
 }
 
@@ -54,11 +54,10 @@ export function parseGameBackup(value) {
     throw new GameBackupError('The backup export timestamp is invalid.');
   }
   try {
-    validateGame(backup.game);
+    return normalizeGame(backup.game);
   } catch (error) {
     throw new GameBackupError(error.message || 'The backup contains an invalid game.', 'invalid-game');
   }
-  return structuredClone(backup.game);
 }
 
 export function gameBackupFileName(game) {

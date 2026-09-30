@@ -6,7 +6,8 @@ async function loadFixture(page) {
       fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json()),
       fetch('/stats/docs/fixtures/representative-game-v1.expected.json').then(response => response.json())
     ]);
-    return { game, expected };
+    const { normalizeGame } = await import('/stats/js/game-model.js');
+    return { game: normalizeGame(game), expected };
   });
 }
 
@@ -129,6 +130,168 @@ test('validation rejects duplicate identities and sequences', async ({ page }) =
   expect(issues).toContain('Duplicate player ID: p1.');
   expect(issues).toContain('Duplicate event ID: e1.');
   expect(issues).toContain('Duplicate event sequence: 1.');
+});
+
+test('version-one games upgrade without mutating the legacy snapshot', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const legacy = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const { GAME_SCHEMA_VERSION, normalizeGame, upgradeGame } = await import('/stats/js/game-model.js');
+    const upgraded = upgradeGame(legacy);
+    const normalized = normalizeGame(legacy);
+    let futureVersionIssues;
+    try {
+      normalizeGame({ ...legacy, schemaVersion: 99 });
+    } catch (error) {
+      futureVersionIssues = error.issues;
+    }
+    return {
+      currentVersion: GAME_SCHEMA_VERSION,
+      legacyVersion: legacy.schemaVersion,
+      upgradedVersion: upgraded.schemaVersion,
+      normalizedVersion: normalized.schemaVersion,
+      sameReference: legacy === upgraded,
+      futureVersionIssues
+    };
+  });
+
+  expect(result).toEqual({
+    currentVersion: 2,
+    legacyVersion: 1,
+    upgradedVersion: 2,
+    normalizedVersion: 2,
+    sameReference: false,
+    futureVersionIssues: ['Unsupported schema version: 99.']
+  });
+});
+
+test('validation accepts partial and complete field-goal details', async ({ page }) => {
+  const { game } = await loadFixture(page);
+  const result = await page.evaluate(async gameData => {
+    const { collectGameValidationIssues } = await import('/stats/js/game-model.js');
+    const fixture = await fetch('/stats/docs/fixtures/shot-details-game-v2.json').then(response => response.json());
+    const partial = structuredClone(gameData);
+    partial.events.find(event => event.id === 'e1').shotDetails = {
+      pressure: 'contested'
+    };
+    const complete = structuredClone(gameData);
+    complete.events.find(event => event.id === 'e1').shotDetails = {
+      location: { x: 0.18, y: 0.72 },
+      pressure: 'open',
+      phase: 'transition',
+      contexts: ['second_chance', 'after_timeout'],
+      creation: 'catch_and_shoot'
+    };
+    return {
+      fixture: collectGameValidationIssues(fixture),
+      partial: collectGameValidationIssues(partial),
+      complete: collectGameValidationIssues(complete)
+    };
+  }, game);
+
+  expect(result.fixture).toEqual([]);
+  expect(result.partial).toEqual([]);
+  expect(result.complete).toEqual([]);
+});
+
+test('validation rejects malformed or inapplicable shot details', async ({ page }) => {
+  const { game } = await loadFixture(page);
+  const results = await page.evaluate(async gameData => {
+    const { collectGameValidationIssues } = await import('/stats/js/game-model.js');
+    const issuesFor = details => {
+      const candidate = structuredClone(gameData);
+      candidate.events.find(event => event.id === 'e1').shotDetails = details;
+      return collectGameValidationIssues(candidate);
+    };
+    const freeThrow = structuredClone(gameData);
+    const freeThrowEvent = freeThrow.events.find(event => event.id === 'e1');
+    freeThrowEvent.shotValue = 1;
+    freeThrowEvent.shotDetails = { pressure: 'open' };
+    const rebound = structuredClone(gameData);
+    rebound.events.find(event => event.id === 'e3').shotDetails = { pressure: 'open' };
+    return {
+      location: issuesFor({ location: { x: -0.1, y: 2 } }),
+      pressure: issuesFor({ pressure: 'wide_open' }),
+      phase: issuesFor({ phase: 'fast_break' }),
+      contexts: issuesFor({ contexts: ['second_chance', 'second_chance', 'unknown'] }),
+      creation: issuesFor({ creation: 'step_back' }),
+      freeThrow: collectGameValidationIssues(freeThrow),
+      rebound: collectGameValidationIssues(rebound)
+    };
+  }, game);
+
+  expect(results.location).toContain('Event e1 shot location requires normalized x and y values from 0 through 1.');
+  expect(results.pressure).toContain('Event e1 shot pressure is invalid.');
+  expect(results.phase).toContain('Event e1 shot phase is invalid.');
+  expect(results.contexts).toContain('Event e1 shot contexts must be unique.');
+  expect(results.contexts).toContain('Event e1 shot context is invalid.');
+  expect(results.creation).toContain('Event e1 shot creation is invalid.');
+  expect(results.freeThrow).toContain('Event e1 shot details are only allowed for 2PT or 3PT shots.');
+  expect(results.rebound).toContain('Event e3 shot details are only allowed for 2PT or 3PT shots.');
+});
+
+test('court geometry derives normalized positions, zones, sides, distances, and shot values', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const {
+      courtLocationFromFeet,
+      courtLocationToFeet,
+      deriveShotLocation
+    } = await import('/stats/js/shot-geometry.js');
+    const deriveFeet = (x, y) => deriveShotLocation(courtLocationFromFeet({ x, y }));
+    const source = courtLocationFromFeet({ x: 12.5, y: 23.5 });
+    return {
+      source,
+      roundTrip: courtLocationToFeet(source),
+      basket: deriveFeet(25, 5.25),
+      paint: deriveFeet(20, 15),
+      shortMidrange: deriveFeet(12, 8),
+      longMidrange: deriveFeet(25, 22),
+      leftCorner: deriveFeet(3, 10),
+      rightCorner: deriveFeet(47, 10),
+      leftAboveBreak: deriveFeet(8, 28),
+      centerAboveBreak: deriveFeet(25, 30),
+      rightAboveBreak: deriveFeet(42, 28),
+      insideCornerBoundary: deriveFeet(3.01, 10)
+    };
+  });
+
+  expect(result.source).toEqual({ x: 0.25, y: 0.5 });
+  expect(result.roundTrip).toEqual({ x: 12.5, y: 23.5 });
+  expect(result.basket).toMatchObject({
+    distanceFeet: 0,
+    side: 'center',
+    zone: 'restricted_area',
+    expectedShotValue: 2
+  });
+  expect(result.paint.zone).toBe('paint_non_restricted');
+  expect(result.shortMidrange.zone).toBe('short_midrange');
+  expect(result.longMidrange.zone).toBe('long_midrange');
+  expect(result.leftCorner).toMatchObject({ side: 'left', zone: 'left_corner_three', expectedShotValue: 3 });
+  expect(result.rightCorner).toMatchObject({ side: 'right', zone: 'right_corner_three', expectedShotValue: 3 });
+  expect(result.leftAboveBreak.zone).toBe('above_break_three_left');
+  expect(result.centerAboveBreak.zone).toBe('above_break_three_center');
+  expect(result.rightAboveBreak.zone).toBe('above_break_three_right');
+  expect(result.insideCornerBoundary.expectedShotValue).toBe(2);
+});
+
+test('court geometry rejects invalid coordinates and clamps pointer positions explicitly', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { clampCourtLocation, deriveShotLocation } = await import('/stats/js/shot-geometry.js');
+    const errors = [];
+    for (const location of [{ x: -0.01, y: 0.5 }, { x: 0.5, y: 1.01 }, { x: NaN, y: 0.5 }]) {
+      try {
+        deriveShotLocation(location);
+      } catch (error) {
+        errors.push(error.name);
+      }
+    }
+    return {
+      clamped: clampCourtLocation({ x: -0.25, y: 1.5 }),
+      errors
+    };
+  });
+
+  expect(result.clamped).toEqual({ x: 0, y: 1 });
+  expect(result.errors).toEqual(['RangeError', 'RangeError', 'RangeError']);
 });
 
 test('validation accepts non-empty coach comments and rejects empty ones', async ({ page }) => {

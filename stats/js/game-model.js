@@ -1,4 +1,34 @@
-export const GAME_SCHEMA_VERSION = 1;
+export const GAME_SCHEMA_VERSION = 2;
+
+export const SHOT_PRESSURES = Object.freeze([
+  'open',
+  'contested',
+  'heavily_contested'
+]);
+
+export const SHOT_PHASES = Object.freeze([
+  'half_court',
+  'transition'
+]);
+
+export const SHOT_CONTEXTS = Object.freeze([
+  'second_chance',
+  'after_timeout'
+]);
+
+export const SHOT_CREATIONS = Object.freeze([
+  'catch_and_shoot',
+  'pull_up',
+  'drive',
+  'post_up',
+  'putback',
+  'other'
+]);
+
+const SHOT_PRESSURE_VALUES = new Set(SHOT_PRESSURES);
+const SHOT_PHASE_VALUES = new Set(SHOT_PHASES);
+const SHOT_CONTEXT_VALUES = new Set(SHOT_CONTEXTS);
+const SHOT_CREATION_VALUES = new Set(SHOT_CREATIONS);
 
 export const STAT_EVENT_TYPES = new Set([
   'shot',
@@ -31,6 +61,62 @@ function hasFiveValidPlayers(lineupIds, playerIds) {
 
 function sameLineup(actual, expected) {
   return actual.length === expected.length && actual.every((id, index) => id === expected[index]);
+}
+
+function collectShotDetailsValidationIssues(details, label, issues) {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) {
+    issues.push(`${label} shot details must be an object.`);
+    return;
+  }
+
+  if (details.location !== undefined) {
+    const location = details.location;
+    if (!location || typeof location !== 'object' || Array.isArray(location)) {
+      issues.push(`${label} shot location must be an object.`);
+    } else {
+      const x = location.x;
+      const y = location.y;
+      if (!Number.isFinite(x) || x < 0 || x > 1 || !Number.isFinite(y) || y < 0 || y > 1) {
+        issues.push(`${label} shot location requires normalized x and y values from 0 through 1.`);
+      }
+    }
+  }
+
+  if (details.pressure !== undefined && !SHOT_PRESSURE_VALUES.has(details.pressure)) {
+    issues.push(`${label} shot pressure is invalid.`);
+  }
+  if (details.phase !== undefined && !SHOT_PHASE_VALUES.has(details.phase)) {
+    issues.push(`${label} shot phase is invalid.`);
+  }
+  if (details.creation !== undefined && !SHOT_CREATION_VALUES.has(details.creation)) {
+    issues.push(`${label} shot creation is invalid.`);
+  }
+  if (details.contexts !== undefined) {
+    if (!Array.isArray(details.contexts)) {
+      issues.push(`${label} shot contexts must be an array.`);
+    } else {
+      if (new Set(details.contexts).size !== details.contexts.length) {
+        issues.push(`${label} shot contexts must be unique.`);
+      }
+      if (details.contexts.some(context => !SHOT_CONTEXT_VALUES.has(context))) {
+        issues.push(`${label} shot context is invalid.`);
+      }
+    }
+  }
+}
+
+export function upgradeGame(game) {
+  const upgraded = structuredClone(game);
+  if (upgraded && typeof upgraded === 'object' && !Array.isArray(upgraded) && upgraded.schemaVersion === 1) {
+    upgraded.schemaVersion = GAME_SCHEMA_VERSION;
+  }
+  return upgraded;
+}
+
+export function normalizeGame(game) {
+  const normalized = upgradeGame(game);
+  validateGame(normalized);
+  return normalized;
 }
 
 export function orderGameEvents(events) {
@@ -175,6 +261,13 @@ export function collectGameValidationIssues(game) {
     if (event.type === 'shot') {
       if (![1, 2, 3].includes(event.shotValue) || typeof event.made !== 'boolean') {
         issues.push(`${label} shot requires a value of 1, 2, or 3 and a made flag.`);
+      }
+    }
+    if (event.shotDetails !== undefined) {
+      if (event.type !== 'shot' || ![2, 3].includes(event.shotValue)) {
+        issues.push(`${label} shot details are only allowed for 2PT or 3PT shots.`);
+      } else {
+        collectShotDetailsValidationIssues(event.shotDetails, label, issues);
       }
     }
     if (event.type === 'rebound' && !['offensive', 'defensive'].includes(event.reboundKind)) {
