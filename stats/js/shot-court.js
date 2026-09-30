@@ -2,24 +2,13 @@ import {
   COURT_GEOMETRY,
   deriveShotLocation
 } from './shot-geometry.js';
+import { SHOT_ZONE_LABELS } from './shot-details.js';
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const VIEWBOX_WIDTH = 500;
 const VIEWBOX_HEIGHT = 470;
 const KEYBOARD_STEP = 0.01;
 const KEYBOARD_LARGE_STEP = 0.05;
-
-const ZONE_LABELS = {
-  restricted_area: 'Restricted area',
-  paint_non_restricted: 'Paint',
-  short_midrange: 'Short midrange',
-  long_midrange: 'Long midrange',
-  left_corner_three: 'Left corner three',
-  right_corner_three: 'Right corner three',
-  above_break_three_left: 'Left above-break three',
-  above_break_three_center: 'Center above-break three',
-  above_break_three_right: 'Right above-break three'
-};
 
 function createSvgElement(documentObject, name, attributes = {}) {
   const element = documentObject.createElementNS(SVG_NAMESPACE, name);
@@ -122,7 +111,7 @@ function locationDescription(location, shotValue) {
   const mismatch = shotValue && shotValue !== derived.expectedShotValue
     ? `; recorded as ${shotValue}PT`
     : '';
-  return `${ZONE_LABELS[derived.zone]} · ${derived.distanceFeet.toFixed(1)} ft · ${valueDescription}${mismatch}`;
+  return `${SHOT_ZONE_LABELS[derived.zone]} · ${derived.distanceFeet.toFixed(1)} ft · ${valueDescription}${mismatch}`;
 }
 
 export function createShotCourt({

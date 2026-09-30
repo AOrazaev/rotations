@@ -301,6 +301,8 @@ Verification:
 
 ### Milestone 3: Timeline, filters, and Review
 
+**Status:** Complete.
+
 Deliver:
 
 - Compact shot-detail badges.

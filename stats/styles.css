@@ -327,6 +327,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-list-item { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 7px; align-items: center; padding: 7px; background: #0f1727; border: 1px solid #202c43; border-radius: 10px; }
 .event-list-item.current-event { background: rgba(109, 124, 255, .13); border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(109, 124, 255, .18); }
 .event-description { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-detail-badges { display: flex; grid-column: 2 / 3; gap: 5px; flex-wrap: wrap; min-width: 0; margin: -1px 0 1px; padding: 0; list-style: none; }
+.event-detail-badges.hidden { display: none; }
+.event-detail-badge { padding: 3px 6px; color: #cbd5ee; background: rgba(109, 124, 255, .1); border: 1px solid rgba(130, 144, 255, .3); border-radius: 999px; font-size: .68rem; line-height: 1.2; white-space: nowrap; }
 .event-time { color: var(--accent2); font-variant-numeric: tabular-nums; }
 .link-button { padding: 4px 0; background: transparent; color: var(--accent2); text-align: left; }
 .event-row-actions { display: flex; gap: 4px; justify-content: flex-end; }
@@ -339,7 +342,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .filter-count { position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; color: #fff; background: var(--accent); border: 2px solid var(--card); border-radius: 999px; font-size: .65rem; font-weight: 700; line-height: 13px; text-align: center; }
 .coach-comment { grid-column: 1 / -1; margin: 2px 4px 2px 58px; padding: 8px 10px; color: #dce2ff; background: rgba(109, 124, 255, .08); border-left: 3px solid var(--accent2); border-radius: 0 8px 8px 0; font-size: .85rem; line-height: 1.4; white-space: pre-wrap; }
 .event-list-item.has-comment [data-action="comment-event"] { color: var(--accent2); border-color: var(--accent2); }
-.event-dialog { width: min(620px, calc(100% - 28px)); padding: 18px; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 18px; }
+.event-dialog { width: min(620px, calc(100% - 28px)); max-height: calc(100vh - 28px); overflow-y: auto; padding: 18px; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 18px; }
 .event-dialog::backdrop { background: rgba(2, 6, 16, .76); }
 .event-dialog form { margin: 0; }
 .edit-event-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

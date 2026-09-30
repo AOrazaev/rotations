@@ -29,6 +29,13 @@ async function openIsolatedStats(page) {
 async function saveReviewFixture(page, overrides = {}) {
   return page.evaluate(async values => {
     const fixture = await fetch('/stats/docs/fixtures/review-view-game-v1.json').then(response => response.json());
+    fixture.events.find(event => event.id === 'e1').shotDetails = {
+      location: { x: 0.5, y: 0.1117 },
+      pressure: 'open',
+      phase: 'half_court',
+      contexts: ['second_chance'],
+      creation: 'cut'
+    };
     const game = { ...fixture, ...values };
     await window.__statsApp.store.saveGame(game);
     await window.__statsApp.setupController.refreshGames();
@@ -50,6 +57,13 @@ test('View opens a saved game in a reload-safe review route', async ({ page }) =
   await expect(page.locator('#reviewModeOpponent')).toHaveText('vs Falcons');
   await expect(page.locator('#reviewRouteState')).toBeHidden();
   await expect(page.locator('#reportFinalScore')).toHaveText('5–3');
+  await expect(page.locator('.event-list-item[data-event-id="e1"] .event-detail-badge')).toHaveText([
+    'Restricted area',
+    'Open',
+    'Half court',
+    'Second chance',
+    'Cut'
+  ]);
   await expect(page.locator('#gamePanel')).toBeHidden();
   expect(await page.evaluate(() => window.__statsApp.reviewMode)).toBe(true);
   expect(await page.evaluate(() => ({
@@ -100,6 +114,11 @@ test('Review view interactions expose no mutation workflow or game writes', asyn
   await page.locator('#openEventFilters').click();
   await page.locator('input[name="filterComment"][value="with"]').check();
   await page.locator('#eventFilterForm button[type="submit"]').click();
+  await page.locator('#openEventFilters').click();
+  await page.locator('#clearEventFilters').click();
+  await page.locator('input[name="filterShotPressure"][value="open"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
   await page.locator('.event-time').first().click();
 
   await page.locator('[data-review-section="team"]').click();

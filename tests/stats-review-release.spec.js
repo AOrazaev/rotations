@@ -38,9 +38,17 @@ test('complete Review workflow remains read-only across reload and tracker retur
 
   await page.goto('/stats/');
   await page.evaluate(() => window.__statsApp.ready);
-  const fixture = await page.evaluate(() =>
-    fetch('/stats/docs/fixtures/review-view-game-v1.json').then(response => response.json())
-  );
+  const fixture = await page.evaluate(async () => {
+    const game = await fetch('/stats/docs/fixtures/review-view-game-v1.json').then(response => response.json());
+    game.events.find(event => event.id === 'e1').shotDetails = {
+      location: { x: 0.5, y: 0.1117 },
+      pressure: 'open',
+      phase: 'half_court',
+      contexts: ['second_chance'],
+      creation: 'cut'
+    };
+    return game;
+  });
   await page.locator('#importGameBackupFile').setInputFiles({
     name: 'review-release-game.json',
     mimeType: 'application/json',
@@ -79,6 +87,18 @@ test('complete Review workflow remains read-only across reload and tracker retur
   await page.locator('input[name="filterComment"][value="with"]').check();
   await page.locator('#eventFilterForm button[type="submit"]').click();
   await expect(page.locator('.event-list-item')).toHaveCount(4);
+  await page.locator('#openEventFilters').click();
+  await page.locator('#clearEventFilters').click();
+  await page.locator('input[name="filterShotPressure"][value="open"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await expect(page.locator('.event-detail-badge')).toHaveText([
+    'Restricted area',
+    'Open',
+    'Half court',
+    'Second chance',
+    'Cut'
+  ]);
 
   await page.locator('[data-review-section="team"]').click();
   await expect(page.locator('#teamReportSection')).toBeVisible();

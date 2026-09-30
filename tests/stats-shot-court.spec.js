@@ -55,7 +55,7 @@ test('field goals save immediately before optional court interaction', async ({ 
   await expect(page.locator('#shotDetailsCapture .shot-court-status')).toContainText('No location selected');
 
   await clickCourtAt(page, 0.06, 0.21);
-  await expect(page.locator('#shotDetailsCapture .shot-court-status')).toContainText('Left corner three');
+  await expect(page.locator('#shotDetailsCapture .shot-court-status')).toContainText('Left corner 3');
   await expect.poll(async () => {
     const event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
     return event.shotDetails?.location;

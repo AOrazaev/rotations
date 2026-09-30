@@ -47,6 +47,18 @@ async function clickEditCourtAt(page, x, y) {
   });
 }
 
+async function clickCaptureCourtAt(page, x, y) {
+  const court = page.locator('#shotDetailsCapture .shot-court-svg');
+  await court.scrollIntoViewIfNeeded();
+  const box = await court.boundingBox();
+  await court.click({
+    position: {
+      x: box.width * x,
+      y: box.height * y
+    }
+  });
+}
+
 test('event timestamp plays with a three-second pre-roll', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="steal"]');
@@ -91,6 +103,13 @@ test('existing field goals can add, edit, and clear structured shot details', as
   await page.locator('#editShotDetails [data-shot-detail-field="creation"][data-value="cut"]').click();
   await page.locator('#eventEditForm button[type="submit"]').click();
   await expect(page.locator('#eventEditDialog')).not.toHaveAttribute('open', '');
+  await expect(page.locator('.event-detail-badge')).toHaveText([
+    'Left corner 3',
+    'Lightly contested',
+    'Half court',
+    'Second chance',
+    'Cut'
+  ]);
 
   let shot = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
   expect(shot.shotDetails).toMatchObject({
@@ -112,6 +131,12 @@ test('existing field goals can add, edit, and clear structured shot details', as
   await expect(page.locator('#editShotDetails .shot-court-marker')).toBeHidden();
   await page.locator('#eventEditForm button[type="submit"]').click();
   await expect(page.locator('#eventEditDialog')).not.toHaveAttribute('open', '');
+  await expect(page.locator('.event-detail-badge')).toHaveText([
+    'Contested',
+    'Half court',
+    'Second chance',
+    'Cut'
+  ]);
 
   shot = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
   expect(shot.shotDetails).toEqual({
@@ -121,6 +146,56 @@ test('existing field goals can add, edit, and clear structured shot details', as
     creation: 'cut'
   });
   expect(shot.made).toBe(false);
+});
+
+test('shot-detail filters combine stored and derived dimensions including untagged values', async ({ page }) => {
+  await openReview(page);
+
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="3"][data-made="true"]', 20);
+  await clickCaptureCourtAt(page, 0.06, 0.21);
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="pressure"][data-value="open"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="phase"][data-value="half_court"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="contexts"][data-value="second_chance"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="creation"][data-value="cut"]').click();
+  await page.locator('#closeShotLocation').click();
+
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="2"][data-made="false"]', 30);
+  await page.locator('#closeShotLocation').click();
+
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="2"][data-made="true"]', 40);
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="pressure"][data-value="contested"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="phase"][data-value="transition"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="creation"][data-value="drive"]').click();
+  await page.locator('#closeShotLocation').click();
+  await addTeamEvent(page, '[data-event-type="assist"]', 50);
+  await expect(page.locator('.event-list-item')).toHaveCount(4);
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('input[name="filterShotZone"][value="left_corner_three"]').check();
+  await page.locator('input[name="filterShotPressure"][value="open"]').check();
+  await page.locator('input[name="filterShotPhase"][value="half_court"]').check();
+  await page.locator('input[name="filterShotContext"][value="second_chance"]').check();
+  await page.locator('input[name="filterShotCreation"][value="cut"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await expect(page.locator('.event-time')).toHaveText('0:20.0');
+  await expect(page.locator('#eventFilterCount')).toHaveText('5');
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('#clearEventFilters').click();
+  await page.locator('input[name="filterShotPressure"][value="__untagged__"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await expect(page.locator('.event-time')).toHaveText('0:30.0');
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('#clearEventFilters').click();
+  await page.locator('input[name="filterShotZone"][value="__untagged__"]').check();
+  await page.locator('input[name="filterShotPressure"][value="contested"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await expect(page.locator('.event-time')).toHaveText('0:40.0');
+  await expect(page.locator('#eventFilterCount')).toHaveText('2');
 });
 
 test('shot-location mismatch confirmation can keep or change the recorded value', async ({ page }) => {
@@ -193,6 +268,29 @@ test('shot-detail correction remains contained in the edit dialog on mobile', as
   expect(boxes[1].left).toBeGreaterThanOrEqual(boxes[0].left);
   expect(boxes[1].right).toBeLessThanOrEqual(boxes[0].right);
   const overflow = await page.locator('#editShotDetails').evaluate(element => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth
+  }));
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+});
+
+test('shot-detail badges wrap within mobile timeline rows', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="3"][data-made="true"]');
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="pressure"][data-value="heavily_contested"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="phase"][data-value="transition"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="contexts"][data-value="second_chance"]').click();
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="creation"][data-value="catch_and_shoot"]').click();
+  await page.locator('#closeShotLocation').click();
+
+  await expect(page.locator('.event-detail-badge')).toHaveText([
+    'Heavily contested',
+    'Transition',
+    'Second chance',
+    'Catch-and-shoot'
+  ]);
+  const overflow = await page.locator('.event-list-item').evaluate(element => ({
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth
   }));
