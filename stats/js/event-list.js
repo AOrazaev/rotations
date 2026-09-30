@@ -102,6 +102,10 @@ export function createEventListController({
   const activeFilters = documentObject.querySelector('#activeEventFilters');
   const shotFilterDetails = documentObject.querySelector('#shotFilterDetails');
   const shotFilterSelectionCount = documentObject.querySelector('#shotFilterSelectionCount');
+  const mobileTimelineBackdrop = documentObject.querySelector('#mobileTimelineBackdrop');
+  const mobileTimelineContent = documentObject.querySelector('#mobileTimelineContent');
+  const mobileTimelinePreview = documentObject.querySelector('#mobileTimelinePreview');
+  const mobileTimelineToggle = documentObject.querySelector('#toggleMobileTimeline');
   const timelineScrollContainer = eventList;
 
   let game = null;
@@ -114,6 +118,10 @@ export function createEventListController({
   let lastPlaybackSeconds = 0;
   let playbackFollowing = true;
   let suppressManualScrollUntil = 0;
+  let eventSummaries = new Map();
+  let mobileTimelineOpen = false;
+  let mobileTimelinePointer = null;
+  let suppressMobileTimelineClickUntil = 0;
   let filters = {
     sides: new Set(),
     types: new Set(),
@@ -304,6 +312,41 @@ export function createEventListController({
     );
   }
 
+  function setMobileTimelineOpen(open) {
+    if (!readOnly) return;
+    mobileTimelineOpen = Boolean(open);
+    eventList.closest('#eventLogPanel')?.classList.toggle('mobile-timeline-open', mobileTimelineOpen);
+    mobileTimelineBackdrop.classList.toggle('hidden', !mobileTimelineOpen);
+    documentObject.body.classList.toggle('mobile-timeline-sheet-open', mobileTimelineOpen);
+    mobileTimelineToggle.setAttribute('aria-expanded', String(mobileTimelineOpen));
+    mobileTimelineToggle.setAttribute(
+      'aria-label',
+      mobileTimelineOpen ? 'Close event timeline' : 'Open event timeline'
+    );
+    mobileTimelineContent.inert = !mobileTimelineOpen;
+  }
+
+  function syncMobileTimelineMode() {
+    if (!readOnly) return;
+    if (documentObject.defaultView.matchMedia('(max-width: 760px)').matches) {
+      setMobileTimelineOpen(false);
+      return;
+    }
+    mobileTimelineOpen = false;
+    eventList.closest('#eventLogPanel')?.classList.remove('mobile-timeline-open');
+    mobileTimelineBackdrop.classList.add('hidden');
+    documentObject.body.classList.remove('mobile-timeline-sheet-open');
+    mobileTimelineToggle.setAttribute('aria-expanded', 'false');
+    mobileTimelineToggle.setAttribute('aria-label', 'Open event timeline');
+    mobileTimelineContent.inert = false;
+  }
+
+  function updateMobileTimelinePreview() {
+    mobileTimelinePreview.textContent = activeEventId
+      ? eventSummaries.get(activeEventId) || 'Current event'
+      : 'Waiting for playback';
+  }
+
   function setPlaybackFollowing(following) {
     playbackFollowing = following;
     updatePlaybackFollowControl();
@@ -317,6 +360,7 @@ export function createEventListController({
       if (active) item.setAttribute('aria-current', 'true');
       else item.removeAttribute('aria-current');
     }
+    updateMobileTimelinePreview();
   }
 
   function scrollActiveEventIntoView({ allowPageScroll = false } = {}) {
@@ -515,6 +559,7 @@ export function createEventListController({
   function render(nextGame) {
     game = nextGame;
     eventList.innerHTML = '';
+    eventSummaries = new Map();
     populateFilterPlayers();
     updateFilterButton();
     updateActiveFilterChips();
@@ -533,6 +578,13 @@ export function createEventListController({
       score[event.side] += event.shotValue;
       scoreByEventId.set(event.id, { ...score });
     }
+    for (const event of orderedEvents) {
+      eventSummaries.set(
+        event.id,
+        `${formatVideoTime(event.videoSeconds)} · ${describeEvent(event, playersById, scoreByEventId.get(event.id))}`
+      );
+    }
+    updateMobileTimelinePreview();
     const events = (earliestFirst ? orderedEvents : orderedEvents.reverse()).filter(eventMatchesFilters);
     emptyEvents.textContent = game.events.length && !events.length
       ? 'No events match the current filters.'
@@ -623,6 +675,57 @@ export function createEventListController({
     else filters[group]?.delete(value);
     render(game);
   });
+  const mobileTimelineMedia = documentObject.defaultView.matchMedia('(max-width: 760px)');
+  function handleMobileTimelineToggle() {
+    if (Date.now() < suppressMobileTimelineClickUntil) {
+      suppressMobileTimelineClickUntil = 0;
+      return;
+    }
+    setMobileTimelineOpen(!mobileTimelineOpen);
+  }
+  function handleMobileTimelinePointerDown(event) {
+    if (!readOnly || event.button !== 0) return;
+    mobileTimelinePointer = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+    mobileTimelineToggle.setPointerCapture(event.pointerId);
+  }
+  function handleMobileTimelinePointerUp(event) {
+    if (!mobileTimelinePointer || mobileTimelinePointer.id !== event.pointerId) return;
+    const deltaX = event.clientX - mobileTimelinePointer.x;
+    const deltaY = event.clientY - mobileTimelinePointer.y;
+    mobileTimelinePointer = null;
+    if (mobileTimelineToggle.hasPointerCapture(event.pointerId)) {
+      mobileTimelineToggle.releasePointerCapture(event.pointerId);
+    }
+    if (Math.abs(deltaY) < 45 || Math.abs(deltaY) <= Math.abs(deltaX)) return;
+    suppressMobileTimelineClickUntil = Date.now() + 500;
+    setMobileTimelineOpen(deltaY < 0);
+  }
+  function handleMobileTimelinePointerCancel() {
+    mobileTimelinePointer = null;
+  }
+  function handleMobileTimelineKeydown(event) {
+    if (event.key === 'Escape' && mobileTimelineOpen) {
+      setMobileTimelineOpen(false);
+      mobileTimelineToggle.focus();
+    }
+  }
+  function handleMobileTimelineBackdrop() {
+    setMobileTimelineOpen(false);
+  }
+  if (readOnly) {
+    mobileTimelineToggle.addEventListener('click', handleMobileTimelineToggle);
+    mobileTimelineToggle.addEventListener('pointerdown', handleMobileTimelinePointerDown);
+    mobileTimelineToggle.addEventListener('pointerup', handleMobileTimelinePointerUp);
+    mobileTimelineToggle.addEventListener('pointercancel', handleMobileTimelinePointerCancel);
+    mobileTimelineBackdrop.addEventListener('click', handleMobileTimelineBackdrop);
+    documentObject.addEventListener('keydown', handleMobileTimelineKeydown);
+    mobileTimelineMedia.addEventListener('change', syncMobileTimelineMode);
+    syncMobileTimelineMode();
+  }
 
   if (!readOnly) {
     sideInput.addEventListener('change', () => {
@@ -847,6 +950,16 @@ export function createEventListController({
       timelineScrollContainer.removeEventListener('wheel', pausePlaybackFollowing);
       timelineScrollContainer.removeEventListener('touchstart', pausePlaybackFollowing);
       timelineScrollContainer.removeEventListener('scroll', handleTimelineScroll);
+      if (!readOnly) return;
+      mobileTimelineToggle.removeEventListener('click', handleMobileTimelineToggle);
+      mobileTimelineToggle.removeEventListener('pointerdown', handleMobileTimelinePointerDown);
+      mobileTimelineToggle.removeEventListener('pointerup', handleMobileTimelinePointerUp);
+      mobileTimelineToggle.removeEventListener('pointercancel', handleMobileTimelinePointerCancel);
+      mobileTimelineBackdrop.removeEventListener('click', handleMobileTimelineBackdrop);
+      documentObject.removeEventListener('keydown', handleMobileTimelineKeydown);
+      mobileTimelineMedia.removeEventListener('change', syncMobileTimelineMode);
+      mobileTimelineContent.inert = false;
+      documentObject.body.classList.remove('mobile-timeline-sheet-open');
     }
   };
 }
