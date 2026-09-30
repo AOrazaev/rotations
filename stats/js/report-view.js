@@ -45,7 +45,8 @@ function addCell(row, content, className = '') {
 
 export function createReportController({
   documentObject = document,
-  videoController
+  videoController,
+  previewSeconds = 0
 }) {
   const reportCard = documentObject.querySelector('#reportCard');
   const finalScore = documentObject.querySelector('#reportFinalScore');
@@ -380,7 +381,7 @@ export function createReportController({
     const event = game.events.find(item => item.id === eventId);
     if (!event) return;
     try {
-      videoController.seekTo(event.videoSeconds);
+      videoController.seekTo(Math.max(0, event.videoSeconds - previewSeconds));
       setError();
     } catch (error) {
       setError(error.message || 'Could not navigate to the source play.');

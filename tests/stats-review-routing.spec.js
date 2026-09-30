@@ -102,8 +102,10 @@ test('Review view interactions expose no mutation workflow or game writes', asyn
   await page.locator('#eventFilterForm button[type="submit"]').click();
   await page.locator('.event-time').first().click();
 
+  await page.locator('[data-review-section="team"]').click();
   await page.locator('#teamComparisonBody tr[data-side="team"] [data-metric="fieldGoals"] button').click();
   await page.locator('#reportSourceList [data-report-event-id]').first().click();
+  await page.locator('[data-review-section="feedback"]').click();
   await page.locator('#feedbackPlayer').selectOption('p1');
   await page.locator('#copyPlayerFeedback').click();
   await page.locator('#copyYouTubeFeedback').click();

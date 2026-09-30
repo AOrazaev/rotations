@@ -54,7 +54,7 @@ Reloading a valid route must reopen the same saved snapshot. Review view does no
 - Event timestamps and descriptions
 - Coach comments as display-only content
 - Timestamp playback with the existing three-second pre-roll
-- Timeline order toggle
+- Timeline starts earliest-first and can be toggled to latest-first
 - Side, event-type, player, comment, and `@team` filters
 - Filter reset and filtered-empty states
 

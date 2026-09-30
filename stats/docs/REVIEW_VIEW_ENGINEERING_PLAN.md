@@ -166,6 +166,8 @@ Verification:
 
 ### Milestone 3: Review-focused layout
 
+**Status: complete.** Review mode now uses a resizable video-and-timeline stage with a compact game/score header and accessible Team, Players, Lineups, and Feedback report tabs below it. The shared report surfaces are selectively presented by `stats/js/review-controller.js`, Review report playback uses a three-second pre-roll, and responsive/keyboard coverage lives in `tests/stats-review-layout.spec.js`.
+
 Deliver:
 
 - A compact Review view header with game, opponent, and exit context.

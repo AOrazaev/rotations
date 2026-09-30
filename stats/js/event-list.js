@@ -19,13 +19,14 @@ const EDITABLE_TYPES = new Set([
   'note'
 ]);
 
-export function describeEvent(event, playersById) {
+export function describeEvent(event, playersById, score = null) {
   const subject = event.side === 'opponent'
     ? 'Opponent'
     : playersById[event.playerId]?.name || 'Our team';
   if (event.type === 'shot') {
     const shot = event.shotValue === 1 ? 'FT' : `${event.shotValue}PT`;
-    return `${subject} ${event.made ? 'made' : 'missed'} ${shot}`;
+    const scoreLabel = event.made && score ? ` - ${score.team}:${score.opponent}` : '';
+    return `${subject} ${event.made ? 'made' : 'missed'} ${shot}${scoreLabel}`;
   }
   if (event.type === 'rebound') return `${subject} ${event.reboundKind} rebound`;
   if (event.type === 'substitution') {
@@ -42,6 +43,7 @@ export function createEventListController({
   videoController,
   saveGame,
   readOnly = false,
+  initialEarliestFirst = false,
   now = () => new Date().toISOString(),
   confirmFn = message => confirm(message),
   onError = () => {}
@@ -92,7 +94,7 @@ export function createEventListController({
   let commentEventId = null;
   let editingSeconds = 0;
   let busy = false;
-  let earliestFirst = false;
+  let earliestFirst = initialEarliestFirst;
   let filters = {
     sides: new Set(),
     types: new Set(),
@@ -298,6 +300,13 @@ export function createEventListController({
     }
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
     const orderedEvents = orderGameEvents(game.events);
+    const scoreByEventId = new Map();
+    const score = { team: 0, opponent: 0 };
+    for (const event of orderedEvents) {
+      if (event.type !== 'shot' || !event.made) continue;
+      score[event.side] += event.shotValue;
+      scoreByEventId.set(event.id, { ...score });
+    }
     const events = (earliestFirst ? orderedEvents : orderedEvents.reverse()).filter(eventMatchesFilters);
     emptyEvents.textContent = game.events.length && !events.length
       ? 'No events match the current filters.'
@@ -307,7 +316,7 @@ export function createEventListController({
       const item = eventTemplate.content.firstElementChild.cloneNode(true);
       item.dataset.eventId = event.id;
       item.querySelector('.event-time').textContent = formatVideoTime(event.videoSeconds);
-      const description = describeEvent(event, playersById);
+      const description = describeEvent(event, playersById, scoreByEventId.get(event.id));
       item.querySelector('.event-description').textContent = description;
       item.querySelector('.event-description').title = description;
       const comment = String(event.coachComment || '').trim();

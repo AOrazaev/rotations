@@ -38,9 +38,49 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .app-shell.game-panel-collapsed { grid-template-columns: minmax(0, 1fr); }
 .review-mode-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .review-mode-header .subtitle { margin-bottom: 0; }
+.review-header-actions { display: flex; align-items: center; gap: 16px; }
+.review-score { display: grid; gap: 2px; min-width: 100px; text-align: center; }
+.review-score span { color: var(--muted); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.review-score strong { font-size: 2rem; font-variant-numeric: tabular-nums; }
+.review-navigation {
+  position: sticky;
+  z-index: 8;
+  top: 0;
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 8px;
+  overflow-x: auto;
+  background: rgba(11, 16, 32, .94);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+}
+.review-tab { flex: 1 0 auto; color: var(--muted); background: transparent; border: 1px solid transparent; font-weight: 700; }
+.review-tab:hover { color: var(--text); border-color: var(--line); }
+.review-tab.active { color: #fff; background: var(--accent); }
 .review-route-state { max-width: 720px; }
 .review-mode #gamePanel, .review-mode #showGamePanel { display: none; }
 .review-mode #statsShell { grid-template-columns: minmax(0, 1fr); }
+.review-mode #statsHero { display: none; }
+.review-mode #reviewModeHeader,
+.review-mode #reviewShell { width: min(100%, 1760px); margin-right: auto; margin-left: auto; }
+.review-mode #reviewNavigation,
+.review-mode #reportCard { width: min(100%, 1480px); margin-right: auto; margin-left: auto; }
+.review-mode #reviewShell {
+  grid-template-columns: minmax(420px, var(--video-column-width, 70%)) minmax(300px, 1fr);
+  gap: 8px;
+}
+.review-mode .capture-panel {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.review-mode .workspace > .video-card { position: sticky; top: 16px; }
+.review-mode #reportCard { margin-bottom: 16px; }
+.review-mode #reportSummary { display: none; }
+.review-mode #reportCard .report-grid { display: contents; }
 .review-shell { display: grid; grid-template-columns: minmax(420px, var(--video-column-width, 70%)) minmax(300px, 1fr); gap: 8px; align-items: start; min-width: 0; }
 .panel-stack { min-width: 0; }
 .panel-stack > .card, .app-shell > .card { margin: 0 0 16px; }
@@ -264,6 +304,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 
 @media (max-width: 760px) {
   .review-shell { grid-template-columns: 1fr; gap: 16px; }
+  .review-mode #reviewShell { grid-template-columns: 1fr; gap: 16px; }
+  .review-mode .capture-panel { position: static; max-height: none; overflow: visible; }
+  .review-mode .workspace > .video-card { position: static; }
   .workspace > .video-card { position: static; }
   .video-size-actions, .video-resize-handle { display: none; }
   .event-entry-card .event-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -271,6 +314,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 
 @media (max-width: 640px) {
   .hero, .input-row { flex-direction: column; }
+  .review-mode-header, .review-header-actions { align-items: stretch; flex-direction: column; }
+  .review-header-actions .nav-link { width: 100%; }
+  .review-score { text-align: left; }
   .nav-link, .input-row button { width: 100%; text-align: center; }
   .marker-actions button { flex: 1 1 auto; }
   .setup-fields { grid-template-columns: 1fr; }
