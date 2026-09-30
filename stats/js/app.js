@@ -9,6 +9,7 @@ import {
 } from './game-store.js';
 import { createGameSetupController } from './game-setup.js';
 import { createEventEntryController } from './event-entry.js';
+import { createReviewController } from './review-controller.js';
 import {
   buildReviewUrl,
   parseStatsRoute
@@ -225,9 +226,11 @@ function setGamePanelCollapsed(collapsed, { moveFocus = false } = {}) {
   if (moveFocus) (collapsed ? showGamePanelButton : hideGamePanelButton).focus();
 }
 
-hideGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(true, { moveFocus: true }));
-showGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(false, { moveFocus: true }));
-setGamePanelCollapsed(localStorage.getItem(gamePanelStorageKey) === 'true');
+if (!reviewMode) {
+  hideGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(true, { moveFocus: true }));
+  showGamePanelButton.addEventListener('click', () => setGamePanelCollapsed(false, { moveFocus: true }));
+  setGamePanelCollapsed(localStorage.getItem(gamePanelStorageKey) === 'true');
+}
 
 function setVideoSize(value) {
   const size = Math.min(75, Math.max(55, Number(value) || 70));
@@ -291,11 +294,26 @@ const store = new GameStore({
   databaseName: window.__STATS_DATABASE_NAME__ || 'basketball-stats'
 });
 let setupController;
+let eventController;
+let reviewController;
 
 function openGameWorkspace(game) {
   document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
   videoController.loadVideo(game.video.sourceUrl);
   eventController.setGame(game);
+}
+
+function removeReviewMutationSurfaces() {
+  [
+    '#gamePanel',
+    '#showGamePanel',
+    '#eventEntryPanel',
+    '#eventEditDialog',
+    '#coachCommentDialog',
+    '#substitutionDialog',
+    '#periodEndDialog',
+    '#noteDialog'
+  ].forEach(selector => document.querySelector(selector)?.remove());
 }
 
 function showReviewRouteState(title, message) {
@@ -346,40 +364,47 @@ async function initializeReviewMode() {
   reviewModeOpponent.textContent = game.opponentName ? `vs ${game.opponentName}` : 'No opponent';
   reviewModeHeader.classList.remove('hidden');
   statsShell.classList.remove('hidden');
-  openGameWorkspace(game);
+  videoController.loadVideo(game.video.sourceUrl);
+  reviewController.setGame(game);
 }
 
-const eventController = createEventEntryController({
-  store,
-  videoController,
-  onGameChanged: async game => {
-    if (setupController) {
-      setupController.syncGame(game);
-      await setupController.refreshGames();
+let ready;
+if (reviewMode) {
+  reviewController = createReviewController({ videoController });
+  removeReviewMutationSurfaces();
+  ready = initializeReviewMode();
+} else {
+  eventController = createEventEntryController({
+    store,
+    videoController,
+    onGameChanged: async game => {
+      if (setupController) {
+        setupController.syncGame(game);
+        await setupController.refreshGames();
+      }
     }
-  }
-});
-setupController = createGameSetupController({
-  store,
-  initializeDraft: !reviewMode,
-  onGameOpened: openGameWorkspace,
-  onReviewRequested(gameId) {
-    location.assign(buildReviewUrl(gameId, location.pathname));
-  },
-});
-const ready = setupController.ready.then(() => {
-  if (reviewMode) return initializeReviewMode();
-});
+  });
+  setupController = createGameSetupController({
+    store,
+    onGameOpened: openGameWorkspace,
+    onReviewRequested(gameId) {
+      location.assign(buildReviewUrl(gameId, location.pathname));
+    },
+  });
+  ready = setupController.ready;
+}
 window.__statsApp = {
   ready,
   reviewMode,
   videoController,
   setupController,
   eventController,
+  reviewController,
   store,
   destroy() {
     videoController.destroy();
-    eventController.destroy();
+    eventController?.destroy();
+    reviewController?.destroy();
     store.close();
   }
 };

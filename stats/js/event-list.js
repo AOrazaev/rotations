@@ -41,6 +41,7 @@ export function createEventListController({
   documentObject = document,
   videoController,
   saveGame,
+  readOnly = false,
   now = () => new Date().toISOString(),
   confirmFn = message => confirm(message),
   onError = () => {}
@@ -314,6 +315,11 @@ export function createEventListController({
       item.classList.toggle('has-comment', !!comment);
       commentBlock.textContent = comment;
       commentBlock.classList.toggle('hidden', !comment);
+      if (readOnly) {
+        item.querySelector('.event-row-actions').remove();
+        eventList.appendChild(item);
+        continue;
+      }
       const commentButton = item.querySelector('[data-action="comment-event"]');
       const commentLabel = comment ? 'Edit coach comment' : 'Add coach comment';
       commentButton.setAttribute('aria-label', commentLabel);
@@ -324,6 +330,7 @@ export function createEventListController({
   }
 
   async function commit(nextGame) {
+    if (readOnly) throw new Error('Review view cannot modify game data.');
     await saveGame(nextGame);
     game = nextGame;
   }
@@ -338,6 +345,8 @@ export function createEventListController({
       if (button.dataset.action === 'play-event') {
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
+      } else if (readOnly) {
+        return;
       } else if (button.dataset.action === 'comment-event') {
         openCommentEditor(selected);
       } else if (button.dataset.action === 'edit-event') {
@@ -356,12 +365,14 @@ export function createEventListController({
     }
   });
 
-  sideInput.addEventListener('change', () => {
-    playerInput.disabled = sideInput.value === 'opponent';
-    if (sideInput.value === 'opponent') playerInput.value = '';
-  });
-  typeInput.addEventListener('change', updateDependentFields);
-  cancelButton.addEventListener('click', () => dialog.close());
+  if (!readOnly) {
+    sideInput.addEventListener('change', () => {
+      playerInput.disabled = sideInput.value === 'opponent';
+      if (sideInput.value === 'opponent') playerInput.value = '';
+    });
+    typeInput.addEventListener('change', updateDependentFields);
+    cancelButton.addEventListener('click', () => dialog.close());
+  }
   orderButton.addEventListener('click', () => {
     earliestFirst = !earliestFirst;
     render(game);
@@ -394,125 +405,127 @@ export function createEventListController({
     filterDialog.close();
     render(game);
   });
-  cancelComment.addEventListener('click', () => commentDialog.close());
-  commentForm.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!game || !commentEventId || busy) return;
-    setCommentError();
-    busy = true;
-    try {
-      const value = commentText.value.trim();
-      if (!value) throw new Error('Enter a coach comment.');
-      const next = structuredClone(game);
-      const commented = next.events.find(item => item.id === commentEventId);
-      commented.coachComment = value;
-      commented.updatedAt = now();
-      next.updatedAt = now();
-      await commit(next);
-      commentDialog.close();
-    } catch (error) {
-      setCommentError(error.message || 'Could not save the coach comment.');
-    } finally {
-      busy = false;
-    }
-  });
-  removeComment.addEventListener('click', async () => {
-    if (!game || !commentEventId || busy) return;
-    setCommentError();
-    busy = true;
-    try {
-      const next = structuredClone(game);
-      const commented = next.events.find(item => item.id === commentEventId);
-      delete commented.coachComment;
-      commented.updatedAt = now();
-      next.updatedAt = now();
-      await commit(next);
-      commentDialog.close();
-    } catch (error) {
-      setCommentError(error.message || 'Could not remove the coach comment.');
-    } finally {
-      busy = false;
-    }
-  });
-  dialog.querySelectorAll('[data-time-adjust]').forEach(button => button.addEventListener('click', () => {
-    editingSeconds = Math.max(0, editingSeconds + Number(button.dataset.timeAdjust));
-    timestampDisplay.textContent = formatVideoTime(editingSeconds);
-    refreshEditorLineupOptions();
-  }));
-  useCurrentButton.addEventListener('click', () => {
-    try {
-      editingSeconds = videoController.getCurrentSeconds();
+  if (!readOnly) {
+    cancelComment.addEventListener('click', () => commentDialog.close());
+    commentForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!game || !commentEventId || busy) return;
+      setCommentError();
+      busy = true;
+      try {
+        const value = commentText.value.trim();
+        if (!value) throw new Error('Enter a coach comment.');
+        const next = structuredClone(game);
+        const commented = next.events.find(item => item.id === commentEventId);
+        commented.coachComment = value;
+        commented.updatedAt = now();
+        next.updatedAt = now();
+        await commit(next);
+        commentDialog.close();
+      } catch (error) {
+        setCommentError(error.message || 'Could not save the coach comment.');
+      } finally {
+        busy = false;
+      }
+    });
+    removeComment.addEventListener('click', async () => {
+      if (!game || !commentEventId || busy) return;
+      setCommentError();
+      busy = true;
+      try {
+        const next = structuredClone(game);
+        const commented = next.events.find(item => item.id === commentEventId);
+        delete commented.coachComment;
+        commented.updatedAt = now();
+        next.updatedAt = now();
+        await commit(next);
+        commentDialog.close();
+      } catch (error) {
+        setCommentError(error.message || 'Could not remove the coach comment.');
+      } finally {
+        busy = false;
+      }
+    });
+    dialog.querySelectorAll('[data-time-adjust]').forEach(button => button.addEventListener('click', () => {
+      editingSeconds = Math.max(0, editingSeconds + Number(button.dataset.timeAdjust));
       timestampDisplay.textContent = formatVideoTime(editingSeconds);
       refreshEditorLineupOptions();
-      setEditError();
-    } catch (error) {
-      setEditError(error.message);
-    }
-  });
-
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!game || !editingEventId || busy) return;
-    setEditError();
-    busy = true;
-    try {
-      const next = structuredClone(game);
-      const edited = next.events.find(item => item.id === editingEventId);
-      edited.videoSeconds = editingSeconds;
-      edited.updatedAt = now();
-      delete edited.shotValue;
-      delete edited.made;
-      delete edited.reboundKind;
-      delete edited.playerOutId;
-      delete edited.playerInId;
-      delete edited.periodLabel;
-      delete edited.note;
-      if (typeInput.value === 'substitution') {
-        edited.side = 'team';
-        edited.type = 'substitution';
-        edited.playerId = null;
-        edited.playerOutId = playerOutInput.value;
-        edited.playerInId = playerInInput.value;
-        if (!edited.playerOutId || !edited.playerInId) {
-          throw new Error('Select one on-court player and one bench player.');
-        }
-      } else if (typeInput.value === 'timeout') {
-        edited.side = sideInput.value;
-        edited.type = 'timeout';
-        edited.playerId = null;
-      } else if (typeInput.value === 'period_end') {
-        edited.side = 'system';
-        edited.type = 'period_end';
-        edited.playerId = null;
-        edited.periodLabel = periodLabelInput.value.trim();
-        if (!edited.periodLabel) throw new Error('Enter a period label.');
-      } else if (typeInput.value === 'note') {
-        edited.side = 'system';
-        edited.type = 'note';
-        edited.playerId = null;
-        edited.note = noteInput.value.trim();
-        if (!edited.note) throw new Error('Enter note text.');
-      } else {
-        edited.side = sideInput.value;
-        edited.playerId = edited.side === 'team' ? playerInput.value : null;
-        if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
-        edited.type = typeInput.value;
-        if (edited.type === 'shot') {
-          edited.shotValue = Number(shotValueInput.value);
-          edited.made = shotMadeInput.value === 'true';
-        } else if (edited.type === 'rebound') {
-          edited.reboundKind = reboundKindInput.value;
-        }
+    }));
+    useCurrentButton.addEventListener('click', () => {
+      try {
+        editingSeconds = videoController.getCurrentSeconds();
+        timestampDisplay.textContent = formatVideoTime(editingSeconds);
+        refreshEditorLineupOptions();
+        setEditError();
+      } catch (error) {
+        setEditError(error.message);
       }
-      next.updatedAt = now();
-      await commit(next);
-      dialog.close();
-    } catch (error) {
-      setEditError(error.message || 'Could not save the correction.');
-    } finally {
-      busy = false;
-    }
-  });
+    });
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!game || !editingEventId || busy) return;
+      setEditError();
+      busy = true;
+      try {
+        const next = structuredClone(game);
+        const edited = next.events.find(item => item.id === editingEventId);
+        edited.videoSeconds = editingSeconds;
+        edited.updatedAt = now();
+        delete edited.shotValue;
+        delete edited.made;
+        delete edited.reboundKind;
+        delete edited.playerOutId;
+        delete edited.playerInId;
+        delete edited.periodLabel;
+        delete edited.note;
+        if (typeInput.value === 'substitution') {
+          edited.side = 'team';
+          edited.type = 'substitution';
+          edited.playerId = null;
+          edited.playerOutId = playerOutInput.value;
+          edited.playerInId = playerInInput.value;
+          if (!edited.playerOutId || !edited.playerInId) {
+            throw new Error('Select one on-court player and one bench player.');
+          }
+        } else if (typeInput.value === 'timeout') {
+          edited.side = sideInput.value;
+          edited.type = 'timeout';
+          edited.playerId = null;
+        } else if (typeInput.value === 'period_end') {
+          edited.side = 'system';
+          edited.type = 'period_end';
+          edited.playerId = null;
+          edited.periodLabel = periodLabelInput.value.trim();
+          if (!edited.periodLabel) throw new Error('Enter a period label.');
+        } else if (typeInput.value === 'note') {
+          edited.side = 'system';
+          edited.type = 'note';
+          edited.playerId = null;
+          edited.note = noteInput.value.trim();
+          if (!edited.note) throw new Error('Enter note text.');
+        } else {
+          edited.side = sideInput.value;
+          edited.playerId = edited.side === 'team' ? playerInput.value : null;
+          if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
+          edited.type = typeInput.value;
+          if (edited.type === 'shot') {
+            edited.shotValue = Number(shotValueInput.value);
+            edited.made = shotMadeInput.value === 'true';
+          } else if (edited.type === 'rebound') {
+            edited.reboundKind = reboundKindInput.value;
+          }
+        }
+        next.updatedAt = now();
+        await commit(next);
+        dialog.close();
+      } catch (error) {
+        setEditError(error.message || 'Could not save the correction.');
+      } finally {
+        busy = false;
+      }
+    });
+  }
 
   return { render };
 }

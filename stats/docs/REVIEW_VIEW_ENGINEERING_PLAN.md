@@ -147,6 +147,8 @@ Verification:
 
 ### Milestone 2: Read-only boundary
 
+**Status: complete.** `stats/js/review-controller.js` composes the shared timeline, reducer, reports, source navigation, and feedback workflows without initializing game setup or event entry. The event timeline has an explicit read-only mode, mutation surfaces are removed from the Review document, and `tests/stats-review-routing.spec.js` verifies controller separation and zero calls to instrumented game-save/delete methods.
+
 Deliver:
 
 - Mode-aware controller composition.

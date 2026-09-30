@@ -13,6 +13,13 @@ async function openIsolatedStats(page) {
       destroy() {}
     };
     window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
+    window.__clipboardWrites = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async text => { window.__clipboardWrites.push(text); }
+      }
+    });
   }, databaseName);
   await page.goto('/stats/');
   await page.evaluate(() => window.__statsApp.ready);
@@ -45,6 +52,11 @@ test('View opens a saved game in a reload-safe review route', async ({ page }) =
   await expect(page.locator('#reportFinalScore')).toHaveText('5–3');
   await expect(page.locator('#gamePanel')).toBeHidden();
   expect(await page.evaluate(() => window.__statsApp.reviewMode)).toBe(true);
+  expect(await page.evaluate(() => ({
+    setup: Boolean(window.__statsApp.setupController),
+    event: Boolean(window.__statsApp.eventController),
+    review: Boolean(window.__statsApp.reviewController)
+  }))).toEqual({ setup: false, event: false, review: true });
 
   await page.reload();
   await page.evaluate(() => window.__statsApp.ready);
@@ -56,6 +68,59 @@ test('View opens a saved game in a reload-safe review route', async ({ page }) =
   await page.evaluate(() => window.__statsApp.ready);
   expect(await page.evaluate(() => window.__statsApp.reviewMode)).toBe(false);
   await expect(page.locator('#gamePanel')).toBeVisible();
+});
+
+test('Review view interactions expose no mutation workflow or game writes', async ({ page }) => {
+  await openIsolatedStats(page);
+  const game = await saveReviewFixture(page);
+  await page.goto(`/stats/?mode=review&game=${encodeURIComponent(game.id)}`);
+  await page.evaluate(() => window.__statsApp.ready);
+
+  await expect(page.locator('#gamePanel')).toHaveCount(0);
+  await expect(page.locator('#eventEntryPanel')).toHaveCount(0);
+  await expect(page.locator('#undoEvent')).toHaveCount(0);
+  await expect(page.locator('[data-action="comment-event"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="edit-event"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="delete-event"]')).toHaveCount(0);
+  await expect(page.locator('#eventEditDialog, #coachCommentDialog, #substitutionDialog, #periodEndDialog, #noteDialog')).toHaveCount(0);
+
+  await page.evaluate(() => {
+    window.__reviewStoreWrites = { save: 0, delete: 0 };
+    window.__statsApp.store.saveGame = async () => {
+      window.__reviewStoreWrites.save += 1;
+      throw new Error('Review view attempted to save.');
+    };
+    window.__statsApp.store.deleteGame = async () => {
+      window.__reviewStoreWrites.delete += 1;
+      throw new Error('Review view attempted to delete.');
+    };
+  });
+
+  await page.locator('#toggleEventOrder').click();
+  await page.locator('#openEventFilters').click();
+  await page.locator('input[name="filterComment"][value="with"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await page.locator('.event-time').first().click();
+
+  await page.locator('#teamComparisonBody tr[data-side="team"] [data-metric="fieldGoals"] button').click();
+  await page.locator('#reportSourceList [data-report-event-id]').first().click();
+  await page.locator('#feedbackPlayer').selectOption('p1');
+  await page.locator('#copyPlayerFeedback').click();
+  await page.locator('#copyYouTubeFeedback').click();
+
+  expect(await page.evaluate(() => window.__reviewStoreWrites)).toEqual({ save: 0, delete: 0 });
+  expect(await page.evaluate(() => window.__clipboardWrites.length)).toBe(2);
+});
+
+test('normal tracker mode still initializes mutation controllers', async ({ page }) => {
+  await openIsolatedStats(page);
+  expect(await page.evaluate(() => ({
+    setup: Boolean(window.__statsApp.setupController),
+    event: Boolean(window.__statsApp.eventController),
+    review: Boolean(window.__statsApp.reviewController)
+  }))).toEqual({ setup: true, event: true, review: false });
+  await expect(page.locator('#gameSetupForm')).toBeVisible();
+  await expect(page.locator('#eventEditDialog')).toHaveCount(1);
 });
 
 test('review routes reject missing, empty, and unknown game identifiers', async ({ page }) => {
