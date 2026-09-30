@@ -1,6 +1,6 @@
 import {
+  normalizeGame,
   orderGameEvents,
-  validateGame
 } from './game-model.js';
 
 const COUNT_EVENT_FIELDS = {
@@ -103,7 +103,7 @@ function getLineupRecord(lineupRecords, lineupIds) {
 }
 
 export function buildGameAnalysis(game) {
-  validateGame(game);
+  game = normalizeGame(game);
   const orderedEvents = orderGameEvents(game.events);
   const score = { team: 0, opponent: 0 };
   const teamComparison = { team: emptySideTotals(), opponent: emptySideTotals() };

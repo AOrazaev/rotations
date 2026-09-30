@@ -19,7 +19,9 @@ A browser-only basketball toolkit designed for static hosting on GitHub Pages. I
 - Attach an embeddable YouTube recording and capture events at its current timestamp.
 - Record team and opponent shots, rebounds, assists, steals, blocks, turnovers, fouls, timeouts, period markers, notes, and substitutions.
 - Correct, delete, filter, reorder, and replay timeline events with a three-second pre-roll.
+- Optionally enrich field goals with court location, pressure, phase, second-chance context, and creation type.
 - Track the active lineup and derive team, player, lineup, plus/minus, EFF, and TS% reports from the event log.
+- Inspect team, opponent, and player shot maps with period filters, color-coded zone efficiency, detail splits, and source-play navigation.
 - Add coach comments and copy selected player feedback for Telegram or as a YouTube timestamp comment.
 - Open any active saved game in a read-only Review view with playback-following timeline navigation and player-focused feedback.
 - Export versioned JSON backups, import them without overwriting existing games, and archive or restore games.
@@ -45,6 +47,8 @@ Review view removes setup, event-entry, correction, comment, archive, import, an
 Review URLs identify a game in IndexedDB in the **same browser and site origin**. They are reload-safe, but they are not public or cross-device sharing links. Another browser, device, private window, cleared site-data profile, or different deployment origin will not have that game. Export a JSON backup to move a game elsewhere.
 
 Archived games cannot open in Review view. Return to normal tracker mode, restore the game, and choose **View** again. See [`stats/docs/REVIEW_VIEW.md`](stats/docs/REVIEW_VIEW.md) for the complete workflow and limitations.
+
+See [`stats/docs/SHOT_DETAILS.md`](stats/docs/SHOT_DETAILS.md) for shot entry, correction, filters, reports, compatibility, and deployment verification.
 
 ## Run locally
 
@@ -79,7 +83,7 @@ npx playwright install --with-deps chromium
 npm test
 ```
 
-The suite covers the planner algorithm and UI, the stats data contract and IndexedDB store, YouTube integration through a fake player, event entry and correction, lineup replay, reports and feedback, responsive layout, backup recovery, the complete MVP workflow, and the end-to-end read-only Review release gate. GitHub Actions runs the suite on every push and pull request.
+The suite covers the planner algorithm and UI, the stats data contract and IndexedDB store, YouTube integration through a fake player, event entry and correction, lineup replay, shot details and reports, responsive layout, backup recovery, the complete MVP workflow, and end-to-end tracker and read-only Review release gates. GitHub Actions runs the suite on every push and pull request.
 
 ## Deploy to GitHub Pages
 
@@ -90,6 +94,8 @@ After publishing, manually confirm:
 1. The root planner and `/stats/` load without a build step.
 2. An embeddable YouTube video plays in tracker and Review modes.
 3. **View** opens a saved game and a direct reload preserves its Review route.
-4. Timeline playback-following, reports, feedback navigation, and **Exit review** work.
+4. Shot entry works with pointer and keyboard input and survives reload plus backup recovery.
+5. Team, opponent, and player shot reports reconcile with the timeline and support period filtering.
+6. Timeline playback-following, source-play navigation, feedback navigation, and **Exit review** work.
 
 YouTube availability and embedding permissions are external to this application.

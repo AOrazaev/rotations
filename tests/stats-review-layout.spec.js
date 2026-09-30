@@ -53,7 +53,7 @@ test('Review view uses video-first section navigation', async ({ page }) => {
   await expect(page.locator('#reviewNavigation')).toBeVisible();
   await expect(page.locator('#reviewNavigation')).toHaveAttribute('aria-label', 'Review reports');
   await expect(page.locator('[data-review-section]')).toHaveText([
-    'Team', 'Players', 'Lineups', 'Feedback'
+    'Team', 'Players', 'Shots', 'Lineups', 'Feedback'
   ]);
   await expect(page.locator('[data-review-section="team"]')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#eventLogPanel')).toBeVisible();
@@ -105,6 +105,11 @@ test('Review view uses video-first section navigation', async ({ page }) => {
   await expect(page.locator('#eventLogPanel')).toBeVisible();
   await expect(page.locator('#playerReportSection')).toBeVisible();
   await expect(page.locator('#teamReportSection')).toBeHidden();
+  await expect(page.locator('#reportSourceSection')).toBeVisible();
+
+  await page.locator('[data-review-section="shots"]').click();
+  await expect(page.locator('#shotReportSection')).toBeVisible();
+  await expect(page.locator('#playerReportSection')).toBeHidden();
   await expect(page.locator('#reportSourceSection')).toBeVisible();
 
   await page.locator('[data-review-section="lineups"]').click();
@@ -270,6 +275,10 @@ for (const width of [1024, 600]) {
       scroll: element.scrollWidth
     }));
     expect(overflow.scroll).toBeGreaterThanOrEqual(overflow.client);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+
+    await page.locator('[data-review-section="shots"]').click();
+    await expect(page.locator('#shotReportSection')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });
 }

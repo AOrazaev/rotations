@@ -14,6 +14,7 @@ export function createReviewController({
   const reportCard = documentObject.querySelector('#reportCard');
   const teamSection = documentObject.querySelector('#teamReportSection');
   const playerSection = documentObject.querySelector('#playerReportSection');
+  const shotSection = documentObject.querySelector('#shotReportSection');
   const feedbackSection = documentObject.querySelector('#feedbackReportSection');
   const lineupSection = documentObject.querySelector('#lineupReportSection');
   const progressionSection = documentObject.querySelector('#scoreProgressionSection');
@@ -44,6 +45,7 @@ export function createReviewController({
   for (const [panel, tabId] of [
     [teamSection, 'reviewTabTeam'],
     [playerSection, 'reviewTabPlayers'],
+    [shotSection, 'reviewTabShots'],
     [lineupSection, 'reviewTabLineups'],
     [feedbackSection, 'reviewTabFeedback']
   ]) {
@@ -66,10 +68,11 @@ export function createReviewController({
     reportCard.classList.toggle('hidden', !game);
     teamSection.classList.toggle('hidden', section !== 'team');
     playerSection.classList.toggle('hidden', section !== 'players');
+    shotSection.classList.toggle('hidden', section !== 'shots');
     feedbackSection.classList.toggle('hidden', section !== 'feedback');
     lineupSection.classList.toggle('hidden', section !== 'lineups');
     progressionSection.classList.toggle('hidden', section !== 'team');
-    sourceSection.classList.toggle('hidden', !['team', 'players', 'lineups'].includes(section));
+    sourceSection.classList.toggle('hidden', !['team', 'players', 'shots', 'lineups'].includes(section));
   }
 
   function handleNavigationClick(event) {

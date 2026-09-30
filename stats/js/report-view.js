@@ -1,4 +1,11 @@
 import { describeEvent } from './event-list.js';
+import { createShotCourtDiagram } from './shot-court.js';
+import {
+  SHOT_REPORT_ANY,
+  SHOT_REPORT_DIMENSIONS,
+  buildShotReport,
+  getShotReportPeriods
+} from './shot-report.js';
 import { formatVideoTime } from './youtube-player.js';
 
 const COMPARISON_METRICS = [
@@ -66,6 +73,22 @@ export function createReportController({
   const lineupBody = documentObject.querySelector('#lineupReportBody');
   const progression = documentObject.querySelector('#scoreProgression');
   const emptyProgression = documentObject.querySelector('#emptyScoreProgression');
+  const shotReportSection = documentObject.querySelector('#shotReportSection');
+  const shotReportScope = documentObject.querySelector('#shotReportScope');
+  const shotReportPeriod = documentObject.querySelector('#shotReportPeriod');
+  const shotReportResult = documentObject.querySelector('#shotReportResult');
+  const shotReportPressure = documentObject.querySelector('#shotReportPressure');
+  const shotReportPhase = documentObject.querySelector('#shotReportPhase');
+  const shotReportContext = documentObject.querySelector('#shotReportContext');
+  const shotReportCreation = documentObject.querySelector('#shotReportCreation');
+  const clearShotReportFilters = documentObject.querySelector('#clearShotReportFilters');
+  const shotReportSummary = documentObject.querySelector('#shotReportSummary');
+  const shotChart = documentObject.querySelector('#shotChart');
+  const shotChartPlot = documentObject.querySelector('#shotChartPlot');
+  const emptyShotChart = documentObject.querySelector('#emptyShotChart');
+  const shotZonePlot = documentObject.querySelector('#shotZonePlot');
+  const shotZoneNoLocation = documentObject.querySelector('#shotZoneNoLocation');
+  const shotSplitReports = documentObject.querySelector('#shotSplitReports');
   const sourceTitle = documentObject.querySelector('#reportSourceTitle');
   const sourceList = documentObject.querySelector('#reportSourceList');
   const sourceEmpty = documentObject.querySelector('#reportSourceEmpty');
@@ -86,6 +109,59 @@ export function createReportController({
   let analysis = null;
   let selectedFeedbackPlayerId = null;
   let activeFeedbackEventId = null;
+  let shotZoneRenderSequence = 0;
+
+  function shotReportFilters() {
+    return {
+      scope: shotReportScope.value || 'team',
+      period: shotReportPeriod.value || SHOT_REPORT_ANY,
+      result: shotReportResult.value || SHOT_REPORT_ANY,
+      pressure: shotReportPressure.value || SHOT_REPORT_ANY,
+      phase: shotReportPhase.value || SHOT_REPORT_ANY,
+      context: shotReportContext.value || SHOT_REPORT_ANY,
+      creation: shotReportCreation.value || SHOT_REPORT_ANY
+    };
+  }
+
+  function renderShotScopeOptions() {
+    const previous = shotReportScope.value;
+    shotReportScope.innerHTML = '';
+    for (const [value, label] of [
+      ['team', 'Our team'],
+      ['opponent', game.opponentName?.trim() || 'Opponent'],
+      ...game.players.map(player => [
+        `player:${player.id}`,
+        player.number ? `#${player.number} ${player.name}` : player.name
+      ])
+    ]) {
+      const option = documentObject.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      shotReportScope.appendChild(option);
+    }
+
+    shotReportScope.value = [...shotReportScope.options].some(option => option.value === previous)
+      ? previous
+      : 'team';
+  }
+
+  function renderShotPeriodOptions() {
+    const previous = shotReportPeriod.value;
+    shotReportPeriod.innerHTML = '';
+    const all = documentObject.createElement('option');
+    all.value = SHOT_REPORT_ANY;
+    all.textContent = 'All periods';
+    shotReportPeriod.appendChild(all);
+    for (const period of getShotReportPeriods(game)) {
+      const option = documentObject.createElement('option');
+      option.value = period.value;
+      option.textContent = period.label;
+      shotReportPeriod.appendChild(option);
+    }
+    shotReportPeriod.value = [...shotReportPeriod.options].some(option => option.value === previous)
+      ? previous
+      : SHOT_REPORT_ANY;
+  }
 
   function setError(message = '') {
     reportError.textContent = message;
@@ -557,6 +633,263 @@ export function createReportController({
     progression.append(legend, plot);
   }
 
+  function markerOffset(index, count) {
+    if (count <= 1) return { x: 0, y: 0 };
+    const angle = (Math.PI * 2 * index / count) - Math.PI / 2;
+    const radius = Math.min(13, 6 + count);
+    return {
+      x: Number((Math.cos(angle) * radius).toFixed(2)),
+      y: Number((Math.sin(angle) * radius).toFixed(2))
+    };
+  }
+
+  function renderShotChart(report, playersById) {
+    shotChartPlot.innerHTML = '';
+    const court = createShotCourtDiagram(documentObject, {
+      class: 'shot-chart-court',
+      'aria-hidden': 'true',
+      focusable: 'false'
+    });
+    shotChartPlot.appendChild(court);
+    const locationGroups = new Map();
+    for (const event of report.plottedEvents) {
+      const { x, y } = event.shotDetails.location;
+      const key = `${x.toFixed(4)}:${y.toFixed(4)}`;
+      if (!locationGroups.has(key)) locationGroups.set(key, []);
+      locationGroups.get(key).push(event);
+    }
+    for (const events of locationGroups.values()) {
+      events.forEach((event, index) => {
+        const offset = markerOffset(index, events.length);
+        const button = documentObject.createElement('button');
+        button.type = 'button';
+        button.className = `shot-chart-marker ${event.made ? 'made' : 'missed'}`;
+        button.dataset.eventId = event.id;
+        button.dataset.reportEventId = event.id;
+        button.style.left = `${event.shotDetails.location.x * 100}%`;
+        button.style.top = `${event.shotDetails.location.y * 100}%`;
+        button.style.setProperty('--shot-offset-x', `${offset.x}px`);
+        button.style.setProperty('--shot-offset-y', `${offset.y}px`);
+        const label = `${formatVideoTime(event.videoSeconds)}, ${describeEvent(event, playersById)}`;
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        shotChartPlot.appendChild(button);
+      });
+    }
+    shotChart.classList.toggle('hidden', report.plottedEvents.length === 0);
+    emptyShotChart.classList.toggle('hidden', report.plottedEvents.length > 0);
+  }
+
+  function createSvgElement(name, attributes = {}) {
+    const element = documentObject.createElementNS(SVG_NAMESPACE, name);
+    for (const [key, value] of Object.entries(attributes)) {
+      element.setAttribute(key, String(value));
+    }
+    return element;
+  }
+
+  function zoneEfficiencyClass(row) {
+    if (!row?.attempted) return 'empty';
+    if (row.pointsPerAttempt < 0.8) return 'low';
+    if (row.pointsPerAttempt < 1.1) return 'medium';
+    return 'high';
+  }
+
+  function zoneLabel(row) {
+    if (!row?.attempted) return '0/0 · —';
+    return `${row.made}/${row.attempted} · ${formatPercentage(row.percentage)}`;
+  }
+
+  function renderShotZones(report) {
+    shotZonePlot.innerHTML = '';
+    shotZoneNoLocation.innerHTML = '';
+    const court = createShotCourtDiagram(documentObject, {
+      class: 'shot-chart-court',
+      'aria-hidden': 'true',
+      focusable: 'false'
+    });
+    const rows = new Map(report.dimensions.zone.map(row => [row.key, row]));
+    const renderId = ++shotZoneRenderSequence;
+    const maskIds = {
+      aboveBreak: `shotZoneAboveBreakMask${renderId}`,
+      longMidrange: `shotZoneLongMidrangeMask${renderId}`,
+      shortMidrange: `shotZoneShortMidrangeMask${renderId}`,
+      paint: `shotZonePaintMask${renderId}`
+    };
+    const defs = createSvgElement('defs');
+    const aboveBreakMask = createSvgElement('mask', {
+      id: maskIds.aboveBreak,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    aboveBreakMask.append(
+      createSvgElement('rect', { x: 0, y: 140, width: 500, height: 330, fill: 'white' }),
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 237.5, fill: 'black' })
+    );
+    const longMidrangeMask = createSvgElement('mask', {
+      id: maskIds.longMidrange,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    longMidrangeMask.append(
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 237.5, fill: 'white' }),
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 150, fill: 'black' }),
+      createSvgElement('rect', { x: 170, y: 0, width: 160, height: 190, fill: 'black' }),
+      createSvgElement('rect', { x: 0, y: 0, width: 30, height: 140, fill: 'black' }),
+      createSvgElement('rect', { x: 470, y: 0, width: 30, height: 140, fill: 'black' })
+    );
+    const shortMidrangeMask = createSvgElement('mask', {
+      id: maskIds.shortMidrange,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    shortMidrangeMask.append(
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 150, fill: 'white' }),
+      createSvgElement('rect', { x: 170, y: 0, width: 160, height: 190, fill: 'black' })
+    );
+    const paintMask = createSvgElement('mask', {
+      id: maskIds.paint,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    paintMask.append(
+      createSvgElement('rect', { x: 170, y: 0, width: 160, height: 190, fill: 'white' }),
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 40, fill: 'black' })
+    );
+    defs.append(aboveBreakMask, longMidrangeMask, shortMidrangeMask, paintMask);
+    const regions = createSvgElement('g', { class: 'shot-zone-regions' });
+    const regionDefinitions = [
+      ['above_break_three_left', 'rect', { x: 0, y: 140, width: 200, height: 330, mask: `url(#${maskIds.aboveBreak})` }],
+      ['above_break_three_center', 'rect', { x: 200, y: 140, width: 100, height: 330, mask: `url(#${maskIds.aboveBreak})` }],
+      ['above_break_three_right', 'rect', { x: 300, y: 140, width: 200, height: 330, mask: `url(#${maskIds.aboveBreak})` }],
+      ['long_midrange', 'circle', { cx: 250, cy: 52.5, r: 237.5, mask: `url(#${maskIds.longMidrange})` }],
+      ['short_midrange', 'circle', { cx: 250, cy: 52.5, r: 150, mask: `url(#${maskIds.shortMidrange})` }],
+      ['paint_non_restricted', 'rect', { x: 170, y: 0, width: 160, height: 190, mask: `url(#${maskIds.paint})` }],
+      ['restricted_area', 'circle', { cx: 250, cy: 52.5, r: 40 }],
+      ['left_corner_three', 'rect', { x: 0, y: 0, width: 30, height: 140 }],
+      ['right_corner_three', 'rect', { x: 470, y: 0, width: 30, height: 140 }]
+    ];
+    for (const [key, shape, attributes] of regionDefinitions) {
+      const row = rows.get(key);
+      const region = createSvgElement(shape, {
+        ...attributes,
+        class: `shot-zone-region ${zoneEfficiencyClass(row)}`,
+        'data-shot-zone-region': key,
+        style: `--zone-opacity:${Math.min(0.72, 0.24 + (row?.attempted || 0) * 0.08)}`
+      });
+      regions.appendChild(region);
+    }
+    court.prepend(defs);
+    court.insertBefore(regions, court.children[2]);
+    shotZonePlot.appendChild(court);
+
+    const labelPositions = {
+      restricted_area: [50, 12],
+      paint_non_restricted: [50, 30],
+      short_midrange: [28, 35],
+      long_midrange: [72, 49],
+      left_corner_three: [8, 19],
+      right_corner_three: [92, 19],
+      above_break_three_left: [18, 72],
+      above_break_three_center: [50, 84],
+      above_break_three_right: [82, 72]
+    };
+    for (const [key, [left, top]] of Object.entries(labelPositions)) {
+      const row = rows.get(key);
+      const button = documentObject.createElement('button');
+      button.type = 'button';
+      button.className = `shot-zone-label ${zoneEfficiencyClass(row)}`;
+      button.dataset.shotZone = key;
+      if (row?.eventIds.length) button.dataset.sourceEventIds = row.eventIds.join(',');
+      button.disabled = !row?.attempted;
+      button.style.left = `${left}%`;
+      button.style.top = `${top}%`;
+      const name = SHOT_REPORT_DIMENSIONS[0].labels[key];
+      button.innerHTML = `<strong>${name}</strong><span>${zoneLabel(row)}</span>`;
+      button.setAttribute(
+        'aria-label',
+        row?.attempted
+          ? `${name}: ${row.made} made of ${row.attempted}, ${formatPercentage(row.percentage)}, ${row.pointsPerAttempt.toFixed(2)} points per attempt. Show source plays.`
+          : `${name}: no attempts.`
+      );
+      shotZonePlot.appendChild(button);
+    }
+
+    const noLocation = rows.get('__untagged__');
+    const noLocationButton = documentObject.createElement('button');
+    noLocationButton.type = 'button';
+    noLocationButton.className = 'secondary small';
+    noLocationButton.disabled = !noLocation?.attempted;
+    if (noLocation?.eventIds.length) {
+      noLocationButton.dataset.sourceEventIds = noLocation.eventIds.join(',');
+    }
+    noLocationButton.textContent = `No location: ${zoneLabel(noLocation)}`;
+    shotZoneNoLocation.appendChild(noLocationButton);
+  }
+
+  function renderShotSplits(report) {
+    shotSplitReports.innerHTML = '';
+    for (const dimension of SHOT_REPORT_DIMENSIONS.filter(item => item.key !== 'zone')) {
+      const section = documentObject.createElement('section');
+      section.className = 'shot-split-section';
+      section.dataset.shotDimension = dimension.key;
+      const heading = documentObject.createElement('h4');
+      heading.textContent = dimension.label;
+      const wrap = documentObject.createElement('div');
+      wrap.className = 'report-table-wrap';
+      const table = documentObject.createElement('table');
+      table.className = 'report-table shot-split-table';
+      const head = table.createTHead().insertRow();
+      for (const label of [dimension.label, 'Made', 'Attempts', 'FG%', 'PPA']) {
+        const cell = documentObject.createElement('th');
+        cell.scope = 'col';
+        cell.textContent = label;
+        head.appendChild(cell);
+      }
+      const body = table.createTBody();
+      for (const rowData of report.dimensions[dimension.key]) {
+        const row = body.insertRow();
+        row.dataset.shotBucket = rowData.key;
+        const label = documentObject.createElement('th');
+        label.scope = 'row';
+        label.textContent = rowData.label;
+        row.appendChild(label);
+        addCell(row, rowData.made);
+        addCell(row, sourceValue(rowData.attempted, rowData.eventIds, 'shot-split-source'));
+        addCell(row, formatPercentage(rowData.percentage));
+        addCell(row, rowData.pointsPerAttempt == null ? '—' : rowData.pointsPerAttempt.toFixed(2));
+      }
+      wrap.appendChild(table);
+      section.append(heading, wrap);
+      shotSplitReports.appendChild(section);
+    }
+  }
+
+  function renderShots() {
+    const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
+    const report = buildShotReport(game, shotReportFilters());
+    const percentage = formatPercentage(report.percentage);
+    const missingLocations = report.attempted - report.plottedEvents.length;
+    shotReportSummary.textContent = `${report.made}/${report.attempted} FG (${percentage}) · `
+      + `${report.pointsPerAttempt == null ? '—' : report.pointsPerAttempt.toFixed(2)} points per attempt · `
+      + `${report.plottedEvents.length} plotted · ${missingLocations} without location`;
+    renderShotChart(report, playersById);
+    renderShotZones(report);
+    renderShotSplits(report);
+  }
+
   function renderSources(eventIds = []) {
     sourceList.innerHTML = '';
     const byId = Object.fromEntries(game.events.map(event => [event.id, event]));
@@ -599,6 +932,16 @@ export function createReportController({
     const eventLink = event.target.closest('[data-report-event-id]');
     if (eventLink) seekToEvent(eventLink.dataset.reportEventId);
   });
+  shotReportSection.addEventListener('change', renderShots);
+  clearShotReportFilters.addEventListener('click', () => {
+    shotReportResult.value = SHOT_REPORT_ANY;
+    shotReportPeriod.value = SHOT_REPORT_ANY;
+    shotReportPressure.value = SHOT_REPORT_ANY;
+    shotReportPhase.value = SHOT_REPORT_ANY;
+    shotReportContext.value = SHOT_REPORT_ANY;
+    shotReportCreation.value = SHOT_REPORT_ANY;
+    renderShots();
+  });
   feedbackPlayer.addEventListener('change', renderFeedback);
   previousFeedbackButton.addEventListener('click', () => moveFeedbackMoment(-1));
   nextFeedbackButton.addEventListener('click', () => moveFeedbackMoment(1));
@@ -626,6 +969,9 @@ export function createReportController({
       finalScore.textContent = `${analysis.report.score.team}–${analysis.report.score.opponent}`;
       renderComparison();
       renderPlayers(playersById);
+      renderShotScopeOptions();
+      renderShotPeriodOptions();
+      renderShots();
       renderFeedback();
       renderLineups(playersById);
       renderProgression();

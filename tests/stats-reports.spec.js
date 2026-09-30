@@ -143,6 +143,96 @@ test('linked report values expose source events and seek to the expected play', 
   expect(await page.evaluate(() => window.__statsFakePlayer.calls.at(-1))).toEqual(['seek', 125]);
 });
 
+test('shot analysis plots locations, separates duplicates, filters, and links source plays', async ({ page }) => {
+  await openFixtureReport(page);
+  await page.evaluate(async () => {
+    const game = (await window.__statsApp.store.listGames())[0];
+    game.events.find(event => event.id === 'e1').shotDetails = {
+      location: { x: 0.5, y: 0.1117 },
+      pressure: 'open',
+      phase: 'half_court',
+      contexts: ['second_chance'],
+      creation: 'cut'
+    };
+    game.events.find(event => event.id === 'e5').shotDetails = {
+      pressure: 'contested',
+      phase: 'transition',
+      creation: 'pull_up'
+    };
+    game.events.find(event => event.id === 'e8').shotDetails = {
+      location: { x: 0.5, y: 0.1117 },
+      pressure: 'open',
+      phase: 'half_court',
+      creation: 'cut'
+    };
+    const periodMarker = game.events.find(event => event.id === 'e14');
+    periodMarker.type = 'period_end';
+    periodMarker.side = 'system';
+    periodMarker.playerId = null;
+    periodMarker.videoSeconds = 145;
+    periodMarker.periodLabel = 'Halftime';
+    delete periodMarker.note;
+    await window.__statsApp.store.saveGame(game);
+    await window.__statsApp.setupController.openGame(game.id);
+  });
+
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('2/3 FG (66.7%) · 1.67 points per attempt · 2 plotted · 1 without location');
+  await expect(page.locator('#shotChartPlot .shot-chart-marker')).toHaveCount(2);
+  await expect(page.locator('#shotChartPlot .shot-chart-marker.made')).toHaveCount(2);
+  const offsets = await page.locator('#shotChartPlot .shot-chart-marker').evaluateAll(markers =>
+    markers.map(marker => [
+      marker.style.getPropertyValue('--shot-offset-x'),
+      marker.style.getPropertyValue('--shot-offset-y')
+    ])
+  );
+  expect(offsets[0]).not.toEqual(offsets[1]);
+
+  await expect(page.locator('#shotZonePlot [data-shot-zone]')).toHaveCount(9);
+  await expect(page.locator('#shotZonePlot [data-shot-zone="restricted_area"]'))
+    .toContainText('Restricted area2/2 · 100%');
+  await expect(page.locator('#shotZonePlot [data-shot-zone-region="restricted_area"]'))
+    .toHaveClass(/high/);
+  await expect(page.locator('#shotZonePlot mask')).toHaveCount(4);
+  await expect(page.locator('#shotZonePlot [data-shot-zone-region="long_midrange"]'))
+    .toHaveAttribute('mask', /^url\(#shotZoneLongMidrangeMask\d+\)$/);
+  await expect(page.locator('#shotZonePlot [data-shot-zone-region="short_midrange"]'))
+    .toHaveAttribute('mask', /^url\(#shotZoneShortMidrangeMask\d+\)$/);
+  await expect(page.locator('#shotZonePlot [data-shot-zone-region="paint_non_restricted"]'))
+    .toHaveAttribute('mask', /^url\(#shotZonePaintMask\d+\)$/);
+  await expect(page.locator('#shotZoneNoLocation')).toContainText('No location: 0/1 · 0%');
+
+  await expect(page.locator('#shotReportPeriod option')).toHaveText([
+    'All periods',
+    'Period 1 — Halftime',
+    'Period 2'
+  ]);
+  await page.locator('#shotReportPeriod').selectOption('1');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('1/2 FG (50%) · 1.00 points per attempt · 1 plotted · 1 without location');
+  await expect(page.locator('#shotChartPlot .shot-chart-marker')).toHaveCount(1);
+  await page.locator('#shotReportPeriod').selectOption('__any__');
+
+  await page.locator('#shotReportContext').selectOption('__untagged__');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('1/2 FG (50%) · 1.50 points per attempt · 1 plotted · 1 without location');
+  await expect(page.locator('#shotChartPlot .shot-chart-marker')).toHaveCount(1);
+
+  await page.locator('#shotReportScope').selectOption('player:p1');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('0/0 FG (—) · — points per attempt · 0 plotted · 0 without location');
+  await page.locator('#clearShotReportFilters').click();
+  await expect(page.locator('#shotReportPeriod')).toHaveValue('__any__');
+  await expect(page.locator('#shotReportSummary'))
+    .toHaveText('1/1 FG (100%) · 2.00 points per attempt · 1 plotted · 0 without location');
+
+  await page.locator('#shotReportScope').selectOption('team');
+  await page.locator('#shotZonePlot [data-shot-zone="restricted_area"]').click();
+  await expect(page.locator('#reportSourceList [data-report-event-id]')).toHaveCount(2);
+  await page.locator('#shotChartPlot [data-report-event-id="e8"]').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls.at(-1))).toEqual(['seek', 150]);
+});
+
 test('report navigation explains when the recording is unavailable', async ({ page }) => {
   await openFixtureReport(page, { playerFails: true });
   await page.locator('#scoreProgression [data-report-event-id]').first().click();

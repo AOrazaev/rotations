@@ -1,4 +1,4 @@
-import { validateGame } from './game-model.js';
+import { GAME_SCHEMA_VERSION, validateGame } from './game-model.js';
 import { parseYouTubeVideoId } from './youtube-player.js';
 import { consumePlannerHandoff } from './roster-transfer.js';
 import {
@@ -44,7 +44,7 @@ export function buildGameFromSetup({
 }) {
   const videoId = parseYouTubeVideoId(videoUrl);
   const game = {
-    schemaVersion: 1,
+    schemaVersion: GAME_SCHEMA_VERSION,
     id,
     title: String(title || '').trim(),
     opponentName: String(opponentName || '').trim(),

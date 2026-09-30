@@ -1,6 +1,6 @@
 import {
   GameValidationError,
-  validateGame
+  normalizeGame
 } from './game-model.js';
 
 export const STATS_DATABASE_NAME = 'basketball-stats';
@@ -53,10 +53,6 @@ function deleteStoredKey(store, gameId) {
       deletion.onerror = () => reject(deletion.error || new Error('IndexedDB delete failed.'));
     };
   });
-}
-
-function clone(value) {
-  return structuredClone(value);
 }
 
 function migrateDatabase(database, transaction, oldVersion) {
@@ -136,12 +132,12 @@ export class GameStore {
   }
 
   async saveGame(game) {
-    validateGame(game);
+    const normalized = normalizeGame(game);
     const database = await this.open();
     const transaction = database.transaction(GAMES_STORE, 'readwrite');
     const completion = transactionComplete(transaction);
     try {
-      const result = await requestResult(transaction.objectStore(GAMES_STORE).put(clone(game)));
+      const result = await requestResult(transaction.objectStore(GAMES_STORE).put(normalized));
       await completion;
       return result;
     } catch (error) {
@@ -168,12 +164,11 @@ export class GameStore {
     }
     if (game === undefined) return null;
     try {
-      validateGame(game);
+      return normalizeGame(game);
     } catch (error) {
       if (error instanceof GameValidationError) throw new StoredGameCorruptionError(gameId, error.issues);
       throw error;
     }
-    return clone(game);
   }
 
   async listGames() {
@@ -191,16 +186,16 @@ export class GameStore {
       });
     }
 
+    const normalizedGames = [];
     for (const game of games) {
       try {
-        validateGame(game);
+        normalizedGames.push(normalizeGame(game));
       } catch (error) {
         if (error instanceof GameValidationError) throw new StoredGameCorruptionError(game?.id || '(unknown)', error.issues);
         throw error;
       }
     }
-    return games
-      .map(clone)
+    return normalizedGames
       .sort((a, b) => Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt))
         || Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
         || a.id.localeCompare(b.id));

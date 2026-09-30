@@ -6,7 +6,9 @@ test.beforeEach(async ({ page }) => {
 
 async function runWithFixture(page, callbackSource) {
   return page.evaluate(async source => {
-    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const legacyGame = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const { normalizeGame } = await import('/stats/js/game-model.js');
+    const game = normalizeGame(legacyGame);
     const storeModule = await import('/stats/js/game-store.js');
     const databaseName = `basketball-stats-test-${crypto.randomUUID()}`;
     const store = new storeModule.GameStore({ databaseName });
@@ -30,7 +32,11 @@ test('save and read survive closing and reopening the store', async ({ page }) =
     return { firstRead, secondRead };
   }`);
 
-  const fixture = await page.evaluate(() => fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json()));
+  const fixture = await page.evaluate(async () => {
+    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const { normalizeGame } = await import('/stats/js/game-model.js');
+    return normalizeGame(game);
+  });
   expect(result.firstRead).toEqual(fixture);
   expect(result.secondRead).toEqual(fixture);
 });
@@ -38,7 +44,9 @@ test('save and read survive closing and reopening the store', async ({ page }) =
 test('saved games survive a browser page reload', async ({ page }) => {
   const databaseName = `basketball-stats-reload-${Date.now()}-${Math.random()}`;
   const fixture = await page.evaluate(async name => {
-    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const legacyGame = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const { normalizeGame } = await import('/stats/js/game-model.js');
+    const game = normalizeGame(legacyGame);
     const { GameStore } = await import('/stats/js/game-store.js');
     const store = new GameStore({ databaseName: name });
     await store.saveGame(game);
@@ -184,7 +192,13 @@ test('version-one databases migrate to the current version without losing games'
       const loaded = await store.getGame(game.id);
       const database = await store.open();
       const inspection = database.transaction('games', 'readonly');
-      const hasUpdatedAtIndex = inspection.objectStore('games').indexNames.contains('updatedAt');
+      const objectStore = inspection.objectStore('games');
+      const hasUpdatedAtIndex = objectStore.indexNames.contains('updatedAt');
+      const storedGame = await new Promise((resolve, reject) => {
+        const request = objectStore.get(game.id);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
       await new Promise((resolve, reject) => {
         inspection.oncomplete = resolve;
         inspection.onerror = () => reject(inspection.error);
@@ -192,6 +206,7 @@ test('version-one databases migrate to the current version without losing games'
       });
       return {
         loaded,
+        storedSchemaVersion: storedGame.schemaVersion,
         version: database.version,
         hasUpdatedAtIndex,
         expectedVersion: STATS_DATABASE_VERSION
@@ -203,6 +218,8 @@ test('version-one databases migrate to the current version without losing games'
   });
 
   expect(result.loaded.id).toBe('game-representative-v1');
+  expect(result.loaded.schemaVersion).toBe(2);
+  expect(result.storedSchemaVersion).toBe(1);
   expect(result.version).toBe(result.expectedVersion);
   expect(result.hasUpdatedAtIndex).toBe(true);
 });
@@ -236,7 +253,9 @@ test('storage initialization failures expose an actionable error code', async ({
 
 test('game backups round-trip exact validated snapshots and reject invalid envelopes', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const legacyGame = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const { normalizeGame } = await import('/stats/js/game-model.js');
+    const game = normalizeGame(legacyGame);
     const {
       createGameBackup,
       parseGameBackup,
@@ -268,7 +287,11 @@ test('game backups round-trip exact validated snapshots and reject invalid envel
     };
   });
 
-  const fixture = await page.evaluate(() => fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json()));
+  const fixture = await page.evaluate(async () => {
+    const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
+    const { normalizeGame } = await import('/stats/js/game-model.js');
+    return normalizeGame(game);
+  });
   expect(result.backup).toMatchObject({
     backupVersion: 1,
     application: 'basketball-stats',

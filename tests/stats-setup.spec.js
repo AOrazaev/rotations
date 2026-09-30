@@ -164,7 +164,7 @@ test('export, delete, and import recover an identical game and report', async ({
     const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
     await window.__statsApp.store.saveGame(game);
     await window.__statsApp.setupController.refreshGames();
-    return game;
+    return window.__statsApp.store.getGame(game.id);
   });
 
   const downloadPromise = page.waitForEvent('download');
@@ -200,7 +200,7 @@ test('invalid and conflicting backup imports preserve existing games', async ({ 
     const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
     await window.__statsApp.store.saveGame(game);
     await window.__statsApp.setupController.refreshGames();
-    return game;
+    return window.__statsApp.store.getGame(game.id);
   });
 
   const invalidBackup = {
@@ -238,7 +238,7 @@ test('games can be archived and restored without changing their contents', async
     const game = await fetch('/stats/docs/fixtures/representative-game-v1.json').then(response => response.json());
     await window.__statsApp.store.saveGame(game);
     await window.__statsApp.setupController.refreshGames();
-    return game;
+    return window.__statsApp.store.getGame(game.id);
   });
 
   await page.locator('[data-action="archive-game"]').click();

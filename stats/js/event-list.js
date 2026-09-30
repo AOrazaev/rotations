@@ -2,6 +2,13 @@ import {
   getLineupAtEventPosition,
   orderGameEvents
 } from './game-model.js';
+import { createShotDetailsEditor } from './shot-details-editor.js';
+import { getConfidentExpectedShotValue } from './shot-geometry.js';
+import {
+  getShotDetailBadges,
+  getShotDetailFacets,
+  UNTAGGED_SHOT_DETAIL
+} from './shot-details.js';
 import { formatVideoTime } from './youtube-player.js';
 
 const PREVIEW_SECONDS = 3;
@@ -61,6 +68,8 @@ export function createEventListController({
   const shotFields = documentObject.querySelector('#editShotFields');
   const shotValueInput = documentObject.querySelector('#editShotValue');
   const shotMadeInput = documentObject.querySelector('#editShotMade');
+  const shotDetailsFields = documentObject.querySelector('#editShotDetailsFields');
+  const shotDetailsHost = documentObject.querySelector('#editShotDetails');
   const reboundFields = documentObject.querySelector('#editReboundFields');
   const reboundKindInput = documentObject.querySelector('#editReboundKind');
   const substitutionFields = documentObject.querySelector('#editSubstitutionFields');
@@ -107,8 +116,17 @@ export function createEventListController({
     types: new Set(),
     players: new Set(),
     teamMention: false,
-    comment: 'any'
+    comment: 'any',
+    shotZones: new Set(),
+    shotPressures: new Set(),
+    shotPhases: new Set(),
+    shotContexts: new Set(),
+    shotCreations: new Set()
   };
+  const shotDetailsEditor = readOnly ? null : createShotDetailsEditor({
+    element: shotDetailsHost,
+    documentObject
+  });
 
   function setEditError(message = '') {
     editError.textContent = message;
@@ -131,6 +149,9 @@ export function createEventListController({
 
   function updateDependentFields() {
     shotFields.classList.toggle('hidden', typeInput.value !== 'shot');
+    const isFieldGoal = typeInput.value === 'shot' && ['2', '3'].includes(shotValueInput.value);
+    shotDetailsFields.classList.toggle('hidden', !isFieldGoal);
+    if (isFieldGoal) shotDetailsEditor.setShotValue(Number(shotValueInput.value));
     reboundFields.classList.toggle('hidden', typeInput.value !== 'rebound');
     substitutionFields.classList.toggle('hidden', typeInput.value !== 'substitution');
     periodEndFields.classList.toggle('hidden', typeInput.value !== 'period_end');
@@ -157,7 +178,12 @@ export function createEventListController({
     return Number(filters.sides.size > 0)
       + Number(filters.types.size > 0)
       + Number(filters.players.size > 0 || filters.teamMention)
-      + Number(filters.comment !== 'any');
+      + Number(filters.comment !== 'any')
+      + Number(filters.shotZones.size > 0)
+      + Number(filters.shotPressures.size > 0)
+      + Number(filters.shotPhases.size > 0)
+      + Number(filters.shotContexts.size > 0)
+      + Number(filters.shotCreations.size > 0);
   }
 
   function updateFilterButton() {
@@ -252,6 +278,11 @@ export function createEventListController({
   function syncFilterForm() {
     setCheckedValues('filterSide', filters.sides);
     setCheckedValues('filterType', filters.types);
+    setCheckedValues('filterShotZone', filters.shotZones);
+    setCheckedValues('filterShotPressure', filters.shotPressures);
+    setCheckedValues('filterShotPhase', filters.shotPhases);
+    setCheckedValues('filterShotContext', filters.shotContexts);
+    setCheckedValues('filterShotCreation', filters.shotCreations);
     populateFilterPlayers();
     filterTeamMention.checked = filters.teamMention;
     const comment = filterForm.querySelector(`input[name="filterComment"][value="${filters.comment}"]`);
@@ -272,6 +303,24 @@ export function createEventListController({
     const hasComment = Boolean(String(event.coachComment || '').trim());
     if (filters.comment === 'with' && !hasComment) return false;
     if (filters.comment === 'without' && hasComment) return false;
+    const hasShotFilters = filters.shotZones.size
+      || filters.shotPressures.size
+      || filters.shotPhases.size
+      || filters.shotContexts.size
+      || filters.shotCreations.size;
+    if (hasShotFilters) {
+      if (event.type !== 'shot' || ![2, 3].includes(event.shotValue)) return false;
+      const facets = getShotDetailFacets(event);
+      const matchesValue = (selected, value) => !selected.size
+        || selected.has(value || UNTAGGED_SHOT_DETAIL);
+      const contextValues = facets.contexts.length ? facets.contexts : [UNTAGGED_SHOT_DETAIL];
+      if (!matchesValue(filters.shotZones, facets.zone)) return false;
+      if (!matchesValue(filters.shotPressures, facets.pressure)) return false;
+      if (!matchesValue(filters.shotPhases, facets.phase)) return false;
+      if (filters.shotContexts.size
+        && !contextValues.some(context => filters.shotContexts.has(context))) return false;
+      if (!matchesValue(filters.shotCreations, facets.creation)) return false;
+    }
     return true;
   }
 
@@ -340,6 +389,8 @@ export function createEventListController({
     else playerInput.innerHTML = '<option value="">Not applicable</option>';
     shotValueInput.value = String(event.shotValue || 2);
     shotMadeInput.value = String(event.made ?? true);
+    shotDetailsEditor.setShotValue(event.shotValue || 2);
+    shotDetailsEditor.setDetails(event.shotDetails || null);
     reboundKindInput.value = event.reboundKind || 'defensive';
     periodLabelInput.value = event.periodLabel || '';
     noteInput.value = event.note || '';
@@ -381,6 +432,17 @@ export function createEventListController({
       const description = describeEvent(event, playersById, scoreByEventId.get(event.id));
       item.querySelector('.event-description').textContent = description;
       item.querySelector('.event-description').title = description;
+      const detailBadges = item.querySelector('.event-detail-badges');
+      const badges = getShotDetailBadges(event);
+      for (const badge of badges) {
+        const badgeItem = documentObject.createElement('li');
+        badgeItem.className = 'event-detail-badge';
+        badgeItem.dataset.shotDetailKind = badge.kind;
+        badgeItem.dataset.value = badge.value;
+        badgeItem.textContent = badge.label;
+        detailBadges.appendChild(badgeItem);
+      }
+      detailBadges.classList.toggle('hidden', !badges.length);
       const comment = String(event.coachComment || '').trim();
       const commentBlock = item.querySelector('.coach-comment');
       item.classList.toggle('has-comment', !!comment);
@@ -443,6 +505,7 @@ export function createEventListController({
       if (sideInput.value === 'opponent') playerInput.value = '';
     });
     typeInput.addEventListener('change', updateDependentFields);
+    shotValueInput.addEventListener('change', updateDependentFields);
     cancelButton.addEventListener('click', () => dialog.close());
   }
   orderButton.addEventListener('click', () => {
@@ -469,7 +532,12 @@ export function createEventListController({
       types: new Set(),
       players: new Set(),
       teamMention: false,
-      comment: 'any'
+      comment: 'any',
+      shotZones: new Set(),
+      shotPressures: new Set(),
+      shotPhases: new Set(),
+      shotContexts: new Set(),
+      shotCreations: new Set()
     };
     syncFilterForm();
     render(game);
@@ -481,7 +549,12 @@ export function createEventListController({
       types: checkedValues('filterType'),
       players: checkedValues('filterPlayer'),
       teamMention: filterTeamMention.checked,
-      comment: filterForm.querySelector('input[name="filterComment"]:checked')?.value || 'any'
+      comment: filterForm.querySelector('input[name="filterComment"]:checked')?.value || 'any',
+      shotZones: checkedValues('filterShotZone'),
+      shotPressures: checkedValues('filterShotPressure'),
+      shotPhases: checkedValues('filterShotPhase'),
+      shotContexts: checkedValues('filterShotContext'),
+      shotCreations: checkedValues('filterShotCreation')
     };
     filterDialog.close();
     render(game);
@@ -551,10 +624,17 @@ export function createEventListController({
       try {
         const next = structuredClone(game);
         const edited = next.events.find(item => item.id === editingEventId);
+        const shotDetails = shotDetailsEditor.getDetails();
+        const remainsFieldGoal = typeInput.value === 'shot' && ['2', '3'].includes(shotValueInput.value);
+        if (shotDetails && !remainsFieldGoal
+          && !confirmFn('Changing this event will remove its shot details. Continue?')) {
+          return;
+        }
         edited.videoSeconds = editingSeconds;
         edited.updatedAt = now();
         delete edited.shotValue;
         delete edited.made;
+        delete edited.shotDetails;
         delete edited.reboundKind;
         delete edited.playerOutId;
         delete edited.playerInId;
@@ -591,8 +671,18 @@ export function createEventListController({
           if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
           edited.type = typeInput.value;
           if (edited.type === 'shot') {
-            edited.shotValue = Number(shotValueInput.value);
+            let shotValue = Number(shotValueInput.value);
+            if ([2, 3].includes(shotValue) && shotDetails?.location) {
+              const expectedShotValue = getConfidentExpectedShotValue(shotDetails.location);
+              if (expectedShotValue && expectedShotValue !== shotValue
+                && confirmFn(`This location is in the ${expectedShotValue}PT area, but the event is recorded as ${shotValue}PT. Change the event to ${expectedShotValue}PT?`)) {
+                shotValue = expectedShotValue;
+                shotValueInput.value = String(shotValue);
+              }
+            }
+            edited.shotValue = shotValue;
             edited.made = shotMadeInput.value === 'true';
+            if ([2, 3].includes(shotValue) && shotDetails) edited.shotDetails = shotDetails;
           } else if (edited.type === 'rebound') {
             edited.reboundKind = reboundKindInput.value;
           }
@@ -617,6 +707,7 @@ export function createEventListController({
     render,
     destroy() {
       unsubscribeTime();
+      shotDetailsEditor?.destroy();
       if (!followPlayback) return;
       timelineScrollContainer.removeEventListener('wheel', pausePlaybackFollowing);
       timelineScrollContainer.removeEventListener('touchstart', pausePlaybackFollowing);
