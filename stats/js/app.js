@@ -3,9 +3,16 @@ import {
   formatVideoTime,
   parseYouTubeVideoId
 } from './youtube-player.js';
-import { GameStore } from './game-store.js';
+import {
+  GameStore,
+  StoredGameCorruptionError
+} from './game-store.js';
 import { createGameSetupController } from './game-setup.js';
 import { createEventEntryController } from './event-entry.js';
+import {
+  buildReviewUrl,
+  parseStatsRoute
+} from './review-route.js';
 
 export function createStatsSpikeApp({
   documentObject = document,
@@ -184,6 +191,14 @@ export function createStatsSpikeApp({
 
 const playerFactory = window.__STATS_PLAYER_FACTORY__ || createYouTubePlayer;
 const videoController = createStatsSpikeApp({ playerFactory });
+const route = parseStatsRoute(location.search);
+const reviewMode = route.mode === 'review';
+const reviewModeHeader = document.querySelector('#reviewModeHeader');
+const reviewModeTitle = document.querySelector('#reviewModeTitle');
+const reviewModeOpponent = document.querySelector('#reviewModeOpponent');
+const reviewRouteState = document.querySelector('#reviewRouteState');
+const reviewRouteTitle = document.querySelector('#reviewRouteTitle');
+const reviewRouteMessage = document.querySelector('#reviewRouteMessage');
 const statsShell = document.querySelector('#statsShell');
 const gamePanel = document.querySelector('#gamePanel');
 const hideGamePanelButton = document.querySelector('#hideGamePanel');
@@ -276,6 +291,64 @@ const store = new GameStore({
   databaseName: window.__STATS_DATABASE_NAME__ || 'basketball-stats'
 });
 let setupController;
+
+function openGameWorkspace(game) {
+  document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
+  videoController.loadVideo(game.video.sourceUrl);
+  eventController.setGame(game);
+}
+
+function showReviewRouteState(title, message) {
+  reviewModeHeader.classList.add('hidden');
+  statsShell.classList.add('hidden');
+  reviewRouteTitle.textContent = title;
+  reviewRouteMessage.textContent = message;
+  reviewRouteState.classList.remove('hidden');
+}
+
+async function initializeReviewMode() {
+  document.body.classList.add('review-mode');
+  if (route.status === 'missing-game') {
+    showReviewRouteState('Select a game to review', 'This review link does not identify a saved game.');
+    return;
+  }
+  if (route.status === 'invalid-game') {
+    showReviewRouteState('Invalid review link', 'The game identifier in this review link is invalid.');
+    return;
+  }
+
+  let game;
+  try {
+    game = await store.getGame(route.gameId);
+  } catch (error) {
+    if (error instanceof StoredGameCorruptionError) {
+      showReviewRouteState('Game cannot be reviewed', 'The saved game is invalid and cannot be reviewed safely.');
+    } else {
+      showReviewRouteState('Local storage unavailable', error.message || 'The saved game could not be read.');
+    }
+    return;
+  }
+  if (!game) {
+    showReviewRouteState('Game not found', 'This game is not available in this browser.');
+    return;
+  }
+  if (game.archivedAt) {
+    showReviewRouteState('Game is archived', `${game.title} must be restored in the normal stats workspace before reviewing it.`);
+    return;
+  }
+
+  const canonicalUrl = buildReviewUrl(game.id, location.pathname);
+  if (`${location.pathname}${location.search}` !== canonicalUrl) {
+    history.replaceState({}, '', canonicalUrl);
+  }
+  reviewRouteState.classList.add('hidden');
+  reviewModeTitle.textContent = game.title;
+  reviewModeOpponent.textContent = game.opponentName ? `vs ${game.opponentName}` : 'No opponent';
+  reviewModeHeader.classList.remove('hidden');
+  statsShell.classList.remove('hidden');
+  openGameWorkspace(game);
+}
+
 const eventController = createEventEntryController({
   store,
   videoController,
@@ -288,13 +361,18 @@ const eventController = createEventEntryController({
 });
 setupController = createGameSetupController({
   store,
-  onGameOpened(game) {
-    document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
-    videoController.loadVideo(game.video.sourceUrl);
-    eventController.setGame(game);
-  }
+  initializeDraft: !reviewMode,
+  onGameOpened: openGameWorkspace,
+  onReviewRequested(gameId) {
+    location.assign(buildReviewUrl(gameId, location.pathname));
+  },
+});
+const ready = setupController.ready.then(() => {
+  if (reviewMode) return initializeReviewMode();
 });
 window.__statsApp = {
+  ready,
+  reviewMode,
   videoController,
   setupController,
   eventController,

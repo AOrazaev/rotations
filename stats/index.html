@@ -18,6 +18,21 @@
       <a class="nav-link" href="../">Rotation Planner</a>
     </header>
 
+    <section id="reviewModeHeader" class="card review-mode-header hidden" aria-labelledby="reviewModeTitle">
+      <div>
+        <p class="eyebrow">Read-only review</p>
+        <h2 id="reviewModeTitle"></h2>
+        <p id="reviewModeOpponent" class="subtitle"></p>
+      </div>
+      <a class="nav-link" href="./">Exit review</a>
+    </section>
+
+    <section id="reviewRouteState" class="card review-route-state hidden" aria-labelledby="reviewRouteTitle">
+      <h2 id="reviewRouteTitle">Review unavailable</h2>
+      <p id="reviewRouteMessage"></p>
+      <a class="nav-link" href="./">Exit review</a>
+    </section>
+
     <div id="statsShell" class="app-shell">
       <button id="showGamePanel" class="sidebar-reopen hidden" type="button" aria-controls="gamePanel" aria-expanded="false">Games</button>
       <aside id="gamePanel" class="panel-stack side-panel game-panel">
@@ -557,6 +572,7 @@
         <span class="game-list-detail"></span>
       </div>
       <div class="marker-actions">
+        <button class="primary small" type="button" data-action="view-game">View</button>
         <button class="secondary small" type="button" data-action="open-game">Open</button>
         <button class="secondary small" type="button" data-action="export-game">Export</button>
         <button class="secondary small" type="button" data-action="archive-game">Archive</button>

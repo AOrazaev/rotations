@@ -126,6 +126,8 @@ Verification:
 
 ### Milestone 1: Entry and routing
 
+**Status: complete.** Active games expose a Review view action backed by `stats/js/review-route.js`. The stats bootstrap loads validated browser-local games directly from `/stats/?mode=review&game=<game-id>`, preserves the route across reloads, isolates planner imports, and provides explicit missing, invalid, unknown, corrupt, and archived-game states with an Exit review path. Coverage lives in `tests/stats-review-routing.spec.js`.
+
 Deliver:
 
 - A **View** action for eligible saved games.

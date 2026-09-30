@@ -19,6 +19,7 @@ test('creates a standalone game and reopens it after page reload', async ({ page
 
   await expect(page.locator('#gamesStatus')).toContainText('Saved Sunday scrimmage');
   await expect(page.locator('.game-list-item')).toHaveCount(1);
+  await expect(page.locator('[data-action="view-game"]')).toHaveAttribute('aria-label', 'View Sunday scrimmage');
   await expect(page.locator('[data-action="open-game"]')).toHaveAttribute('aria-label', 'Open Sunday scrimmage');
   await expect(page.locator('[data-action="export-game"]')).toHaveAttribute('aria-label', 'Export Sunday scrimmage');
   await expect(page.locator('[data-action="archive-game"]')).toHaveAttribute('aria-label', 'Archive Sunday scrimmage');
