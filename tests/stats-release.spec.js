@@ -12,7 +12,8 @@ async function reportSnapshot(page) {
     teams: [...document.querySelectorAll('#teamComparisonBody tr')].map(row => row.textContent),
     players: [...document.querySelectorAll('#playerReportBody tr')].map(row => row.textContent),
     lineups: [...document.querySelectorAll('#lineupReportBody tr')].map(row => row.textContent),
-    progression: [...document.querySelectorAll('#scoreProgression li')].map(item => item.textContent),
+    progression: [...document.querySelectorAll('#scoreProgression [data-report-event-id]')]
+      .map(item => item.getAttribute('aria-label')),
   }));
 }
 

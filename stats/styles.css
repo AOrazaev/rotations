@@ -264,6 +264,23 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .report-event-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .report-event-list li { display: flex; align-items: center; gap: 12px; padding: 9px 10px; background: #0f1727; border: 1px solid #202c43; border-radius: 10px; }
 .report-event-list .link-button { min-width: 58px; }
+.score-chart { display: grid; gap: 8px; width: min(100%, 600px); margin: 0 auto; padding: 10px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
+.score-chart-legend { display: flex; justify-content: center; gap: 18px; color: var(--muted); font-size: .78rem; font-weight: 700; }
+.score-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.score-chart-legend span::before { width: 10px; height: 3px; content: ""; border-radius: 999px; background: var(--accent2); }
+.score-chart-legend .opponent::before { background: var(--danger); }
+.score-chart-plot { position: relative; min-width: 0; }
+.score-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.score-chart-grid { stroke: rgba(154, 166, 198, .16); stroke-width: 1; }
+.score-chart-axis-label { fill: var(--muted); font-size: 11px; }
+.score-chart-period-line { stroke: rgba(232, 236, 255, .45); stroke-width: 1; stroke-dasharray: 5 4; }
+.score-chart-period-label { fill: var(--muted); font-size: 10px; font-weight: 700; }
+.score-chart-line { fill: none; stroke: var(--accent2); stroke-width: 3; stroke-linejoin: round; }
+.score-chart-line.opponent { stroke: var(--danger); }
+.score-chart-point { position: absolute; width: 18px; height: 18px; min-width: 0; padding: 0; transform: translate(-50%, -50%); background: transparent; border: 0; border-radius: 50%; box-shadow: none; }
+.score-chart-point::before { position: absolute; top: 50%; left: 50%; width: 7px; height: 7px; content: ""; transform: translate(-50%, -50%); background: var(--accent2); border-radius: 50%; }
+.score-chart-point.opponent::before { background: var(--danger); }
+.score-chart-point:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 .empty-state.compact { padding: 12px; }
 .source-plays { padding-top: 16px; border-top: 1px solid var(--line); }
 .event-side { display: flex; gap: 8px; margin-bottom: 12px; }

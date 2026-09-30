@@ -71,8 +71,59 @@ test('fixture report renders hand-calculated team, player, lineup, and progressi
   await expect(secondLineup.locator('.lineup-plus-minus')).toHaveText('+2');
   await expect(secondLineup.locator('.lineup-video-time')).toHaveText('1:00.0');
 
-  await expect(page.locator('#scoreProgression li')).toHaveCount(4);
-  await expect(page.locator('#scoreProgression li strong')).toHaveText(['2–0', '2–2', '5–2', '5–3']);
+  await expect(page.locator('#scoreProgression .score-chart-line')).toHaveCount(2);
+  await expect(page.locator('#scoreProgression .score-chart-point')).toHaveCount(4);
+  expect(await page.locator('#scoreProgression .score-chart-point').first().evaluate(point => ({
+    markerWidth: getComputedStyle(point, '::before').width,
+    borderWidth: getComputedStyle(point).borderWidth
+  }))).toEqual({ markerWidth: '7px', borderWidth: '0px' });
+  expect(await page.locator('#scoreProgression .score-chart-point').evaluateAll(points =>
+    points.map(point => point.getAttribute('aria-label'))
+  )).toEqual([
+    '1:50.0, Our team 2, Falcons 0',
+    '2:05.0, Our team 2, Falcons 2',
+    '2:30.0, Our team 5, Falcons 2',
+    '3:00.0, Our team 5, Falcons 3'
+  ]);
+  expect(await page.locator('#scoreProgression').evaluate(element =>
+    element.getBoundingClientRect().height
+  )).toBeLessThan(240);
+});
+
+test('score progression chart keeps the existing no-made-shots empty state', async ({ page }) => {
+  await openFixtureReport(page);
+  await page.evaluate(async () => {
+    const game = (await window.__statsApp.store.listGames())[0];
+    for (const event of game.events) {
+      if (event.type === 'shot') event.made = false;
+    }
+    await window.__statsApp.store.saveGame(game);
+    await window.__statsApp.setupController.openGame(game.id);
+  });
+
+  await expect(page.locator('#emptyScoreProgression')).toBeVisible();
+  await expect(page.locator('#scoreProgression')).toBeHidden();
+  await expect(page.locator('#reportFinalScore')).toHaveText('0–0');
+});
+
+test('score progression chart marks period ends with labeled vertical lines', async ({ page }) => {
+  await openFixtureReport(page);
+  await page.evaluate(async () => {
+    const game = (await window.__statsApp.store.listGames())[0];
+    const marker = game.events.find(event => event.id === 'e14');
+    marker.type = 'period_end';
+    marker.videoSeconds = 145;
+    marker.periodLabel = 'Halftime';
+    delete marker.note;
+    await window.__statsApp.store.saveGame(game);
+    await window.__statsApp.setupController.openGame(game.id);
+  });
+
+  await expect(page.locator('#scoreProgression .score-chart-period-line')).toHaveCount(1);
+  await expect(page.locator('#scoreProgression .score-chart-period-line')).toHaveAttribute('data-event-id', 'e14');
+  await expect(page.locator('#scoreProgression .score-chart-period-label')).toHaveText('Halftime');
+  await expect(page.locator('#scoreProgression .score-chart-period-line title'))
+    .toHaveText('Halftime at 2:25.0');
 });
 
 test('linked report values expose source events and seek to the expected play', async ({ page }) => {
@@ -87,13 +138,14 @@ test('linked report values expose source events and seek to the expected play', 
   await page.locator('#reportSourceList li[data-event-id="e8"] [data-report-event-id]').click();
   expect(await page.evaluate(() => window.__statsFakePlayer.calls.at(-1))).toEqual(['seek', 150]);
 
-  await page.locator('#scoreProgression li[data-event-id="e4"] [data-report-event-id]').click();
+  await page.locator('#scoreProgression [data-event-id="e4"]').focus();
+  await page.keyboard.press('Enter');
   expect(await page.evaluate(() => window.__statsFakePlayer.calls.at(-1))).toEqual(['seek', 125]);
 });
 
 test('report navigation explains when the recording is unavailable', async ({ page }) => {
   await openFixtureReport(page, { playerFails: true });
-  await page.locator('#scoreProgression li').first().locator('[data-report-event-id]').click();
+  await page.locator('#scoreProgression [data-report-event-id]').first().click();
   await expect(page.locator('#reportError')).toContainText('recording is unavailable for seeking');
 });
 
