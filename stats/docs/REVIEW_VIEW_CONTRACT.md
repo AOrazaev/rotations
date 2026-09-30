@@ -73,6 +73,7 @@ The timeline must not show comment, edit, delete, or undo controls.
 ### Player feedback
 
 - Player selector
+- Selected-player statistical summary
 - Player-attributed commented moments
 - Feedback selection checkboxes
 - Previous and next feedback navigation

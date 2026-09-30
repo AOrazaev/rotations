@@ -29,7 +29,8 @@ export function createReviewController({
   const reportController = createReportController({
     documentObject,
     videoController,
-    previewSeconds: 3
+    previewSeconds: 3,
+    playerReview: true
   });
   let game = null;
   let activeSection = 'team';

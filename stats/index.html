@@ -290,6 +290,12 @@
             <button id="copyYouTubeFeedback" class="secondary small" type="button">Copy for YouTube</button>
           </div>
         </div>
+        <dl id="feedbackPlayerSummary" class="player-review-summary hidden" aria-label="Selected player statistics"></dl>
+        <div id="feedbackMomentNavigation" class="feedback-moment-navigation hidden" aria-label="Feedback moment navigation">
+          <button id="previousFeedbackMoment" class="secondary small" type="button" aria-label="Previous feedback moment">Previous</button>
+          <strong id="feedbackMomentPosition" aria-live="polite">No feedback moments</strong>
+          <button id="nextFeedbackMoment" class="secondary small" type="button" aria-label="Next feedback moment">Next</button>
+        </div>
         <div id="emptyPlayerFeedback" class="empty-state compact">No coach-commented events for this player.</div>
         <ol id="playerFeedbackList" class="player-feedback-list"></ol>
         <p id="playerFeedbackStatus" class="message" role="status"></p>

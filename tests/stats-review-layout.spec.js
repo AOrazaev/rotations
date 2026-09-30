@@ -68,7 +68,16 @@ test('Review view uses video-first section navigation', async ({ page }) => {
   );
   expect(Math.abs(videoAndTimeline[0].y - videoAndTimeline[1].y)).toBeLessThan(2);
   expect(videoAndTimeline[0].width).toBeGreaterThan(videoAndTimeline[1].width);
-  expect(await page.locator('.capture-panel').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
+  expect(await page.locator('.capture-panel').evaluate(element => getComputedStyle(element).overflowY)).toBe('visible');
+  expect(await page.locator('#eventList').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
+  const headerTop = await page.locator('#eventLogPanel .section-head').evaluate(element =>
+    element.getBoundingClientRect().top
+  );
+  await page.locator('#eventList').evaluate(element => { element.scrollTop = element.scrollHeight; });
+  expect(await page.locator('#eventList').evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await page.locator('#eventLogPanel .section-head').evaluate(element =>
+    element.getBoundingClientRect().top
+  )).toBeCloseTo(headerTop, 1);
   await expect(page.locator('#videoResizeHandle')).toBeVisible();
   await page.locator('#decreaseVideoSize').click();
   await expect(page.locator('#videoSizeValue')).toHaveText('65%');
@@ -157,13 +166,13 @@ test('Review timeline follows playback and yields to manual scrolling', async ({
   await openReview(page);
   await page.evaluate(() => {
     window.__timelineScrolls = [];
-    const panel = document.querySelector('.capture-panel');
+    const panel = document.querySelector('#eventList');
     panel.scrollTo = options => window.__timelineScrolls.push(options);
     window.__statsFakePlayer.playing = true;
     window.__statsFakePlayer.current = 109;
   });
 
-  await expect(page.locator('[aria-current="true"]')).toHaveCount(0);
+  await expect(page.locator('#eventList [aria-current="true"]')).toHaveCount(0);
   await page.evaluate(() => { window.__statsFakePlayer.current = 110; });
   await expect(page.locator('.event-list-item[data-event-id="e1"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('.event-list-item[data-event-id="e1"]')).toHaveClass(/current-event/);
@@ -174,7 +183,7 @@ test('Review timeline follows playback and yields to manual scrolling', async ({
   await expect(page.locator('.event-list-item[data-event-id="e8"]')).not.toHaveAttribute('aria-current', 'true');
 
   const scrollCount = await page.evaluate(() => window.__timelineScrolls.length);
-  await page.locator('.capture-panel').dispatchEvent('wheel');
+  await page.locator('#eventList').dispatchEvent('wheel');
   await expect(page.locator('#followTimelinePlayback')).toBeVisible();
   await page.evaluate(() => { window.__statsFakePlayer.current = 170; });
   await expect(page.locator('.event-list-item[data-event-id="e11"]')).toHaveAttribute('aria-current', 'true');

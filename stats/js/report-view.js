@@ -46,7 +46,8 @@ function addCell(row, content, className = '') {
 export function createReportController({
   documentObject = document,
   videoController,
-  previewSeconds = 0
+  previewSeconds = 0,
+  playerReview = false
 }) {
   const reportCard = documentObject.querySelector('#reportCard');
   const finalScore = documentObject.querySelector('#reportFinalScore');
@@ -61,6 +62,11 @@ export function createReportController({
   const sourceEmpty = documentObject.querySelector('#reportSourceEmpty');
   const reportError = documentObject.querySelector('#reportError');
   const feedbackPlayer = documentObject.querySelector('#feedbackPlayer');
+  const feedbackSummary = documentObject.querySelector('#feedbackPlayerSummary');
+  const feedbackNavigation = documentObject.querySelector('#feedbackMomentNavigation');
+  const previousFeedbackButton = documentObject.querySelector('#previousFeedbackMoment');
+  const nextFeedbackButton = documentObject.querySelector('#nextFeedbackMoment');
+  const feedbackPosition = documentObject.querySelector('#feedbackMomentPosition');
   const feedbackList = documentObject.querySelector('#playerFeedbackList');
   const emptyFeedback = documentObject.querySelector('#emptyPlayerFeedback');
   const copyFeedbackButton = documentObject.querySelector('#copyPlayerFeedback');
@@ -69,6 +75,8 @@ export function createReportController({
 
   let game = null;
   let analysis = null;
+  let selectedFeedbackPlayerId = null;
+  let activeFeedbackEventId = null;
 
   function setError(message = '') {
     reportError.textContent = message;
@@ -118,6 +126,73 @@ export function createReportController({
       : `${minutes}:${remainingSeconds}`;
   }
 
+  function renderFeedbackSummary(player) {
+    feedbackSummary.innerHTML = '';
+    feedbackSummary.classList.toggle('hidden', !playerReview || !player);
+    if (!playerReview || !player) return;
+    const stats = analysis.report.players[player.id];
+    const metrics = [
+      ['points', 'Points', stats.points],
+      ['fieldGoals', 'FG', `${stats.fieldGoalsMade}/${stats.fieldGoalsAttempted}`],
+      ['threePoint', '3PT', `${stats.threePointMade}/${stats.threePointAttempted}`],
+      ['freeThrows', 'FT', `${stats.freeThrowsMade}/${stats.freeThrowsAttempted}`],
+      ['rebounds', 'Rebounds', stats.offensiveRebounds + stats.defensiveRebounds],
+      ['assists', 'Assists', stats.assists],
+      ['steals', 'Steals', stats.steals],
+      ['blocks', 'Blocks', stats.blocks],
+      ['turnovers', 'Turnovers', stats.turnovers],
+      ['plusMinus', '+/-', signed(stats.plusMinus)],
+      ['efficiency', 'EFF', stats.efficiency],
+      ['trueShooting', 'TS%', formatPercentage(stats.trueShootingPercentage)],
+      ['videoTime', 'Video time', formatVideoTime(stats.videoSeconds)]
+    ];
+    for (const [key, label, value] of metrics) {
+      const item = documentObject.createElement('div');
+      item.className = 'player-review-stat';
+      item.dataset.playerStat = key;
+      const term = documentObject.createElement('dt');
+      term.textContent = label;
+      const description = documentObject.createElement('dd');
+      description.textContent = value;
+      item.append(term, description);
+      feedbackSummary.appendChild(item);
+    }
+  }
+
+  function updateFeedbackMoment(events, { seek = false } = {}) {
+    const index = events.findIndex(event => event.id === activeFeedbackEventId);
+    for (const item of feedbackList.querySelectorAll('[data-event-id]')) {
+      const active = playerReview && item.dataset.eventId === activeFeedbackEventId;
+      item.classList.toggle('current-feedback', active);
+      if (active) item.setAttribute('aria-current', 'true');
+      else item.removeAttribute('aria-current');
+    }
+    feedbackNavigation.classList.toggle('hidden', !playerReview || index < 0);
+    feedbackPosition.textContent = index < 0 ? 'No feedback moments' : `${index + 1} of ${events.length}`;
+    previousFeedbackButton.disabled = index <= 0;
+    nextFeedbackButton.disabled = index < 0 || index >= events.length - 1;
+    if (!seek || index < 0) return;
+    try {
+      videoController.seekTo(feedbackSeconds(events[index]));
+      videoController.play();
+      setFeedbackStatus();
+      feedbackList.querySelector(`[data-event-id="${CSS.escape(activeFeedbackEventId)}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } catch (error) {
+      setFeedbackStatus(error.message || 'Could not play the feedback moment.', true);
+    }
+  }
+
+  function moveFeedbackMoment(offset) {
+    const player = game.players.find(item => item.id === feedbackPlayer.value);
+    const events = player ? feedbackEvents(player) : [];
+    const currentIndex = events.findIndex(event => event.id === activeFeedbackEventId);
+    const nextIndex = Math.min(events.length - 1, Math.max(0, currentIndex + offset));
+    if (nextIndex < 0 || nextIndex === currentIndex) return;
+    activeFeedbackEventId = events[nextIndex].id;
+    updateFeedbackMoment(events, { seek: true });
+  }
+
   function renderFeedback() {
     const previousPlayerId = feedbackPlayer.value;
     feedbackPlayer.innerHTML = '';
@@ -136,6 +211,12 @@ export function createReportController({
     const player = game.players.find(item => item.id === feedbackPlayer.value);
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
     const events = player ? feedbackEvents(player) : [];
+    const playerChanged = player?.id !== selectedFeedbackPlayerId;
+    selectedFeedbackPlayerId = player?.id || null;
+    if (playerChanged || !events.some(event => event.id === activeFeedbackEventId)) {
+      activeFeedbackEventId = events[0]?.id || null;
+    }
+    renderFeedbackSummary(player);
     emptyFeedback.classList.toggle('hidden', events.length > 0);
     copyFeedbackButton.disabled = events.length === 0;
     copyYouTubeFeedbackButton.disabled = events.length === 0;
@@ -167,6 +248,7 @@ export function createReportController({
       item.append(include, content);
       feedbackList.appendChild(item);
     }
+    updateFeedbackMoment(events);
   }
 
   function selectedFeedback() {
@@ -398,6 +480,8 @@ export function createReportController({
     if (eventLink) seekToEvent(eventLink.dataset.reportEventId);
   });
   feedbackPlayer.addEventListener('change', renderFeedback);
+  previousFeedbackButton.addEventListener('click', () => moveFeedbackMoment(-1));
+  nextFeedbackButton.addEventListener('click', () => moveFeedbackMoment(1));
   feedbackList.addEventListener('change', () => {
     const hasSelection = Boolean(feedbackList.querySelector('.feedback-event-select:checked'));
     copyFeedbackButton.disabled = !hasSelection;

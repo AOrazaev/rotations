@@ -90,8 +90,7 @@ export function createEventListController({
   const orderButton = documentObject.querySelector('#toggleEventOrder');
   const orderDescription = documentObject.querySelector('#eventOrderDescription');
   const followPlaybackButton = documentObject.querySelector('#followTimelinePlayback');
-  const eventLogPanel = documentObject.querySelector('#eventLogPanel');
-  const timelineScrollContainer = eventList.closest('.capture-panel') || eventLogPanel;
+  const timelineScrollContainer = eventList;
 
   let game = null;
   let editingEventId = null;

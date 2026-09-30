@@ -188,6 +188,8 @@ Verification:
 
 ### Milestone 4: Player-focused review
 
+**Status: complete.** Review mode now adds a selected-player statistical summary and canonical previous/next navigation to the shared feedback workflow. Navigation highlights the selected moment and starts playback from its three-second pre-roll, while direct attribution, substitutions, exact jersey mentions, team mentions, selection checkboxes, and both copy formats remain shared with tracker reports. Focused coverage lives in `tests/stats-review-player.spec.js`.
+
 Deliver:
 
 - A player selector using the saved game roster.

@@ -99,6 +99,8 @@ test('report navigation explains when the recording is unavailable', async ({ pa
 
 test('player feedback copies selected coach comments with timestamped YouTube links', async ({ page }) => {
   await openFixtureReport(page);
+  await expect(page.locator('#feedbackPlayerSummary')).toBeHidden();
+  await expect(page.locator('#feedbackMomentNavigation')).toBeHidden();
   await page.evaluate(async () => {
     const game = (await window.__statsApp.store.listGames())[0];
     game.events.find(event => event.id === 'e1').coachComment = 'Attack the space decisively.';
