@@ -65,6 +65,78 @@ test('analysis exposes deterministic ordering, active lineup, progression, and s
   ]);
 });
 
+test('shot reports reconcile field goals and preserve explicit untagged buckets', async ({ page }) => {
+  const { game } = await loadFixture(page);
+  const result = await page.evaluate(async gameData => {
+    gameData.events.find(event => event.id === 'e1').shotDetails = {
+      location: { x: 0.5, y: 0.1117 },
+      pressure: 'open',
+      phase: 'half_court',
+      contexts: ['second_chance'],
+      creation: 'cut'
+    };
+    gameData.events.find(event => event.id === 'e5').shotDetails = {
+      pressure: 'contested',
+      phase: 'transition',
+      creation: 'pull_up'
+    };
+    gameData.events.find(event => event.id === 'e8').shotDetails = {
+      location: { x: 0.5, y: 0.1117 },
+      pressure: 'open',
+      phase: 'half_court',
+      creation: 'cut'
+    };
+    const periodGame = structuredClone(gameData);
+    const periodMarker = periodGame.events.find(event => event.id === 'e14');
+    periodMarker.type = 'period_end';
+    periodMarker.side = 'system';
+    periodMarker.playerId = null;
+    periodMarker.videoSeconds = 145;
+    periodMarker.periodLabel = 'Halftime';
+    delete periodMarker.note;
+    const { buildShotReport, getShotReportPeriods } = await import('/stats/js/shot-report.js');
+    return {
+      team: buildShotReport(gameData),
+      untaggedContext: buildShotReport(gameData, { context: '__untagged__' }),
+      player: buildShotReport(gameData, { scope: 'player:p1' }),
+      playerAttempts: gameData.players.map(player =>
+        buildShotReport(gameData, { scope: `player:${player.id}` }).attempted
+      ),
+      opponent: buildShotReport(gameData, { scope: 'opponent' }),
+      periods: getShotReportPeriods(periodGame),
+      firstPeriod: buildShotReport(periodGame, { period: '1' }),
+      secondPeriod: buildShotReport(periodGame, { period: '2' })
+    };
+  }, game);
+
+  expect(result.team.attempted).toBe(3);
+  expect(result.team.made).toBe(2);
+  expect(result.team.pointsPerAttempt).toBeCloseTo(5 / 3);
+  expect(result.playerAttempts.reduce((total, attempted) => total + attempted, 0))
+    .toBe(result.team.attempted);
+  expect(result.team.plottedEvents.map(event => event.id)).toEqual(['e1', 'e8']);
+  expect(result.team.dimensions.zone).toEqual([
+    expect.objectContaining({ key: 'restricted_area', made: 2, attempted: 2, eventIds: ['e1', 'e8'] }),
+    expect.objectContaining({ key: '__untagged__', made: 0, attempted: 1, eventIds: ['e5'] })
+  ]);
+  expect(result.team.dimensions.context).toEqual([
+    expect.objectContaining({ key: 'second_chance', attempted: 1 }),
+    expect.objectContaining({ key: '__untagged__', attempted: 2 })
+  ]);
+  expect(result.untaggedContext.events.map(event => event.id)).toEqual(['e5', 'e8']);
+  expect(result.player.events.map(event => event.id)).toEqual(['e1']);
+  expect(result.opponent.attempted).toBe(2);
+  expect(result.opponent.dimensions.pressure).toEqual([
+    expect.objectContaining({ key: '__untagged__', attempted: 2 })
+  ]);
+  expect(result.periods).toEqual([
+    { value: '1', label: 'Period 1 — Halftime' },
+    { value: '2', label: 'Period 2' }
+  ]);
+  expect(result.firstPeriod.events.map(event => event.id)).toEqual(['e1', 'e5']);
+  expect(result.secondPeriod.events.map(event => event.id)).toEqual(['e8']);
+});
+
 test('opponent misses count as attempts without changing score or plus/minus', async ({ page }) => {
   const { game } = await loadFixture(page);
   game.events = game.events.filter(event => event.id === 'e2');

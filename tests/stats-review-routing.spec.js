@@ -36,6 +36,13 @@ async function saveReviewFixture(page, overrides = {}) {
       contexts: ['second_chance'],
       creation: 'cut'
     };
+    const periodMarker = fixture.events.find(event => event.id === 'e14');
+    periodMarker.type = 'period_end';
+    periodMarker.side = 'system';
+    periodMarker.playerId = null;
+    periodMarker.videoSeconds = 145;
+    periodMarker.periodLabel = 'Halftime';
+    delete periodMarker.note;
     const game = { ...fixture, ...values };
     await window.__statsApp.store.saveGame(game);
     await window.__statsApp.setupController.refreshGames();
@@ -124,6 +131,11 @@ test('Review view interactions expose no mutation workflow or game writes', asyn
   await page.locator('[data-review-section="team"]').click();
   await page.locator('#teamComparisonBody tr[data-side="team"] [data-metric="fieldGoals"] button').click();
   await page.locator('#reportSourceList [data-report-event-id]').first().click();
+  await page.locator('[data-review-section="shots"]').click();
+  await page.locator('#shotReportPeriod').selectOption('1');
+  await page.locator('#shotReportPressure').selectOption('open');
+  await expect(page.locator('#shotReportSummary')).toContainText('1/1 FG');
+  await page.locator('#shotChartPlot [data-report-event-id]').click();
   await page.locator('[data-review-section="feedback"]').click();
   await page.locator('#feedbackPlayer').selectOption('p1');
   await page.locator('#copyPlayerFeedback').click();

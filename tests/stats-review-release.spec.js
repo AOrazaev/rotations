@@ -111,6 +111,13 @@ test('complete Review workflow remains read-only across reload and tracker retur
   await page.locator('[data-review-section="players"]').click();
   await expect(page.locator('#playerReportSection')).toBeVisible();
   await expect(page.locator('#playerReportBody tr')).toHaveCount(6);
+  await page.locator('[data-review-section="shots"]').click();
+  await expect(page.locator('#shotReportSummary')).toContainText('1 plotted');
+  await page.locator('#shotReportPressure').selectOption('open');
+  await expect(page.locator('#shotReportSummary')).toContainText('1/1 FG');
+  await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+  await page.locator('#shotChartPlot [data-report-event-id="e1"]').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([['seek', 107]]);
   await page.locator('[data-review-section="lineups"]').click();
   await expect(page.locator('#lineupReportSection')).toBeVisible();
   await expect(page.locator('#lineupReportBody tr')).toHaveCount(2);

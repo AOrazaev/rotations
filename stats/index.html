@@ -250,6 +250,7 @@
     <nav id="reviewNavigation" class="review-navigation hidden" aria-label="Review reports" role="tablist">
       <button id="reviewTabTeam" class="review-tab active" type="button" role="tab" aria-selected="true" aria-controls="teamReportSection" data-review-section="team">Team</button>
       <button id="reviewTabPlayers" class="review-tab" type="button" role="tab" aria-selected="false" aria-controls="playerReportSection" data-review-section="players" tabindex="-1">Players</button>
+      <button id="reviewTabShots" class="review-tab" type="button" role="tab" aria-selected="false" aria-controls="shotReportSection" data-review-section="shots" tabindex="-1">Shots</button>
       <button id="reviewTabLineups" class="review-tab" type="button" role="tab" aria-selected="false" aria-controls="lineupReportSection" data-review-section="lineups" tabindex="-1">Lineups</button>
       <button id="reviewTabFeedback" class="review-tab" type="button" role="tab" aria-selected="false" aria-controls="feedbackReportSection" data-review-section="feedback" tabindex="-1">Feedback</button>
     </nav>
@@ -285,6 +286,102 @@
             </thead>
             <tbody id="playerReportBody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <div id="shotReportSection" class="report-section shot-report-section">
+        <div class="section-head">
+          <div>
+            <h3>Shot analysis</h3>
+            <p>Explore field-goal locations and efficiency. Missing details remain in report totals.</p>
+          </div>
+          <button id="clearShotReportFilters" class="secondary small" type="button">Clear filters</button>
+        </div>
+        <div class="shot-report-filters" aria-label="Shot report filters">
+          <label>View
+            <select id="shotReportScope"></select>
+          </label>
+          <label>Period
+            <select id="shotReportPeriod"></select>
+          </label>
+          <label>Result
+            <select id="shotReportResult">
+              <option value="__any__">All results</option>
+              <option value="made">Made</option>
+              <option value="missed">Missed</option>
+            </select>
+          </label>
+          <label>Pressure
+            <select id="shotReportPressure">
+              <option value="__any__">Any pressure</option>
+              <option value="open">Open</option>
+              <option value="lightly_contested">Lightly contested</option>
+              <option value="contested">Contested</option>
+              <option value="heavily_contested">Heavily contested</option>
+              <option value="__untagged__">Not tagged</option>
+            </select>
+          </label>
+          <label>Phase
+            <select id="shotReportPhase">
+              <option value="__any__">Any phase</option>
+              <option value="half_court">Half court</option>
+              <option value="transition">Transition</option>
+              <option value="__untagged__">Not tagged</option>
+            </select>
+          </label>
+          <label>Context
+            <select id="shotReportContext">
+              <option value="__any__">Any context</option>
+              <option value="second_chance">Second chance</option>
+              <option value="__untagged__">Not tagged</option>
+            </select>
+          </label>
+          <label>Creation
+            <select id="shotReportCreation">
+              <option value="__any__">Any creation</option>
+              <option value="catch_and_shoot">Catch-and-shoot</option>
+              <option value="pull_up">Pull-up</option>
+              <option value="drive">Drive</option>
+              <option value="cut">Cut</option>
+              <option value="post_up">Post-up</option>
+              <option value="putback">Putback</option>
+              <option value="other">Other</option>
+              <option value="__untagged__">Not tagged</option>
+            </select>
+          </label>
+        </div>
+        <p id="shotReportSummary" class="shot-report-summary" role="status"></p>
+        <div class="shot-report-layout">
+          <div class="shot-report-visuals">
+            <section class="shot-report-visual">
+              <h4>Shot locations</h4>
+              <div class="shot-chart-legend" aria-hidden="true">
+                <span class="made">Made</span>
+                <span class="missed">Missed</span>
+              </div>
+              <div id="shotChart" class="shot-chart">
+                <div id="shotChartPlot" class="shot-chart-plot"></div>
+              </div>
+              <p id="emptyShotChart" class="empty-state compact hidden">No filtered shots have a recorded location.</p>
+            </section>
+            <section class="shot-report-visual">
+              <h4>Zone efficiency</h4>
+              <div class="shot-zone-legend" aria-label="Zone color legend">
+                <span class="low">Below 0.80 PPA</span>
+                <span class="medium">0.80–1.09 PPA</span>
+                <span class="high">1.10+ PPA</span>
+              </div>
+              <div id="shotZoneChart" class="shot-chart shot-zone-chart">
+                <div id="shotZonePlot" class="shot-chart-plot"></div>
+              </div>
+              <div id="shotZoneNoLocation" class="shot-zone-no-location"></div>
+            </section>
+          </div>
+          <div id="shotSplitReports" class="shot-split-reports">
+            <div class="empty-state compact">
+              Detail splits appear when a game is loaded.
+            </div>
+          </div>
         </div>
       </div>
 

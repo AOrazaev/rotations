@@ -320,6 +320,8 @@ Verification:
 
 ### Milestone 4: Shot chart and analytical reports
 
+**Status:** Complete.
+
 Deliver:
 
 - Team, opponent, and player shot charts.

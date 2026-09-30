@@ -28,14 +28,13 @@ function appendLine(documentObject, court, x1, y1, x2, y2, className = 'shot-cou
   }));
 }
 
-function buildCourt(documentObject, statusId) {
+export function createShotCourtDiagram(documentObject = document, attributes = {}) {
   const court = createSvgElement(documentObject, 'svg', {
     class: 'shot-court-svg',
     viewBox: `0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`,
-    role: 'application',
-    tabindex: '0',
-    'aria-label': 'Shot location half court',
-    'aria-describedby': statusId
+    role: 'img',
+    'aria-label': 'Basketball half court',
+    ...attributes
   });
 
   court.appendChild(createSvgElement(documentObject, 'rect', {
@@ -79,6 +78,16 @@ function buildCourt(documentObject, statusId) {
     class: 'shot-court-center-arc',
     d: 'M 190 470 A 60 60 0 0 1 310 470'
   }));
+  return court;
+}
+
+function buildCourt(documentObject, statusId) {
+  const court = createShotCourtDiagram(documentObject, {
+    role: 'application',
+    tabindex: '0',
+    'aria-label': 'Shot location half court',
+    'aria-describedby': statusId
+  });
 
   const markerTarget = createSvgElement(documentObject, 'circle', {
     class: 'shot-court-marker-target hidden',

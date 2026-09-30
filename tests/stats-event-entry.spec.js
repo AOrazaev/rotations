@@ -116,6 +116,7 @@ test('identical timestamps retain insertion sequence and survive reload', async 
   const playerId = await selectFirstLineupPlayer(page);
   await page.locator('[data-event-type="shot"][data-shot-value="2"][data-made="true"]').click();
   await page.locator('[data-event-type="assist"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(2);
 
   let events = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events;
   expect(events.map(event => [event.videoSeconds, event.sequence])).toEqual([[42.4, 1], [42.4, 2]]);
