@@ -709,22 +709,74 @@ export function createReportController({
       focusable: 'false'
     });
     const rows = new Map(report.dimensions.zone.map(row => [row.key, row]));
-    const maskId = `shotZoneArcMask${++shotZoneRenderSequence}`;
+    const renderId = ++shotZoneRenderSequence;
+    const maskIds = {
+      aboveBreak: `shotZoneAboveBreakMask${renderId}`,
+      longMidrange: `shotZoneLongMidrangeMask${renderId}`,
+      shortMidrange: `shotZoneShortMidrangeMask${renderId}`,
+      paint: `shotZonePaintMask${renderId}`
+    };
     const defs = createSvgElement('defs');
-    const mask = createSvgElement('mask', { id: maskId });
-    mask.append(
+    const aboveBreakMask = createSvgElement('mask', {
+      id: maskIds.aboveBreak,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    aboveBreakMask.append(
       createSvgElement('rect', { x: 0, y: 140, width: 500, height: 330, fill: 'white' }),
       createSvgElement('circle', { cx: 250, cy: 52.5, r: 237.5, fill: 'black' })
     );
-    defs.appendChild(mask);
+    const longMidrangeMask = createSvgElement('mask', {
+      id: maskIds.longMidrange,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    longMidrangeMask.append(
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 237.5, fill: 'white' }),
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 150, fill: 'black' }),
+      createSvgElement('rect', { x: 170, y: 0, width: 160, height: 190, fill: 'black' }),
+      createSvgElement('rect', { x: 0, y: 0, width: 30, height: 140, fill: 'black' }),
+      createSvgElement('rect', { x: 470, y: 0, width: 30, height: 140, fill: 'black' })
+    );
+    const shortMidrangeMask = createSvgElement('mask', {
+      id: maskIds.shortMidrange,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    shortMidrangeMask.append(
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 150, fill: 'white' }),
+      createSvgElement('rect', { x: 170, y: 0, width: 160, height: 190, fill: 'black' })
+    );
+    const paintMask = createSvgElement('mask', {
+      id: maskIds.paint,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 470
+    });
+    paintMask.append(
+      createSvgElement('rect', { x: 170, y: 0, width: 160, height: 190, fill: 'white' }),
+      createSvgElement('circle', { cx: 250, cy: 52.5, r: 40, fill: 'black' })
+    );
+    defs.append(aboveBreakMask, longMidrangeMask, shortMidrangeMask, paintMask);
     const regions = createSvgElement('g', { class: 'shot-zone-regions' });
     const regionDefinitions = [
-      ['above_break_three_left', 'rect', { x: 0, y: 140, width: 200, height: 330, mask: `url(#${maskId})` }],
-      ['above_break_three_center', 'rect', { x: 200, y: 140, width: 100, height: 330, mask: `url(#${maskId})` }],
-      ['above_break_three_right', 'rect', { x: 300, y: 140, width: 200, height: 330, mask: `url(#${maskId})` }],
-      ['long_midrange', 'circle', { cx: 250, cy: 52.5, r: 237.5 }],
-      ['short_midrange', 'circle', { cx: 250, cy: 52.5, r: 150 }],
-      ['paint_non_restricted', 'rect', { x: 170, y: 0, width: 160, height: 190 }],
+      ['above_break_three_left', 'rect', { x: 0, y: 140, width: 200, height: 330, mask: `url(#${maskIds.aboveBreak})` }],
+      ['above_break_three_center', 'rect', { x: 200, y: 140, width: 100, height: 330, mask: `url(#${maskIds.aboveBreak})` }],
+      ['above_break_three_right', 'rect', { x: 300, y: 140, width: 200, height: 330, mask: `url(#${maskIds.aboveBreak})` }],
+      ['long_midrange', 'circle', { cx: 250, cy: 52.5, r: 237.5, mask: `url(#${maskIds.longMidrange})` }],
+      ['short_midrange', 'circle', { cx: 250, cy: 52.5, r: 150, mask: `url(#${maskIds.shortMidrange})` }],
+      ['paint_non_restricted', 'rect', { x: 170, y: 0, width: 160, height: 190, mask: `url(#${maskIds.paint})` }],
       ['restricted_area', 'circle', { cx: 250, cy: 52.5, r: 40 }],
       ['left_corner_three', 'rect', { x: 0, y: 0, width: 30, height: 140 }],
       ['right_corner_three', 'rect', { x: 470, y: 0, width: 30, height: 140 }]

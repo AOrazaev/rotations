@@ -193,6 +193,13 @@ test('shot analysis plots locations, separates duplicates, filters, and links so
     .toContainText('Restricted area2/2 · 100%');
   await expect(page.locator('#shotZonePlot [data-shot-zone-region="restricted_area"]'))
     .toHaveClass(/high/);
+  await expect(page.locator('#shotZonePlot mask')).toHaveCount(4);
+  await expect(page.locator('#shotZonePlot [data-shot-zone-region="long_midrange"]'))
+    .toHaveAttribute('mask', /^url\(#shotZoneLongMidrangeMask\d+\)$/);
+  await expect(page.locator('#shotZonePlot [data-shot-zone-region="short_midrange"]'))
+    .toHaveAttribute('mask', /^url\(#shotZoneShortMidrangeMask\d+\)$/);
+  await expect(page.locator('#shotZonePlot [data-shot-zone-region="paint_non_restricted"]'))
+    .toHaveAttribute('mask', /^url\(#shotZonePaintMask\d+\)$/);
   await expect(page.locator('#shotZoneNoLocation')).toContainText('No location: 0/1 · 0%');
 
   await expect(page.locator('#shotReportPeriod option')).toHaveText([
