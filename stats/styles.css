@@ -264,6 +264,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .quick-totals { display: flex; justify-content: space-between; gap: 10px; margin: 12px 0; color: var(--muted); font-size: .85rem; }
 .event-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .event-list-item { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 7px; align-items: center; padding: 7px; background: #0f1727; border: 1px solid #202c43; border-radius: 10px; }
+.event-list-item.current-event { background: rgba(109, 124, 255, .13); border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(109, 124, 255, .18); }
 .event-description { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .event-time { color: var(--accent2); font-variant-numeric: tabular-nums; }
 .link-button { padding: 4px 0; background: transparent; color: var(--accent2); text-align: left; }

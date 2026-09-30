@@ -23,7 +23,8 @@ export function createReviewController({
     documentObject,
     videoController,
     readOnly: true,
-    initialEarliestFirst: true
+    initialEarliestFirst: true,
+    followPlayback: true
   });
   const reportController = createReportController({
     documentObject,
@@ -114,6 +115,7 @@ export function createReviewController({
     destroy() {
       navigation.removeEventListener('click', handleNavigationClick);
       navigation.removeEventListener('keydown', handleNavigationKeydown);
+      eventListController.destroy();
     }
   };
 }

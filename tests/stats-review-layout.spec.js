@@ -153,6 +153,38 @@ test('Review timeline and report playback use a three-second pre-roll', async ({
   ]);
 });
 
+test('Review timeline follows playback and yields to manual scrolling', async ({ page }) => {
+  await openReview(page);
+  await page.evaluate(() => {
+    window.__timelineScrolls = [];
+    const panel = document.querySelector('.capture-panel');
+    panel.scrollTo = options => window.__timelineScrolls.push(options);
+    window.__statsFakePlayer.playing = true;
+    window.__statsFakePlayer.current = 109;
+  });
+
+  await expect(page.locator('[aria-current="true"]')).toHaveCount(0);
+  await page.evaluate(() => { window.__statsFakePlayer.current = 110; });
+  await expect(page.locator('.event-list-item[data-event-id="e1"]')).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('.event-list-item[data-event-id="e1"]')).toHaveClass(/current-event/);
+  await expect.poll(() => page.evaluate(() => window.__timelineScrolls.length)).toBeGreaterThan(0);
+
+  await page.evaluate(() => { window.__statsFakePlayer.current = 150; });
+  await expect(page.locator('.event-list-item[data-event-id="e9"]')).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('.event-list-item[data-event-id="e8"]')).not.toHaveAttribute('aria-current', 'true');
+
+  const scrollCount = await page.evaluate(() => window.__timelineScrolls.length);
+  await page.locator('.capture-panel').dispatchEvent('wheel');
+  await expect(page.locator('#followTimelinePlayback')).toBeVisible();
+  await page.evaluate(() => { window.__statsFakePlayer.current = 170; });
+  await expect(page.locator('.event-list-item[data-event-id="e11"]')).toHaveAttribute('aria-current', 'true');
+  await expect.poll(() => page.evaluate(() => window.__timelineScrolls.length)).toBe(scrollCount);
+
+  await page.locator('#followTimelinePlayback').click();
+  await expect(page.locator('#followTimelinePlayback')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.__timelineScrolls.length)).toBeGreaterThan(scrollCount);
+});
+
 for (const width of [1024, 600]) {
   test(`Review layout avoids page overflow at ${width}px`, async ({ page }) => {
     await openReview(page, width);
@@ -169,6 +201,16 @@ for (const width of [1024, 600]) {
         elements.map(element => element.getBoundingClientRect().y)
       );
       expect(stage[0]).toBeLessThan(stage[1]);
+      await page.evaluate(() => {
+        window.__mobileFollowCalls = [];
+        document.querySelector('[data-event-id="e11"]').scrollIntoView = options => {
+          window.__mobileFollowCalls.push(options);
+        };
+        window.__statsFakePlayer.playing = true;
+        window.__statsFakePlayer.current = 170;
+      });
+      await expect(page.locator('.event-list-item[data-event-id="e11"]')).toHaveAttribute('aria-current', 'true');
+      await expect.poll(() => page.evaluate(() => window.__mobileFollowCalls.length)).toBeGreaterThan(0);
     }
     const dimensions = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,

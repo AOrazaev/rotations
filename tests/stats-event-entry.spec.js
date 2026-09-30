@@ -45,6 +45,8 @@ test('records a timestamped team event with selected player and active lineup', 
   await expect(page.locator('#teamFieldGoals')).toHaveText('1/1');
   await expect(page.locator('.event-list-item')).toHaveCount(1);
   await expect(page.locator('.event-description')).toContainText('made 2PT - 2:0');
+  await expect(page.locator('#followTimelinePlayback')).toBeHidden();
+  await expect(page.locator('[aria-current="true"]')).toHaveCount(0);
   await expect(page.locator('[data-action="edit-event"]')).toHaveAttribute('aria-label', 'Edit event');
   await expect(page.locator('[data-action="delete-event"]')).toHaveAttribute('aria-label', 'Delete event');
   const timelineRowPositions = await page.locator('.event-time, .event-description, .event-row-actions').evaluateAll(elements =>

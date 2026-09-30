@@ -55,6 +55,8 @@ Reloading a valid route must reopen the same saved snapshot. Review view does no
 - Coach comments as display-only content
 - Timestamp playback with the existing three-second pre-roll
 - Timeline starts earliest-first and can be toggled to latest-first
+- Current playback event highlighting and automatic timeline following
+- Manual scrolling pauses following until the coach selects Follow playback or plays a timeline event
 - Side, event-type, player, comment, and `@team` filters
 - Filter reset and filtered-empty states
 
@@ -91,6 +93,7 @@ Every Review view action is classified below. No required workflow depends on a 
 | Play, pause, or seek video | Yes | No | Player state only |
 | Use Space or Arrow shortcuts | Yes | No | Ignored while editing form controls |
 | Play a timeline timestamp | Yes | No | Seeks to three-second pre-roll |
+| Pause or resume timeline following | Yes | No | In-memory presentation state |
 | Change timeline order | Yes | No | In-memory presentation state |
 | Apply or reset timeline filters | Yes | No | In-memory presentation state |
 | Open a report source list | Yes | No | In-memory presentation state |

@@ -36,6 +36,7 @@ export function createStatsSpikeApp({
   let loadSequence = 0;
   let playbackActive = false;
   const readyListeners = new Set();
+  const timeListeners = new Set();
 
   function notifyReady() {
     readyListeners.forEach(listener => listener(!!player));
@@ -48,7 +49,9 @@ export function createStatsSpikeApp({
 
   function refreshCurrentTime() {
     if (!player) return;
-    currentTime.textContent = formatVideoTime(player.getCurrentSeconds());
+    const seconds = player.getCurrentSeconds();
+    currentTime.textContent = formatVideoTime(seconds);
+    timeListeners.forEach(listener => listener(seconds));
   }
 
   function startClock() {
@@ -168,6 +171,16 @@ export function createStatsSpikeApp({
       readyListeners.add(listener);
       return () => readyListeners.delete(listener);
     },
+    subscribeTime(listener) {
+      timeListeners.add(listener);
+      if (player) listener(player.getCurrentSeconds());
+      return () => timeListeners.delete(listener);
+    },
+    isPlaying() {
+      return player
+        ? (typeof player.isPlaying === 'function' ? player.isPlaying() : playbackActive)
+        : false;
+    },
     getCurrentSeconds() {
       if (!player) throw new Error('The game recording is unavailable for adding events.');
       return player.getCurrentSeconds();
@@ -175,6 +188,7 @@ export function createStatsSpikeApp({
     seekTo(seconds) {
       if (!player) throw new Error('The game recording is unavailable for seeking.');
       player.seekTo(seconds);
+      refreshCurrentTime();
     },
     play() {
       if (!player) throw new Error('The game recording is unavailable for playback.');

@@ -44,6 +44,7 @@ export function createEventListController({
   saveGame,
   readOnly = false,
   initialEarliestFirst = false,
+  followPlayback = false,
   now = () => new Date().toISOString(),
   confirmFn = message => confirm(message),
   onError = () => {}
@@ -88,6 +89,9 @@ export function createEventListController({
   const clearFilters = documentObject.querySelector('#clearEventFilters');
   const orderButton = documentObject.querySelector('#toggleEventOrder');
   const orderDescription = documentObject.querySelector('#eventOrderDescription');
+  const followPlaybackButton = documentObject.querySelector('#followTimelinePlayback');
+  const eventLogPanel = documentObject.querySelector('#eventLogPanel');
+  const timelineScrollContainer = eventList.closest('.capture-panel') || eventLogPanel;
 
   let game = null;
   let editingEventId = null;
@@ -95,6 +99,10 @@ export function createEventListController({
   let editingSeconds = 0;
   let busy = false;
   let earliestFirst = initialEarliestFirst;
+  let activeEventId = null;
+  let lastPlaybackSeconds = 0;
+  let playbackFollowing = true;
+  let suppressManualScrollUntil = 0;
   let filters = {
     sides: new Set(),
     types: new Set(),
@@ -169,6 +177,61 @@ export function createEventListController({
     orderButton.title = action;
     orderButton.classList.toggle('earliest-first', earliestFirst);
     orderDescription.textContent = earliestFirst ? 'Earliest first.' : 'Latest first.';
+  }
+
+  function setPlaybackFollowing(following) {
+    playbackFollowing = following;
+    followPlaybackButton.classList.toggle('hidden', !followPlayback || following);
+  }
+
+  function setActiveEvent(eventId) {
+    activeEventId = eventId;
+    for (const item of eventList.querySelectorAll('[data-event-id]')) {
+      const active = item.dataset.eventId === eventId;
+      item.classList.toggle('current-event', active);
+      if (active) item.setAttribute('aria-current', 'true');
+      else item.removeAttribute('aria-current');
+    }
+  }
+
+  function scrollActiveEventIntoView() {
+    if (!activeEventId || !playbackFollowing || !videoController.isPlaying()) return;
+    const item = eventList.querySelector(`[data-event-id="${CSS.escape(activeEventId)}"]`);
+    if (!item) return;
+    if (documentObject.defaultView.getComputedStyle(timelineScrollContainer).overflowY === 'visible') {
+      item.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    const panelBox = timelineScrollContainer.getBoundingClientRect();
+    const itemBox = item.getBoundingClientRect();
+    const top = timelineScrollContainer.scrollTop
+      + itemBox.top
+      - panelBox.top
+      - (timelineScrollContainer.clientHeight - itemBox.height) / 2;
+    suppressManualScrollUntil = Date.now() + 500;
+    timelineScrollContainer.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }
+
+  function updatePlaybackPosition(seconds, { forceScroll = false } = {}) {
+    lastPlaybackSeconds = seconds;
+    const orderedEvents = orderGameEvents(game?.events || []);
+    let currentEvent = null;
+    for (const event of orderedEvents) {
+      if (event.videoSeconds > seconds) break;
+      currentEvent = event;
+    }
+    const nextEventId = currentEvent?.id || null;
+    const changed = nextEventId !== activeEventId;
+    setActiveEvent(nextEventId);
+    if (followPlayback && (changed || forceScroll)) scrollActiveEventIntoView();
+  }
+
+  function pausePlaybackFollowing() {
+    if (followPlayback && playbackFollowing) setPlaybackFollowing(false);
+  }
+
+  function handleTimelineScroll() {
+    if (Date.now() >= suppressManualScrollUntil) pausePlaybackFollowing();
   }
 
   function populateFilterPlayers() {
@@ -352,6 +415,7 @@ export function createEventListController({
     if (!selected) return;
     try {
       if (button.dataset.action === 'play-event') {
+        setPlaybackFollowing(true);
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
       } else if (readOnly) {
@@ -386,6 +450,15 @@ export function createEventListController({
     earliestFirst = !earliestFirst;
     render(game);
   });
+  if (followPlayback) {
+    followPlaybackButton.addEventListener('click', () => {
+      setPlaybackFollowing(true);
+      updatePlaybackPosition(videoController.getCurrentSeconds(), { forceScroll: true });
+    });
+    timelineScrollContainer.addEventListener('wheel', pausePlaybackFollowing, { passive: true });
+    timelineScrollContainer.addEventListener('touchstart', pausePlaybackFollowing, { passive: true });
+    timelineScrollContainer.addEventListener('scroll', handleTimelineScroll, { passive: true });
+  }
   filterButton.addEventListener('click', () => {
     syncFilterForm();
     filterDialog.showModal();
@@ -536,5 +609,19 @@ export function createEventListController({
     });
   }
 
-  return { render };
+  setPlaybackFollowing(true);
+  const unsubscribeTime = followPlayback
+    ? videoController.subscribeTime(seconds => updatePlaybackPosition(seconds))
+    : () => {};
+
+  return {
+    render,
+    destroy() {
+      unsubscribeTime();
+      if (!followPlayback) return;
+      timelineScrollContainer.removeEventListener('wheel', pausePlaybackFollowing);
+      timelineScrollContainer.removeEventListener('touchstart', pausePlaybackFollowing);
+      timelineScrollContainer.removeEventListener('scroll', handleTimelineScroll);
+    }
+  };
 }
