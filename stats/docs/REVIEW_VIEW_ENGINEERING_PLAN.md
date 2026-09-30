@@ -214,6 +214,8 @@ Verification:
 
 ### Milestone 5: Release hardening
 
+**Status: implementation complete; deployed-site verification pending.** `tests/stats-review-release.spec.js` exercises backup import, Review entry, playback, filters, ordering, reports, feedback navigation and copy, direct reload, IndexedDB-level zero-write behavior, exit, and tracker reopening. The root README and `stats/docs/REVIEW_VIEW.md` document the workflow and browser-local route limits. The remaining release gate is the manual real-YouTube check on the deployed branch after merge.
+
 Deliver:
 
 - Complete Playwright Review view scenario.

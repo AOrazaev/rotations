@@ -18,7 +18,9 @@ export function createReviewController({
   const lineupSection = documentObject.querySelector('#lineupReportSection');
   const progressionSection = documentObject.querySelector('#scoreProgressionSection');
   const sourceSection = documentObject.querySelector('#reportSourceSection');
+  const reviewScoreBlock = documentObject.querySelector('#reviewVideoScore');
   const reviewScore = documentObject.querySelector('#reviewModeScore');
+  const reviewScoreOpponent = documentObject.querySelector('#reviewScoreOpponent');
   const eventListController = createEventListController({
     documentObject,
     videoController,
@@ -33,6 +35,8 @@ export function createReviewController({
     playerReview: true
   });
   let game = null;
+  let analysis = null;
+  let playbackSeconds = 0;
   let activeSection = 'team';
 
   undoButton.remove();
@@ -90,16 +94,41 @@ export function createReviewController({
   navigation.addEventListener('click', handleNavigationClick);
   navigation.addEventListener('keydown', handleNavigationKeydown);
 
+  function updatePlaybackScore() {
+    let team = 0;
+    let opponent = 0;
+    for (const point of analysis?.scoreProgression || []) {
+      if (point.videoSeconds > playbackSeconds) break;
+      team = point.team;
+      opponent = point.opponent;
+    }
+    const score = `${team}–${opponent}`;
+    const opponentName = game?.opponentName?.trim() || 'Opponent';
+    if (reviewScore.textContent !== score) reviewScore.textContent = score;
+    if (reviewScoreOpponent.textContent !== opponentName) reviewScoreOpponent.textContent = opponentName;
+    reviewScoreBlock.setAttribute(
+      'aria-label',
+      `Current score: Our team ${team}, ${opponentName} ${opponent}`
+    );
+  }
+
+  const unsubscribeTime = videoController.subscribeTime(seconds => {
+    playbackSeconds = seconds;
+    updatePlaybackScore();
+  });
+
   function render() {
     navigation.classList.toggle('hidden', !game);
     if (!game) {
+      analysis = null;
+      updatePlaybackScore();
       eventListController.render(null);
       reportController.render(null, null);
       setActiveSection(activeSection);
       return;
     }
-    const analysis = buildGameAnalysis(game);
-    reviewScore.textContent = `${analysis.report.score.team}–${analysis.report.score.opponent}`;
+    analysis = buildGameAnalysis(game);
+    updatePlaybackScore();
     eventListController.render(game);
     reportController.render(game, analysis);
     setActiveSection(activeSection);
@@ -116,6 +145,7 @@ export function createReviewController({
     destroy() {
       navigation.removeEventListener('click', handleNavigationClick);
       navigation.removeEventListener('keydown', handleNavigationKeydown);
+      unsubscribeTime();
       eventListController.destroy();
     }
   };

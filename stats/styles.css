@@ -42,6 +42,10 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .review-score { display: grid; gap: 2px; min-width: 100px; text-align: center; }
 .review-score span { color: var(--muted); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .review-score strong { font-size: 2rem; font-variant-numeric: tabular-nums; }
+.review-mode .review-video-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: baseline; gap: 12px; margin-top: 12px; padding: 10px 14px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
+.review-video-score span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-score-team { text-align: right; }
+.review-score-opponent { text-align: left; }
 .review-navigation {
   position: sticky;
   z-index: 8;

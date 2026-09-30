@@ -25,10 +25,6 @@
         <p id="reviewModeOpponent" class="subtitle"></p>
       </div>
       <div class="review-header-actions">
-        <div class="review-score" aria-label="Current score">
-          <span>Score</span>
-          <strong id="reviewModeScore">0–0</strong>
-        </div>
         <a class="nav-link" href="./">Exit review</a>
       </div>
     </section>
@@ -122,6 +118,11 @@
             <p id="videoError" class="message error hidden" role="alert"></p>
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
+            </div>
+            <div id="reviewVideoScore" class="review-score review-video-score hidden" role="status" aria-live="polite" aria-label="Current score: Our team 0, Opponent 0">
+              <span class="review-score-team">Our team</span>
+              <strong id="reviewModeScore">0–0</strong>
+              <span id="reviewScoreOpponent" class="review-score-opponent">Opponent</span>
             </div>
             <p class="video-shortcuts" aria-label="Video keyboard shortcuts">
               Shortcuts:

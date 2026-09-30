@@ -35,7 +35,21 @@ test('Review view uses video-first section navigation', async ({ page }) => {
 
   await expect(page.locator('#statsHero')).toBeHidden();
   await expect(page.locator('#reviewModeTitle')).toHaveText(game.title);
-  await expect(page.locator('#reviewModeScore')).toHaveText('5–3');
+  await expect(page.locator('#reviewModeScore')).toHaveText('0–0');
+  await expect(page.locator('.review-score-team')).toHaveText('Our team');
+  await expect(page.locator('#reviewScoreOpponent')).toHaveText('Falcons');
+  await expect(page.locator('#reviewVideoScore')).toHaveAttribute(
+    'aria-label',
+    'Current score: Our team 0, Falcons 0'
+  );
+  const videoScoreGeometry = await page.locator('#playerFrame, .review-video-score').evaluateAll(elements =>
+    elements.map(element => {
+      const box = element.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom, width: box.width };
+    })
+  );
+  expect(videoScoreGeometry[1].top).toBeGreaterThanOrEqual(videoScoreGeometry[0].bottom);
+  expect(videoScoreGeometry[1].width).toBe(videoScoreGeometry[0].width);
   await expect(page.locator('#reviewNavigation')).toBeVisible();
   await expect(page.locator('#reviewNavigation')).toHaveAttribute('aria-label', 'Review reports');
   await expect(page.locator('[data-review-section]')).toHaveText([
@@ -120,6 +134,27 @@ test('wide Review view uses more screen width while keeping reports readable', a
   expect(geometry.viewport - geometry.stage.x - geometry.stage.width).toBeLessThanOrEqual(85);
   expect(geometry.report.width).toBeGreaterThanOrEqual(1479);
   expect(geometry.report.width).toBeLessThan(geometry.stage.width);
+});
+
+test('Review video score follows playback position in both directions', async ({ page }) => {
+  await openReview(page);
+
+  for (const [seconds, score] of [
+    [110, '2–0'],
+    [124, '2–0'],
+    [125, '2–2'],
+    [150, '5–2'],
+    [180, '5–3'],
+    [115, '2–0']
+  ]) {
+    await page.evaluate(value => { window.__statsFakePlayer.current = value; }, seconds);
+    await expect(page.locator('#reviewModeScore')).toHaveText(score);
+  }
+  await expect(page.locator('#reviewVideoScore')).toHaveAttribute(
+    'aria-label',
+    'Current score: Our team 2, Falcons 0'
+  );
+  await expect(page.locator('#reportFinalScore')).toHaveText('5–3');
 });
 
 test('Review navigation supports arrow keys and video shortcuts ignore selectors', async ({ page }) => {
