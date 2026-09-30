@@ -2,6 +2,8 @@ import {
   getLineupAtEventPosition,
   orderGameEvents
 } from './game-model.js';
+import { createShotDetailsEditor } from './shot-details-editor.js';
+import { getConfidentExpectedShotValue } from './shot-geometry.js';
 import { formatVideoTime } from './youtube-player.js';
 
 const PREVIEW_SECONDS = 3;
@@ -61,6 +63,8 @@ export function createEventListController({
   const shotFields = documentObject.querySelector('#editShotFields');
   const shotValueInput = documentObject.querySelector('#editShotValue');
   const shotMadeInput = documentObject.querySelector('#editShotMade');
+  const shotDetailsFields = documentObject.querySelector('#editShotDetailsFields');
+  const shotDetailsHost = documentObject.querySelector('#editShotDetails');
   const reboundFields = documentObject.querySelector('#editReboundFields');
   const reboundKindInput = documentObject.querySelector('#editReboundKind');
   const substitutionFields = documentObject.querySelector('#editSubstitutionFields');
@@ -109,6 +113,10 @@ export function createEventListController({
     teamMention: false,
     comment: 'any'
   };
+  const shotDetailsEditor = readOnly ? null : createShotDetailsEditor({
+    element: shotDetailsHost,
+    documentObject
+  });
 
   function setEditError(message = '') {
     editError.textContent = message;
@@ -131,6 +139,9 @@ export function createEventListController({
 
   function updateDependentFields() {
     shotFields.classList.toggle('hidden', typeInput.value !== 'shot');
+    const isFieldGoal = typeInput.value === 'shot' && ['2', '3'].includes(shotValueInput.value);
+    shotDetailsFields.classList.toggle('hidden', !isFieldGoal);
+    if (isFieldGoal) shotDetailsEditor.setShotValue(Number(shotValueInput.value));
     reboundFields.classList.toggle('hidden', typeInput.value !== 'rebound');
     substitutionFields.classList.toggle('hidden', typeInput.value !== 'substitution');
     periodEndFields.classList.toggle('hidden', typeInput.value !== 'period_end');
@@ -340,6 +351,8 @@ export function createEventListController({
     else playerInput.innerHTML = '<option value="">Not applicable</option>';
     shotValueInput.value = String(event.shotValue || 2);
     shotMadeInput.value = String(event.made ?? true);
+    shotDetailsEditor.setShotValue(event.shotValue || 2);
+    shotDetailsEditor.setDetails(event.shotDetails || null);
     reboundKindInput.value = event.reboundKind || 'defensive';
     periodLabelInput.value = event.periodLabel || '';
     noteInput.value = event.note || '';
@@ -443,6 +456,7 @@ export function createEventListController({
       if (sideInput.value === 'opponent') playerInput.value = '';
     });
     typeInput.addEventListener('change', updateDependentFields);
+    shotValueInput.addEventListener('change', updateDependentFields);
     cancelButton.addEventListener('click', () => dialog.close());
   }
   orderButton.addEventListener('click', () => {
@@ -551,10 +565,17 @@ export function createEventListController({
       try {
         const next = structuredClone(game);
         const edited = next.events.find(item => item.id === editingEventId);
+        const shotDetails = shotDetailsEditor.getDetails();
+        const remainsFieldGoal = typeInput.value === 'shot' && ['2', '3'].includes(shotValueInput.value);
+        if (shotDetails && !remainsFieldGoal
+          && !confirmFn('Changing this event will remove its shot details. Continue?')) {
+          return;
+        }
         edited.videoSeconds = editingSeconds;
         edited.updatedAt = now();
         delete edited.shotValue;
         delete edited.made;
+        delete edited.shotDetails;
         delete edited.reboundKind;
         delete edited.playerOutId;
         delete edited.playerInId;
@@ -591,8 +612,18 @@ export function createEventListController({
           if (edited.side === 'team' && !edited.playerId) throw new Error('Select one of our on-court players.');
           edited.type = typeInput.value;
           if (edited.type === 'shot') {
-            edited.shotValue = Number(shotValueInput.value);
+            let shotValue = Number(shotValueInput.value);
+            if ([2, 3].includes(shotValue) && shotDetails?.location) {
+              const expectedShotValue = getConfidentExpectedShotValue(shotDetails.location);
+              if (expectedShotValue && expectedShotValue !== shotValue
+                && confirmFn(`This location is in the ${expectedShotValue}PT area, but the event is recorded as ${shotValue}PT. Change the event to ${expectedShotValue}PT?`)) {
+                shotValue = expectedShotValue;
+                shotValueInput.value = String(shotValue);
+              }
+            }
+            edited.shotValue = shotValue;
             edited.made = shotMadeInput.value === 'true';
+            if ([2, 3].includes(shotValue) && shotDetails) edited.shotDetails = shotDetails;
           } else if (edited.type === 'rebound') {
             edited.reboundKind = reboundKindInput.value;
           }
@@ -617,6 +648,7 @@ export function createEventListController({
     render,
     destroy() {
       unsubscribeTime();
+      shotDetailsEditor?.destroy();
       if (!followPlayback) return;
       timelineScrollContainer.removeEventListener('wheel', pausePlaybackFollowing);
       timelineScrollContainer.removeEventListener('touchstart', pausePlaybackFollowing);

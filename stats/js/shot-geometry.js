@@ -95,6 +95,18 @@ export function getExpectedShotValue(location) {
   return isCornerThree || isArcThree ? 3 : 2;
 }
 
+export function getConfidentExpectedShotValue(location, toleranceFeet = 0.5) {
+  if (!Number.isFinite(toleranceFeet) || toleranceFeet < 0) {
+    throw new RangeError('Shot-value tolerance must be a non-negative finite number.');
+  }
+  const point = courtLocationToFeet(location);
+  const horizontalDistance = Math.abs(point.x - COURT_GEOMETRY.basketXFeet);
+  const boundaryDistance = point.y <= COURT_GEOMETRY.cornerThreeLineEndFeet
+    ? Math.abs(horizontalDistance - COURT_GEOMETRY.cornerThreeDistanceFeet)
+    : Math.abs(getShotDistanceFeet(location) - COURT_GEOMETRY.threePointRadiusFeet);
+  return boundaryDistance <= toleranceFeet ? null : getExpectedShotValue(location);
+}
+
 export function getShotZone(location) {
   const point = courtLocationToFeet(location);
   const distance = getShotDistanceFeet(location);

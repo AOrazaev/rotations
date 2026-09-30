@@ -35,6 +35,18 @@ async function addTeamEvent(page, selector, seconds = null) {
   return playerId;
 }
 
+async function clickEditCourtAt(page, x, y) {
+  const court = page.locator('#editShotDetails .shot-court-svg');
+  await court.scrollIntoViewIfNeeded();
+  const box = await court.boundingBox();
+  await court.click({
+    position: {
+      x: box.width * x,
+      y: box.height * y
+    }
+  });
+}
+
 test('event timestamp plays with a three-second pre-roll', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="steal"]');
@@ -63,6 +75,128 @@ test('editing a made shot to missed immediately recalculates and persists stats'
   await expect(page.locator('.event-description')).toContainText('missed 3PT');
   const stored = await page.evaluate(async () => (await window.__statsApp.store.listGames())[0]);
   expect(stored.events[0].made).toBe(false);
+});
+
+test('existing field goals can add, edit, and clear structured shot details', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="3"][data-made="true"]');
+  await page.locator('#closeShotLocation').click();
+
+  await page.locator('[data-action="edit-event"]').click();
+  await expect(page.locator('#editShotDetailsFields')).toBeVisible();
+  await clickEditCourtAt(page, 0.06, 0.21);
+  await page.locator('#editShotDetails [data-shot-detail-field="pressure"][data-value="lightly_contested"]').click();
+  await page.locator('#editShotDetails [data-shot-detail-field="phase"][data-value="half_court"]').click();
+  await page.locator('#editShotDetails [data-shot-detail-field="contexts"][data-value="second_chance"]').click();
+  await page.locator('#editShotDetails [data-shot-detail-field="creation"][data-value="cut"]').click();
+  await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect(page.locator('#eventEditDialog')).not.toHaveAttribute('open', '');
+
+  let shot = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(shot.shotDetails).toMatchObject({
+    location: { x: expect.closeTo(0.06, 2), y: expect.closeTo(0.21, 2) },
+    pressure: 'lightly_contested',
+    phase: 'half_court',
+    contexts: ['second_chance'],
+    creation: 'cut'
+  });
+
+  await page.locator('[data-action="edit-event"]').click();
+  await expect(page.locator('#editShotDetails [data-shot-detail-field="pressure"][data-value="lightly_contested"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#editShotDetails .shot-court-marker')).toBeVisible();
+  await page.locator('#editShotMade').selectOption('false');
+  await page.locator('#editShotDetails [data-shot-detail-field="pressure"][data-value="contested"]').click();
+  await page.locator('#editShotDetails [data-shot-details-action="clear-location"]').click();
+  await expect(page.locator('#editShotDetails [data-shot-detail-field="pressure"][data-value="contested"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#editShotDetails [data-shot-detail-field="pressure"][data-value="lightly_contested"]')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#editShotDetails .shot-court-marker')).toBeHidden();
+  await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect(page.locator('#eventEditDialog')).not.toHaveAttribute('open', '');
+
+  shot = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(shot.shotDetails).toEqual({
+    pressure: 'contested',
+    phase: 'half_court',
+    contexts: ['second_chance'],
+    creation: 'cut'
+  });
+  expect(shot.made).toBe(false);
+});
+
+test('shot-location mismatch confirmation can keep or change the recorded value', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="2"][data-made="true"]');
+  await page.locator('#closeShotLocation').click();
+
+  await page.locator('[data-action="edit-event"]').click();
+  await clickEditCourtAt(page, 0.02, 0.21);
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Change the event to 3PT');
+    dialog.dismiss();
+  });
+  await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect(page.locator('#eventEditDialog')).not.toHaveAttribute('open', '');
+
+  let shot = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(shot.shotValue).toBe(2);
+  expect(shot.shotDetails.location.x).toBeCloseTo(0.02, 2);
+
+  await page.locator('[data-action="edit-event"]').click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect(page.locator('#eventEditDialog')).not.toHaveAttribute('open', '');
+
+  shot = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(shot.shotValue).toBe(3);
+  await expect(page.locator('.event-description')).toContainText('made 3PT');
+});
+
+test('changing an enriched field goal requires confirmation before discarding details', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="2"][data-made="true"]');
+  await page.locator('#shotDetailsCapture [data-shot-detail-field="pressure"][data-value="open"]').click();
+  await expect.poll(async () => {
+    const shot = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+    return shot.shotDetails?.pressure;
+  }).toBe('open');
+  await page.locator('#closeShotLocation').click();
+
+  await page.locator('[data-action="edit-event"]').click();
+  await page.locator('#editEventType').selectOption('rebound');
+  await page.locator('#editReboundKind').selectOption('defensive');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect(page.locator('#eventEditDialog')).toHaveAttribute('open', '');
+  expect((await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0].type).toBe('shot');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect(page.locator('#eventEditDialog')).not.toHaveAttribute('open', '');
+  const event = (await page.evaluate(() => window.__statsApp.eventController.getGame())).events[0];
+  expect(event).toMatchObject({ type: 'rebound', reboundKind: 'defensive' });
+  expect(event).not.toHaveProperty('shotDetails');
+});
+
+test('shot-detail correction remains contained in the edit dialog on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="3"][data-made="false"]');
+  await page.locator('#closeShotLocation').click();
+  await page.locator('[data-action="edit-event"]').click();
+
+  const boxes = await page.locator('#eventEditDialog, #editShotDetails .shot-court-svg').evaluateAll(elements =>
+    elements.map(element => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, right: box.right };
+    })
+  );
+  expect(boxes[1].left).toBeGreaterThanOrEqual(boxes[0].left);
+  expect(boxes[1].right).toBeLessThanOrEqual(boxes[0].right);
+  const overflow = await page.locator('#editShotDetails').evaluate(element => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth
+  }));
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
 });
 
 test('changing an event to opponent attribution moves its score and removes player attribution', async ({ page }) => {

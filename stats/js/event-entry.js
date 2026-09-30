@@ -5,7 +5,8 @@ import {
   getLineupAtEventPosition,
   rebuildLineupSnapshots
 } from './game-model.js';
-import { createShotCourt } from './shot-court.js';
+import { createShotDetailsEditor } from './shot-details-editor.js';
+import { getConfidentExpectedShotValue } from './shot-geometry.js';
 import { formatVideoTime } from './youtube-player.js';
 
 export function createEventEntryController({
@@ -13,6 +14,7 @@ export function createEventEntryController({
   store,
   videoController,
   now = () => new Date().toISOString(),
+  confirmFn = message => confirm(message),
   onGameChanged = () => {}
 }) {
   const gameStatus = documentObject.querySelector('#eventGameStatus');
@@ -26,9 +28,8 @@ export function createEventEntryController({
   const eventError = documentObject.querySelector('#eventError');
   const shotLocationPanel = documentObject.querySelector('#shotLocationPanel');
   const shotLocationDescription = documentObject.querySelector('#shotLocationDescription');
-  const shotCourtMap = documentObject.querySelector('#shotCourtMap');
+  const shotDetailsCapture = documentObject.querySelector('#shotDetailsCapture');
   const closeShotLocation = documentObject.querySelector('#closeShotLocation');
-  const clearShotLocation = documentObject.querySelector('#clearShotLocation');
   const undoButton = documentObject.querySelector('#undoEvent');
   const eventEntryPanel = documentObject.querySelector('#eventEntryPanel');
   const eventLogPanel = documentObject.querySelector('#eventLogPanel');
@@ -70,14 +71,14 @@ export function createEventEntryController({
   let undoQueued = false;
   let eventEntryQueue = Promise.resolve();
   const reportController = createReportController({ documentObject, videoController });
-  const shotCourt = createShotCourt({
-    element: shotCourtMap,
+  const shotDetailsEditor = createShotDetailsEditor({
+    element: shotDetailsCapture,
     documentObject,
-    onChange(location) {
+    onChange(details, change) {
       const eventId = activeShotEventId;
       if (!eventId) return;
       const revision = ++shotLocationRevision;
-      eventEntryQueue = eventEntryQueue.then(() => saveShotLocation(eventId, location, revision));
+      eventEntryQueue = eventEntryQueue.then(() => saveShotDetails(eventId, details, change, revision));
     }
   });
 
@@ -96,24 +97,27 @@ export function createEventEntryController({
     openSubstitutionButton.disabled = !enabled || !game || game.players.length <= 5;
     openPeriodEndButton.disabled = !enabled;
     openNoteButton.disabled = !enabled;
-    shotCourt.setDisabled(!enabled);
+    shotDetailsEditor.setDisabled(!enabled);
   }
 
   function hideShotLocation() {
     shotLocationRevision++;
     activeShotEventId = null;
     shotLocationPanel.classList.add('hidden');
-    shotCourt.setLocation(null);
+    shotDetailsEditor.setDetails(null);
+  }
+
+  function updateShotLocationDescription(event) {
+    shotLocationDescription.textContent = `${event.made ? 'Made' : 'Missed'} ${event.shotValue}PT saved at ${formatVideoTime(event.videoSeconds)}. Details are optional.`;
   }
 
   function showShotLocation(event) {
     shotLocationRevision++;
     activeShotEventId = event.id;
-    shotLocationDescription.textContent = `${event.made ? 'Made' : 'Missed'} ${event.shotValue}PT saved at ${formatVideoTime(event.videoSeconds)}. Location is optional.`;
-    shotCourt.setShotValue(event.shotValue);
-    shotCourt.setLocation(event.shotDetails?.location || null);
+    updateShotLocationDescription(event);
+    shotDetailsEditor.setShotValue(event.shotValue);
+    shotDetailsEditor.setDetails(event.shotDetails || null);
     shotLocationPanel.classList.remove('hidden');
-    clearShotLocation.disabled = !event.shotDetails?.location;
   }
 
   function updatePlayerSelection() {
@@ -203,42 +207,44 @@ export function createEventEntryController({
     await onGameChanged(game);
   }
 
-  async function saveShotLocation(eventId, location, revision) {
+  async function saveShotDetails(eventId, details, change, revision) {
     if (!game) return;
     const previousEvent = game.events.find(event => event.id === eventId);
     if (!previousEvent || previousEvent.type !== 'shot' || ![2, 3].includes(previousEvent.shotValue)) {
       if (activeShotEventId === eventId) hideShotLocation();
       return;
     }
-    const previousLocation = previousEvent.shotDetails?.location || null;
+    const previousDetails = previousEvent.shotDetails || null;
     busy = true;
     try {
       const next = structuredClone(game);
       const event = next.events.find(item => item.id === eventId);
-      if (location) {
-        event.shotDetails = {
-          ...(event.shotDetails || {}),
-          location
-        };
-      } else if (event.shotDetails) {
-        delete event.shotDetails.location;
-        if (!Object.keys(event.shotDetails).length) delete event.shotDetails;
+      if (details) event.shotDetails = details;
+      else delete event.shotDetails;
+      if (change.field === 'location' && details?.location) {
+        const expectedShotValue = getConfidentExpectedShotValue(details.location);
+        if (expectedShotValue && expectedShotValue !== event.shotValue
+          && confirmFn(`This location is in the ${expectedShotValue}PT area, but the event is recorded as ${event.shotValue}PT. Change the event to ${expectedShotValue}PT?`)) {
+          event.shotValue = expectedShotValue;
+        }
       }
       event.updatedAt = now();
       next.updatedAt = now();
       await persist(next);
       if (activeShotEventId === eventId && shotLocationRevision === revision) {
-        clearShotLocation.disabled = !shotCourt.getLocation();
+        const saved = game.events.find(item => item.id === eventId);
+        shotDetailsEditor.setDetails(saved.shotDetails || null);
+        shotDetailsEditor.setShotValue(saved.shotValue);
+        updateShotLocationDescription(saved);
       }
     } catch (error) {
       if (activeShotEventId === eventId && shotLocationRevision === revision) {
-        shotCourt.setLocation(previousLocation);
-        clearShotLocation.disabled = !previousLocation;
+        shotDetailsEditor.setDetails(previousDetails);
       }
-      setError(error.message || 'Could not save the shot location.');
+      setError(error.message || 'Could not save the shot details.');
     } finally {
       busy = false;
-      shotCourt.setDisabled(!videoController.isReady());
+      shotDetailsEditor.setDisabled(!videoController.isReady());
     }
   }
 
@@ -294,7 +300,7 @@ export function createEventEntryController({
       setError(error.message || 'Could not save the event.');
     } finally {
       busy = false;
-      shotCourt.setDisabled(!videoController.isReady());
+      shotDetailsEditor.setDisabled(!videoController.isReady());
     }
   }
 
@@ -485,13 +491,6 @@ export function createEventEntryController({
   });
 
   closeShotLocation.addEventListener('click', hideShotLocation);
-  clearShotLocation.addEventListener('click', () => {
-    if (!activeShotEventId) return;
-    shotCourt.setLocation(null);
-    const eventId = activeShotEventId;
-    const revision = ++shotLocationRevision;
-    eventEntryQueue = eventEntryQueue.then(() => saveShotLocation(eventId, null, revision));
-  });
 
   async function undoLatestEvent() {
     if (!game?.events.length) return;
@@ -534,7 +533,7 @@ export function createEventEntryController({
     getGame: () => game ? structuredClone(game) : null,
     destroy() {
       unsubscribeReady();
-      shotCourt.destroy();
+      shotDetailsEditor.destroy();
     },
   };
 }

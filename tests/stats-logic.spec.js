@@ -176,10 +176,10 @@ test('validation accepts partial and complete field-goal details', async ({ page
     const complete = structuredClone(gameData);
     complete.events.find(event => event.id === 'e1').shotDetails = {
       location: { x: 0.18, y: 0.72 },
-      pressure: 'open',
+      pressure: 'lightly_contested',
       phase: 'transition',
-      contexts: ['second_chance', 'after_timeout'],
-      creation: 'catch_and_shoot'
+      contexts: ['second_chance'],
+      creation: 'cut'
     };
     return {
       fixture: collectGameValidationIssues(fixture),
@@ -250,7 +250,12 @@ test('court geometry derives normalized positions, zones, sides, distances, and 
       leftAboveBreak: deriveFeet(8, 28),
       centerAboveBreak: deriveFeet(25, 30),
       rightAboveBreak: deriveFeet(42, 28),
-      insideCornerBoundary: deriveFeet(3.01, 10)
+      insideCornerBoundary: deriveFeet(3.01, 10),
+      confidentValues: {
+        boundary: (await import('/stats/js/shot-geometry.js')).getConfidentExpectedShotValue(courtLocationFromFeet({ x: 3, y: 10 })),
+        clearTwo: (await import('/stats/js/shot-geometry.js')).getConfidentExpectedShotValue(courtLocationFromFeet({ x: 5, y: 10 })),
+        clearThree: (await import('/stats/js/shot-geometry.js')).getConfidentExpectedShotValue(courtLocationFromFeet({ x: 1, y: 10 }))
+      }
     };
   });
 
@@ -271,6 +276,7 @@ test('court geometry derives normalized positions, zones, sides, distances, and 
   expect(result.centerAboveBreak.zone).toBe('above_break_three_center');
   expect(result.rightAboveBreak.zone).toBe('above_break_three_right');
   expect(result.insideCornerBoundary.expectedShotValue).toBe(2);
+  expect(result.confidentValues).toEqual({ boundary: null, clearTwo: 2, clearThree: 3 });
 });
 
 test('court geometry rejects invalid coordinates and clamps pointer positions explicitly', async ({ page }) => {

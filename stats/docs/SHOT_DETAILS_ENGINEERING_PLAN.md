@@ -29,6 +29,7 @@ Ignoring or dismissing shot details must leave a valid basic shot event. Free th
 - Automatically derived zone, side, approximate distance, and expected 2PT/3PT value.
 - Pressure:
   - `open`
+  - `lightly_contested`
   - `contested`
   - `heavily_contested`
 - Offensive phase:
@@ -36,11 +37,11 @@ Ignoring or dismissing shot details must leave a valid basic shot event. Free th
   - `transition`
 - Additional context tags:
   - `second_chance`
-  - `after_timeout`
 - Creation:
   - `catch_and_shoot`
   - `pull_up`
   - `drive`
+  - `cut`
   - `post_up`
   - `putback`
   - `other`
@@ -78,8 +79,8 @@ Field-goal events may contain:
     },
     "pressure": "open",
     "phase": "transition",
-    "contexts": ["after_timeout"],
-    "creation": "catch_and_shoot"
+    "contexts": ["second_chance"],
+    "creation": "cut"
   }
 }
 ```
@@ -96,7 +97,7 @@ Rules:
 - Zone, side, distance, and expected point value are derived from coordinates and are not persisted.
 - Changing an event away from a field goal removes `shotDetails`.
 
-Separating `phase` from `contexts` avoids false exclusivity: an attempt can be half-court and second-chance, or half-court and after-timeout.
+Separating `phase` from `contexts` avoids false exclusivity: an attempt can be either half-court or transition while also being a second-chance attempt.
 
 ## Schema compatibility
 
@@ -231,7 +232,6 @@ Primary report sections:
 - Pressure
 - Half court versus transition
 - Second chance
-- After timeout
 - Creation type
 
 Missing details belong to an explicit **Not tagged** bucket so partial adoption does not disappear from totals.
@@ -279,6 +279,8 @@ Verification:
 - The map causes no page overflow and requires no external assets or build step.
 
 ### Milestone 2: Optional capture and correction
+
+**Status:** Complete.
 
 Deliver:
 

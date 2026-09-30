@@ -2,6 +2,7 @@ export const GAME_SCHEMA_VERSION = 2;
 
 export const SHOT_PRESSURES = Object.freeze([
   'open',
+  'lightly_contested',
   'contested',
   'heavily_contested'
 ]);
@@ -12,14 +13,14 @@ export const SHOT_PHASES = Object.freeze([
 ]);
 
 export const SHOT_CONTEXTS = Object.freeze([
-  'second_chance',
-  'after_timeout'
+  'second_chance'
 ]);
 
 export const SHOT_CREATIONS = Object.freeze([
   'catch_and_shoot',
   'pull_up',
   'drive',
+  'cut',
   'post_up',
   'putback',
   'other'
