@@ -13,6 +13,13 @@ async function installSharedTestEnvironment(page) {
     };
     window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
     window.__sharedIndexedDbWrites = 0;
+    window.__sharedClipboardWrites = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async text => { window.__sharedClipboardWrites.push(text); }
+      }
+    });
     for (const method of ['add', 'put', 'delete', 'clear']) {
       const original = IDBObjectStore.prototype[method];
       IDBObjectStore.prototype[method] = function (...args) {
@@ -33,7 +40,17 @@ test('shared route parser accepts safe names and rejects paths or file extension
       traversal: parseStatsRoute('?mode=shared&game=..%2Fsecret'),
       extension: parseStatsRoute('?mode=shared&game=game.json'),
       whitespace: parseStatsRoute('?mode=shared&game=%20game'),
-      built: buildSharedReviewUrl('game-20260927', '/rotations/stats/')
+      filtered: parseStatsRoute(
+        '?mode=shared&game=game-20260927&tl-player=p1&tl-player=p2'
+        + '&tl-type=shot&tl-type=invalid&tl-pressure=open&tl-comment=with'
+      ),
+      built: buildSharedReviewUrl('game-20260927', '/rotations/stats/'),
+      builtFiltered: buildSharedReviewUrl('game-20260927', '/rotations/stats/', {
+        players: ['p1'],
+        types: ['shot'],
+        shotPressures: ['open'],
+        comment: 'with'
+      })
     };
   });
 
@@ -43,7 +60,20 @@ test('shared route parser accepts safe names and rejects paths or file extension
     traversal: { mode: 'shared', status: 'invalid-game', snapshotName: null },
     extension: { mode: 'shared', status: 'invalid-game', snapshotName: null },
     whitespace: { mode: 'shared', status: 'invalid-game', snapshotName: null },
-    built: '/rotations/stats/?mode=shared&game=game-20260927'
+    filtered: {
+      mode: 'shared',
+      status: 'ready',
+      snapshotName: 'game-20260927',
+      timelineFilters: {
+        types: ['shot'],
+        shotPressures: ['open'],
+        players: ['p1', 'p2'],
+        comment: 'with'
+      }
+    },
+    built: '/rotations/stats/?mode=shared&game=game-20260927',
+    builtFiltered: '/rotations/stats/?mode=shared&game=game-20260927'
+      + '&tl-type=shot&tl-pressure=open&tl-player=p1&tl-comment=with'
   });
 });
 
@@ -98,6 +128,58 @@ test('published game opens as a reload-safe zero-write shared Review link', asyn
   await page.evaluate(() => window.__statsApp.ready);
   await expect(page.locator('#reviewModeTitle')).toHaveText(publishedBackup.game.title);
   await expect(page.locator('.event-list-item')).toHaveCount(publishedBackup.game.events.length);
+  expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
+});
+
+test('shared timeline filters survive reload, update the URL, and copy as a link', async ({ page, request }) => {
+  await installSharedTestEnvironment(page);
+  const publishedBackup = await request.get('/games/game-20260927.json').then(response => response.json());
+  const playerShot = publishedBackup.game.events.find(event =>
+    event.type === 'shot' && event.side === 'team' && event.playerId
+  );
+  expect(playerShot).toBeTruthy();
+  const player = publishedBackup.game.players.find(item => item.id === playerShot.playerId);
+  const expectedPlayerShots = publishedBackup.game.events.filter(event =>
+    event.type === 'shot' && event.playerId === player.id
+  );
+  const allShots = publishedBackup.game.events.filter(event => event.type === 'shot');
+  const playerLabel = player.number ? `#${player.number} ${player.name}` : player.name;
+
+  await page.goto(
+    `/stats/?mode=shared&game=game-20260927`
+    + `&tl-player=${encodeURIComponent(player.id)}&tl-player=missing-player`
+    + '&tl-type=shot&tl-type=invalid&ignored=value'
+  );
+  await page.evaluate(() => window.__statsApp.ready);
+
+  await expect(page.locator('.event-list-item')).toHaveCount(expectedPlayerShots.length);
+  await expect(page.locator('#activeEventFilters .filter-chip-label')).toHaveText([
+    'Shot',
+    playerLabel
+  ]);
+  let url = new URL(page.url());
+  expect(url.searchParams.getAll('tl-player')).toEqual([player.id]);
+  expect(url.searchParams.getAll('tl-type')).toEqual(['shot']);
+  expect(url.searchParams.has('ignored')).toBe(false);
+
+  await page.reload();
+  await page.evaluate(() => window.__statsApp.ready);
+  await expect(page.locator('.event-list-item')).toHaveCount(expectedPlayerShots.length);
+
+  await page.locator('.filter-chip[data-filter-group="players"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(allShots.length);
+  expect(new URL(page.url()).searchParams.has('tl-player')).toBe(false);
+
+  await page.locator('#openEventFilters').click();
+  await page.locator(`input[name="filterPlayer"][value="${player.id}"]`).check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(expectedPlayerShots.length);
+  url = new URL(page.url());
+  expect(url.searchParams.getAll('tl-player')).toEqual([player.id]);
+
+  await page.locator('#copyFilteredReviewLink').click();
+  await expect(page.locator('#copyFilteredReviewStatus')).toHaveText('Filtered link copied.');
+  expect(await page.evaluate(() => window.__sharedClipboardWrites)).toEqual([page.url()]);
   expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
 });
 
