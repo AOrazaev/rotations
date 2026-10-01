@@ -240,6 +240,8 @@ for (const width of [1024, 600]) {
     await expect(page.locator('#reviewModeHeader')).toBeVisible();
     await expect(page.locator('#reviewNavigation')).toBeVisible();
     if (width > 760) {
+      await expect(page.locator('#toggleMobileTimeline')).toBeHidden();
+      await expect(page.locator('#mobileTimelineContent')).not.toHaveAttribute('inert', '');
       const stage = await page.locator('.video-card, #eventLogPanel').evaluateAll(elements =>
         elements.map(element => element.getBoundingClientRect().y)
       );
@@ -252,18 +254,47 @@ for (const width of [1024, 600]) {
       expect(stage[0]).toBeLessThan(stage[1]);
       await page.evaluate(() => {
         window.__mobileFollowCalls = [];
-        document.querySelector('[data-event-id="e11"]').scrollIntoView = options => {
+        document.querySelector('#eventList').scrollTo = options => {
           window.__mobileFollowCalls.push(options);
         };
         window.__statsFakePlayer.playing = true;
         window.__statsFakePlayer.current = 170;
       });
       await expect(page.locator('.event-list-item[data-event-id="e11"]')).toHaveAttribute('aria-current', 'true');
-      expect(await page.evaluate(() => window.__mobileFollowCalls.length)).toBe(0);
-      await expect(page.locator('#followTimelinePlayback')).toBeVisible();
-      await expect(page.locator('#followTimelinePlayback')).toHaveText('Jump to current event');
-      await page.locator('#followTimelinePlayback').click();
-      await expect.poll(() => page.evaluate(() => window.__mobileFollowCalls.length)).toBe(1);
+      await expect.poll(() => page.evaluate(() => window.__mobileFollowCalls.length)).toBeGreaterThan(0);
+      await expect(page.locator('#mobileTimelinePreview')).toContainText('2:50.0');
+      await expect(page.locator('#toggleMobileTimeline')).toBeVisible();
+      await expect(page.locator('#toggleMobileTimeline')).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.locator('#mobileTimelineContent')).toHaveAttribute('inert', '');
+
+      const handle = page.locator('#toggleMobileTimeline');
+      let handleBox = await handle.boundingBox();
+      await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y - 70, { steps: 4 });
+      await page.mouse.up();
+      await expect(page.locator('#eventLogPanel')).toHaveClass(/mobile-timeline-open/);
+      await expect(handle).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.locator('#mobileTimelineContent')).not.toHaveAttribute('inert', '');
+      await expect(page.locator('#mobileTimelineBackdrop')).toBeVisible();
+
+      await page.waitForTimeout(250);
+      handleBox = await handle.boundingBox();
+      await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height + 70, { steps: 4 });
+      await page.mouse.up();
+      await expect(page.locator('#eventLogPanel')).not.toHaveClass(/mobile-timeline-open/);
+
+      await handle.click();
+      await expect(page.locator('#eventLogPanel')).toHaveClass(/mobile-timeline-open/);
+      await page.locator('#mobileTimelineBackdrop').click({ position: { x: 4, y: 4 } });
+      await expect(page.locator('#eventLogPanel')).not.toHaveClass(/mobile-timeline-open/);
+
+      await handle.click();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#eventLogPanel')).not.toHaveClass(/mobile-timeline-open/);
+      await expect(handle).toBeFocused();
     }
     const dimensions = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,

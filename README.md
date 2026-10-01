@@ -43,7 +43,7 @@ Choose **View** on an active saved game to open:
 /stats/?mode=review&game=<game-id>
 ```
 
-Review view removes setup, event-entry, correction, comment, archive, import, and backup controls. It keeps video playback, timeline filtering and ordering, reports, player summaries, feedback navigation, and clipboard actions. The timeline starts earliest-first and highlights the current playback event. On desktop it follows playback until you manually scroll it; choose **Follow playback** or play a timeline timestamp to resume following. On mobile, highlighting does not move the page away from the video; choose **Jump to current event** when you want to move to the active timeline entry.
+Review view removes setup, event-entry, correction, comment, archive, import, and backup controls. It keeps video playback, timeline filtering and ordering, reports, player summaries, feedback navigation, and clipboard actions. The timeline starts earliest-first and highlights the current playback event. On desktop it follows playback until you manually scroll it; choose **Follow playback** or play a timeline timestamp to resume following. On mobile, the current event appears in a collapsed bottom-sheet preview; tap or swipe upward to open the internally scrolling timeline, then tap the handle, swipe downward, use the backdrop, or press Escape to close it.
 
 Review URLs identify a game in IndexedDB in the **same browser and site origin**. They are reload-safe, but they are not public or cross-device sharing links. Another browser, device, private window, cleared site-data profile, or different deployment origin will not have that game. Export a JSON backup to move a game elsewhere.
 
