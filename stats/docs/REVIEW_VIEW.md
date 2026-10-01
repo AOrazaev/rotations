@@ -60,6 +60,25 @@ https://aorazaev.github.io/rotations/stats/?mode=shared&game=game-20260927
 
 Shared Review accepts only same-deployment files under `/games/`. The response is limited to 1 MiB and must be a valid Basketball Stats backup. The game is parsed and rendered in memory; it is not imported into IndexedDB, and reloading the URL fetches the published file again.
 
+## Share a filtered timeline
+
+Timeline filters in local and Shared Review are synchronized with optional URL parameters. Apply one or more filters, then choose **Copy filtered link** beside the applied-filter chips. The copied URL restores the same filters after reload or when opened by another viewer of a published game.
+
+Supported parameters are:
+
+- `tl-side`
+- `tl-type`
+- `tl-player`
+- `tl-team-mention=1`
+- `tl-comment`
+- `tl-zone`
+- `tl-pressure`
+- `tl-phase`
+- `tl-context`
+- `tl-creation`
+
+Parameters representing multi-select groups may be repeated. Generated links use stable internal player IDs while the interface displays player names. Unknown filter values and players not present in the loaded game are discarded and removed from the canonical URL. Changing a filter or removing an applied-filter chip updates the address bar without modifying the game.
+
 Anything committed under `/games/` is public repository and GitHub Pages content. Review the exported game and remove private player information or comments before publishing it. To revise a snapshot, replace the JSON file and redeploy; to preserve an immutable historical link, publish revisions under new names.
 
 ## Player feedback attribution

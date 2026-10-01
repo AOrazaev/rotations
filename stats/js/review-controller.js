@@ -4,7 +4,9 @@ import { createReportController } from './report-view.js';
 
 export function createReviewController({
   documentObject = document,
-  videoController
+  videoController,
+  initialTimelineFilters = null,
+  onTimelineFiltersChanged = () => {}
 }) {
   const eventLogPanel = documentObject.querySelector('#eventLogPanel');
   const eventTimelineInstruction = documentObject.querySelector('#eventTimelineInstruction');
@@ -27,7 +29,9 @@ export function createReviewController({
     videoController,
     readOnly: true,
     initialEarliestFirst: true,
-    followPlayback: true
+    followPlayback: true,
+    initialFilters: initialTimelineFilters,
+    onFiltersChanged: onTimelineFiltersChanged
   });
   const reportController = createReportController({
     documentObject,
@@ -145,6 +149,7 @@ export function createReviewController({
       render();
     },
     getGame: () => game ? structuredClone(game) : null,
+    getTimelineFilters: () => eventListController.getFilters(),
     destroy() {
       navigation.removeEventListener('click', handleNavigationClick);
       navigation.removeEventListener('keydown', handleNavigationKeydown);

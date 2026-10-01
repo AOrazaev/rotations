@@ -185,6 +185,9 @@ test('complete Review workflow remains read-only across reload and tracker retur
   await expect(page.locator('#reportFinalScore')).toHaveText('5–3');
   await page.locator('[data-review-section="shots"]').click();
   await expect(page.locator('#shotChartPlot [data-report-event-id]')).toHaveCount(2);
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  expect(new URL(page.url()).searchParams.getAll('tl-pressure')).toEqual(['open']);
+  await page.locator('.filter-chip[data-filter-group="shotPressures"]').click();
   await expect(page.locator('.event-list-item[data-event-id="e8"] .event-detail-badge')).toHaveText([
     'Right corner 3',
     'Lightly contested',

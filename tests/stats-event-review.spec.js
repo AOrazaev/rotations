@@ -547,6 +547,7 @@ test('timeline filters combine side, type, player, and coach comment selections'
   await expect(page.locator('.event-description')).toContainText('steal');
   await expect(page.locator('#openEventFilters')).toHaveAttribute('aria-label', 'Filter timeline, 4 active');
   await expect(page.locator('#eventFilterCount')).toHaveText('4');
+  await expect(page.locator('#copyFilteredReviewLink')).toBeHidden();
   await expect(page.locator('#activeEventFilters .filter-chip-label')).toHaveText([
     'Our team',
     'Steal',

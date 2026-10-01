@@ -412,10 +412,13 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .shot-filter-details[open] summary { border-bottom: 1px solid var(--line); }
 .shot-filter-selection-count { color: var(--muted); font-size: .78rem; font-weight: 600; }
 .shot-filter-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px; }
-.active-filter-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 12px; }
+.timeline-filter-summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.active-filter-chips { display: flex; flex: 1 1 240px; flex-wrap: wrap; gap: 7px; }
 .filter-chip { display: inline-flex; align-items: center; gap: 6px; width: auto; padding: 5px 9px; color: #dce2ff; background: rgba(109, 124, 255, .12); border: 1px solid rgba(109, 124, 255, .4); border-radius: 999px; font-size: .78rem; }
 .filter-chip:hover { border-color: var(--accent2); }
 .filter-chip-remove { color: var(--muted); font-size: 1rem; line-height: .8; }
+.copy-filtered-review-status { flex-basis: 100%; color: var(--muted); font-size: .78rem; }
+.copy-filtered-review-status.error { color: var(--danger); }
 .edit-dependent-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; grid-column: 1 / -1; }
 .dialog-field { display: grid; gap: 7px; color: var(--muted); font-size: .85rem; }
 .timestamp-editor { display: grid; gap: 9px; margin-top: 16px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }

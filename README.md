@@ -70,6 +70,8 @@ https://aorazaev.github.io/rotations/stats/?mode=shared&game=game-20260927
 
 The page downloads and validates the backup from the same deployment's `/games/` directory, then renders it entirely in memory using the read-only Review workspace. It does not import or save the game to IndexedDB. Published backups are public repository and GitHub Pages content; do not publish private player information or comments.
 
+Shared Review timeline filters are represented in the URL. Apply side, event type, player, comment, zone, pressure, phase, context, or creation filters, then choose **Copy filtered link** beside the applied-filter chips. Opening that link restores the filters, and later filter changes keep the address bar synchronized. Invalid values and player IDs absent from the published game are removed automatically.
+
 See [`stats/docs/SHOT_DETAILS.md`](stats/docs/SHOT_DETAILS.md) for shot entry, correction, filters, reports, compatibility, and deployment verification.
 
 ## Run locally
