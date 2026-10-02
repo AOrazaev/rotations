@@ -176,6 +176,42 @@ workbench. Override the timeout when starting the service:
   -ProcessingTimeoutSeconds 60
 ```
 
+## Gaming-PC Checkpoint 4 validation
+
+On a fresh Windows clone with Python 3.12 and current NVIDIA drivers, run:
+
+```powershell
+.\voice-companion\scripts\prepare-gaming-pc.ps1
+.\voice-companion\scripts\validate-checkpoint-4.ps1
+```
+
+The setup script installs the balanced faster-whisper model, Qwen3 Q4_K_M, and
+the CUDA 12.4 llama.cpp wheel. Override `-LlamaWheelIndexUrl` if the machine
+requires a different supported wheel index.
+
+The validation command takes at least 30 minutes by default. It runs seven
+rounds of the eight-case corpus with five-minute gaps and records:
+
+- Redacted hardware and package information.
+- faster-whisper and Qwen warmup, selected transcription device/compute type,
+  and per-command interpretation latency.
+- Exact events, warnings, and errors for all 56 commands.
+- Process working-set and private-memory samples.
+- NVIDIA memory, temperature, utilization, and performance-state samples.
+
+The command prints the path of one JSON report under
+`voice-companion\validation-results\`. Return that file for review. It contains
+only the committed curated transcripts, not microphone audio, tokens, model
+paths, hostnames, or usernames.
+
+For a quick installation check instead of the checkpoint soak:
+
+```powershell
+.\voice-companion\scripts\validate-checkpoint-4.ps1 `
+  -Repetitions 1 `
+  -DelayBetweenRoundsSeconds 0
+```
+
 ## Tests
 
 ```powershell

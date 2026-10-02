@@ -22,6 +22,9 @@ hardware/profile diagnostics, and clear readiness feedback.
 - Prominent loading, ready, and failure banners.
 - Model identities and recommended profile in the readiness display.
 - Collapsible raw warmup diagnostics.
+- Reproducible gaming-PC setup and validation scripts.
+- One redacted validation report containing dual-model warmup, repeated corpus
+  accuracy and latency, process memory, and NVIDIA telemetry.
 
 ## Native Windows baseline
 
