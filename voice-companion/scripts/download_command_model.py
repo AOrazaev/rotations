@@ -13,7 +13,20 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from voice_companion.interpretation import DEFAULT_COMMAND_MODEL
 from voice_companion.profiles import default_model_directory
 
-MODEL_REPOSITORY = "Qwen/Qwen3-4B-GGUF"
+MODEL_CANDIDATES = {
+    "qwen3": {
+        "repository": "Qwen/Qwen3-4B-GGUF",
+        "filename": DEFAULT_COMMAND_MODEL,
+        "license": "Apache-2.0",
+        "quantizedBy": "Qwen",
+    },
+    "phi4mini": {
+        "repository": "bartowski/microsoft_Phi-4-mini-instruct-GGUF",
+        "filename": "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf",
+        "license": "MIT",
+        "quantizedBy": "bartowski",
+    },
+}
 
 
 def main():
@@ -21,16 +34,22 @@ def main():
         description="Download the local command interpretation model."
     )
     parser.add_argument("--model-directory")
+    parser.add_argument(
+        "--candidate",
+        choices=sorted(MODEL_CANDIDATES),
+        default="qwen3",
+    )
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
+    candidate = MODEL_CANDIDATES[args.candidate]
     model_directory = (
         Path(args.model_directory)
         if args.model_directory
         else default_model_directory()
     )
     model_directory.mkdir(parents=True, exist_ok=True)
-    target = model_directory / DEFAULT_COMMAND_MODEL
+    target = model_directory / candidate["filename"]
 
     try:
         from huggingface_hub import hf_hub_download
@@ -44,13 +63,14 @@ def main():
         status = "already-installed"
     else:
         print(
-            f"Downloading {DEFAULT_COMMAND_MODEL} from {MODEL_REPOSITORY} "
+            f"Downloading {candidate['filename']} from "
+            f"{candidate['repository']} "
             f"to {model_directory}..."
         )
         downloaded = Path(
             hf_hub_download(
-                repo_id=MODEL_REPOSITORY,
-                filename=DEFAULT_COMMAND_MODEL,
+                repo_id=candidate["repository"],
+                filename=candidate["filename"],
                 local_dir=model_directory,
                 force_download=args.force,
             )
@@ -64,8 +84,11 @@ def main():
     manifest = {
         "formatVersion": 1,
         "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "repository": MODEL_REPOSITORY,
-        "model": DEFAULT_COMMAND_MODEL,
+        "candidate": args.candidate,
+        "repository": candidate["repository"],
+        "model": candidate["filename"],
+        "license": candidate["license"],
+        "quantizedBy": candidate["quantizedBy"],
         "path": str(target),
         "sizeBytes": target.stat().st_size,
         "status": status,

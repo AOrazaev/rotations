@@ -23,6 +23,7 @@
       <div class="actions">
         <button id="checkConnection" type="button">Check service</button>
         <button id="warmModels" type="button">Warm models</button>
+        <button id="exportDiagnostics" type="button">Export diagnostics</button>
       </div>
       <p id="warmupStatus" class="readiness-banner" role="status">Models have not been warmed from this page.</p>
       <div class="status-grid" aria-live="polite">
@@ -103,6 +104,9 @@
 
     <section class="card">
       <h2>Proposal</h2>
+      <div class="actions">
+        <button id="cancelProcessing" type="button" disabled>Cancel processing</button>
+      </div>
       <div id="proposalResult" class="proposal-result" aria-live="polite">No proposal.</div>
       <h3>Raw response</h3>
       <pre id="requestResult" aria-live="polite">No request sent.</pre>

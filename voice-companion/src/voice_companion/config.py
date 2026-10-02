@@ -10,6 +10,7 @@ MAX_DURATION_SECONDS = 20
 MAX_ROSTER_PLAYERS = 30
 MAX_LINEUP_PLAYERS = 5
 MAX_CONCURRENT_REQUESTS = 1
+MAX_PROCESSING_SECONDS = 120
 
 DEFAULT_ALLOWED_ORIGINS = {
     "https://aorazaev.github.io",
@@ -47,6 +48,7 @@ class ServiceSettings:
     max_context_bytes: int = MAX_CONTEXT_BYTES
     max_duration_seconds: int = MAX_DURATION_SECONDS
     max_concurrent_requests: int = MAX_CONCURRENT_REQUESTS
+    max_processing_seconds: int = MAX_PROCESSING_SECONDS
     profile: str = "spike"
 
     def __post_init__(self):
@@ -60,3 +62,5 @@ class ServiceSettings:
             raise ValueError("max_duration_seconds must be positive.")
         if self.max_concurrent_requests <= 0:
             raise ValueError("max_concurrent_requests must be positive.")
+        if self.max_processing_seconds <= 0:
+            raise ValueError("max_processing_seconds must be positive.")

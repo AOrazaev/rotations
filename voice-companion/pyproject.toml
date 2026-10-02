@@ -12,6 +12,7 @@ license = { text = "MIT" }
 [project.scripts]
 bask-voice-companion = "voice_companion.server:main"
 bask-voice-evaluate = "voice_companion.evaluate:main"
+bask-voice-evaluate-commands = "voice_companion.evaluate_commands:main"
 
 [project.optional-dependencies]
 transcription = [

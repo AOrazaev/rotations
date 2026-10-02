@@ -12,7 +12,8 @@ param(
   [string]$CommandInterpreter = "none",
   [string]$CommandModel = "",
   [int]$CommandContextSize = 4096,
-  [int]$CommandGpuLayers = 0
+  [int]$CommandGpuLayers = 0,
+  [int]$ProcessingTimeoutSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +33,8 @@ $arguments = @(
   "--profile", $Profile,
   "--command-interpreter", $CommandInterpreter,
   "--command-context-size", $CommandContextSize,
-  "--command-gpu-layers", $CommandGpuLayers
+  "--command-gpu-layers", $CommandGpuLayers,
+  "--processing-timeout-seconds", $ProcessingTimeoutSeconds
 )
 if ($Model) { $arguments += @("--model", $Model) }
 if ($Device) { $arguments += @("--device", $Device) }

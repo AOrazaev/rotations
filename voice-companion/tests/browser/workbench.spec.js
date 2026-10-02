@@ -18,6 +18,11 @@ test('workbench checks service and processes an audio file', async ({ page }) =>
   await expect(page.locator('#warmupStatus')).toContainText('Models ready');
   await expect(page.locator('#warmModels')).toHaveText('Models ready');
 
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportDiagnostics').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('bask-voice-diagnostics.json');
+
   await page.locator('#videoSeconds').fill('42.5');
   await page.locator('#audioFile').setInputFiles({
     name: 'sample.webm',

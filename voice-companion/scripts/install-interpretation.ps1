@@ -2,6 +2,8 @@ param(
   [string]$PackageIndexUrl = "",
   [string]$TrustedHost = "",
   [string]$WheelIndexUrl = "https://abetlen.github.io/llama-cpp-python/whl/cpu",
+  [ValidateSet("qwen3", "phi4mini")]
+  [string]$ModelCandidate = "qwen3",
   [switch]$SkipModelDownload,
   [switch]$ForceModelDownload
 )
@@ -39,7 +41,8 @@ if ($LASTEXITCODE -ne 0) {
 
 if (-not $SkipModelDownload) {
   $downloadArguments = @(
-    (Join-Path $PSScriptRoot "download_command_model.py")
+    (Join-Path $PSScriptRoot "download_command_model.py"),
+    "--candidate", $ModelCandidate
   )
   if ($ForceModelDownload) {
     $downloadArguments += "--force"

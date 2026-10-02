@@ -4,6 +4,7 @@ import http.client
 import json
 import sys
 import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -46,7 +47,9 @@ class FixtureInterpreter:
             "lastError": None,
         }
 
-    def interpret(self, transcript, context):
+    def interpret(self, transcript, context, cancellation=None):
+        if cancellation:
+            cancellation.raise_if_cancelled()
         return InterpretationResult(
             events=[
                 {
@@ -65,8 +68,36 @@ class FixtureInterpreter:
 
 
 class FailingInterpreter(FixtureInterpreter):
-    def interpret(self, transcript, context):
+    def interpret(self, transcript, context, cancellation=None):
         raise InvalidInterpretation("Model proposal is invalid.")
+
+
+class BlockingInterpreter(FixtureInterpreter):
+    def __init__(self):
+        self.entered = threading.Event()
+
+    def interpret(self, transcript, context, cancellation=None):
+        self.entered.set()
+        while True:
+            if cancellation:
+                cancellation.raise_if_cancelled()
+            time.sleep(0.01)
+
+
+class OutOfMemoryInterpreter(FixtureInterpreter):
+    def interpret(self, transcript, context, cancellation=None):
+        raise MemoryError("allocation failed")
+
+
+class CrashOnceInterpreter(FixtureInterpreter):
+    def __init__(self):
+        self.calls = 0
+
+    def interpret(self, transcript, context, cancellation=None):
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("model worker crashed")
+        return super().interpret(transcript, context, cancellation)
 
 
 class ServerTest(unittest.TestCase):
@@ -130,6 +161,23 @@ class ServerTest(unittest.TestCase):
             json.loads(payload)["commandModelState"],
             "configuration_required",
         )
+
+    def test_diagnostics_are_redacted(self):
+        status, _, payload = self.request(
+            "GET",
+            "/v1/diagnostics",
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+            },
+        )
+        self.assertEqual(status, 200)
+        diagnostics = json.loads(payload)
+        encoded = json.dumps(diagnostics)
+        self.assertNotIn("test-token", encoded)
+        self.assertNotIn("modelPath", diagnostics["interpretation"])
+        self.assertNotIn("modelDirectory", diagnostics["transcription"])
+        self.assertTrue(diagnostics["privacy"]["containsToken"] is False)
 
     def test_unknown_origin_is_rejected(self):
         status, _, payload = self.request(
@@ -344,6 +392,132 @@ class InterpretationServerTest(unittest.TestCase):
         self.assertEqual(payload["status"], "ready")
         self.assertIn("recommendedProfile", payload["hardware"])
         self.assertGreaterEqual(payload["timingMs"]["total"], 0)
+
+    def test_active_interpretation_can_be_cancelled(self):
+        interpreter = BlockingInterpreter()
+        self.server.interpreter = interpreter
+        context = {
+            "protocolVersion": 1,
+            "requestId": "request-cancel",
+            "capturedSeconds": 15.0,
+            "language": "en",
+            "roster": [
+                {"id": "p13", "jersey": "13", "name": "Denis"},
+            ],
+            "currentLineupIds": ["p13"],
+            "allowedEventTypes": ["shot"],
+        }
+        body = json.dumps(
+            {"transcript": "Thirteen makes two", "context": context}
+        ).encode()
+        result = {}
+
+        def send_interpretation():
+            connection = http.client.HTTPConnection(
+                "127.0.0.1",
+                self.server.server_address[1],
+                timeout=3,
+            )
+            connection.request(
+                "POST",
+                "/v1/interpret-command",
+                body=body,
+                headers={
+                    "Origin": "https://aorazaev.github.io",
+                    "X-Bask-Voice-Token": "test-token",
+                    "Content-Type": "application/json",
+                    "Content-Length": str(len(body)),
+                },
+            )
+            response = connection.getresponse()
+            result["status"] = response.status
+            result["payload"] = json.loads(response.read())
+            connection.close()
+
+        request_thread = threading.Thread(target=send_interpretation)
+        request_thread.start()
+        self.assertTrue(interpreter.entered.wait(timeout=1))
+
+        cancel_body = json.dumps({"requestId": "request-cancel"}).encode()
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            self.server.server_address[1],
+            timeout=2,
+        )
+        connection.request(
+            "POST",
+            "/v1/cancel",
+            body=cancel_body,
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+                "Content-Type": "application/json",
+                "Content-Length": str(len(cancel_body)),
+            },
+        )
+        cancel_response = connection.getresponse()
+        cancel_payload = json.loads(cancel_response.read())
+        connection.close()
+        request_thread.join(timeout=2)
+
+        self.assertEqual(cancel_response.status, 202)
+        self.assertEqual(cancel_payload["status"], "cancellation_requested")
+        self.assertEqual(result["status"], 409)
+        self.assertEqual(result["payload"]["error"]["code"], "request_cancelled")
+
+    def test_out_of_memory_is_explicit(self):
+        self.server.interpreter = OutOfMemoryInterpreter()
+        status, payload = self._interpret_request("request-oom")
+
+        self.assertEqual(status, 507)
+        self.assertEqual(payload["error"]["code"], "model_out_of_memory")
+
+    def test_service_recovers_after_interpreter_runtime_failure(self):
+        self.server.interpreter = CrashOnceInterpreter()
+
+        first_status, first_payload = self._interpret_request("request-crash-1")
+        second_status, second_payload = self._interpret_request("request-crash-2")
+
+        self.assertEqual(first_status, 500)
+        self.assertEqual(first_payload["error"]["code"], "interpretation_failed")
+        self.assertEqual(second_status, 200)
+        self.assertEqual(second_payload["events"][0]["type"], "shot")
+
+    def _interpret_request(self, request_id):
+        context = {
+            "protocolVersion": 1,
+            "requestId": request_id,
+            "capturedSeconds": 15.0,
+            "language": "en",
+            "roster": [
+                {"id": "p13", "jersey": "13", "name": "Denis"},
+            ],
+            "currentLineupIds": ["p13"],
+            "allowedEventTypes": ["shot"],
+        }
+        body = json.dumps(
+            {"transcript": "Thirteen makes two", "context": context}
+        ).encode()
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            self.server.server_address[1],
+            timeout=2,
+        )
+        connection.request(
+            "POST",
+            "/v1/interpret-command",
+            body=body,
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            },
+        )
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        connection.close()
+        return response.status, payload
 
     def test_voice_error_preserves_successful_transcript(self):
         self.server.interpreter = FailingInterpreter()

@@ -18,11 +18,13 @@ const hardwareStatus = document.querySelector('#hardwareStatus');
 const warmModels = document.querySelector('#warmModels');
 const warmupResult = document.querySelector('#warmupResult');
 const warmupStatus = document.querySelector('#warmupStatus');
+const exportDiagnostics = document.querySelector('#exportDiagnostics');
 const transcriptInput = document.querySelector('#transcriptInput');
 const transcriptFixture = document.querySelector('#transcriptFixture');
 const interpretTranscript = document.querySelector('#interpretTranscript');
 const proposalResult = document.querySelector('#proposalResult');
 const transcriptResult = document.querySelector('#transcriptResult');
+const cancelProcessing = document.querySelector('#cancelProcessing');
 const processButtons = [...document.querySelectorAll('.process-audio')];
 
 let recorder = null;
@@ -31,6 +33,7 @@ let chunks = [];
 let recordedBlob = null;
 let capturedSeconds = null;
 let previewUrl = null;
+let activeRequestId = null;
 
 function headers() {
   return { 'X-Bask-Voice-Token': tokenInput.value };
@@ -107,6 +110,42 @@ function showRequestError(error) {
   show(requestResult, payload || error.message);
 }
 
+function beginProcessing(requestId) {
+  activeRequestId = requestId;
+  cancelProcessing.disabled = false;
+  cancelProcessing.textContent = 'Cancel processing';
+}
+
+function endProcessing() {
+  activeRequestId = null;
+  cancelProcessing.disabled = true;
+  cancelProcessing.textContent = 'Cancel processing';
+}
+
+cancelProcessing.addEventListener('click', async () => {
+  if (!activeRequestId) return;
+  cancelProcessing.disabled = true;
+  cancelProcessing.textContent = 'Cancelling...';
+  try {
+    const response = await fetch('/v1/cancel', {
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ requestId: activeRequestId })
+    });
+    const payload = await readJson(response);
+    cancelProcessing.textContent = payload.status === 'cancellation_requested'
+      ? 'Cancellation requested'
+      : 'Request already finished';
+  } catch (error) {
+    showRequestError(error);
+    cancelProcessing.disabled = false;
+    cancelProcessing.textContent = 'Retry cancellation';
+  }
+});
+
 document.querySelector('#checkConnection').addEventListener('click', async () => {
   show(connectionResult, 'Checking...');
   serviceStatus.textContent = 'Checking';
@@ -152,6 +191,32 @@ warmModels.addEventListener('click', async () => {
         'Content-Type': 'application/json'
       },
       body: '{}'
+    });
+
+    exportDiagnostics.addEventListener('click', async () => {
+      exportDiagnostics.disabled = true;
+      exportDiagnostics.textContent = 'Exporting...';
+      try {
+        const payload = await fetch('/v1/diagnostics', {
+          headers: headers()
+        }).then(readJson);
+        const blob = new Blob(
+          [`${JSON.stringify(payload, null, 2)}\n`],
+          { type: 'application/json' }
+        );
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'bask-voice-diagnostics.json';
+        link.click();
+        URL.revokeObjectURL(url);
+        exportDiagnostics.textContent = 'Diagnostics exported';
+      } catch (error) {
+        show(connectionResult, error.payload || error.message);
+        exportDiagnostics.textContent = 'Retry diagnostic export';
+      } finally {
+        exportDiagnostics.disabled = false;
+      }
     });
     const payload = await readJson(response);
     transcriptionStatus.textContent = payload.transcription?.model || 'Ready';
@@ -228,6 +293,7 @@ async function processAudio(blob, seconds) {
   });
   try {
     const context = buildContext(seconds);
+    beginProcessing(context.requestId);
     const form = new FormData();
     form.append('context', new Blob([JSON.stringify(context)], { type: 'application/json' }));
     form.append('audio', blob, `voice-command.${blob.type.includes('ogg') ? 'ogg' : 'webm'}`);
@@ -240,6 +306,7 @@ async function processAudio(blob, seconds) {
   } catch (error) {
     showRequestError(error);
   } finally {
+    endProcessing();
     document.querySelector('#processFile').disabled = false;
     processRecording.disabled = !recordedBlob;
   }
@@ -268,6 +335,8 @@ interpretTranscript.addEventListener('click', async () => {
   show(requestResult, 'Interpreting...');
   interpretTranscript.disabled = true;
   try {
+    const context = buildContext(Number(videoSeconds.value));
+    beginProcessing(context.requestId);
     const response = await fetch('/v1/interpret-command', {
       method: 'POST',
       headers: {
@@ -276,13 +345,14 @@ interpretTranscript.addEventListener('click', async () => {
       },
       body: JSON.stringify({
         transcript: transcriptInput.value,
-        context: buildContext(Number(videoSeconds.value))
+        context
       })
     });
     showResponse(await readJson(response));
   } catch (error) {
     showRequestError(error);
   } finally {
+    endProcessing();
     interpretTranscript.disabled = false;
   }
 });

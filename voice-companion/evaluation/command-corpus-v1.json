@@ -1,0 +1,87 @@
+{
+  "formatVersion": 1,
+  "context": {
+    "sideHint": null,
+    "roster": [
+      {"id": "p7", "jersey": "7", "name": "Alex"},
+      {"id": "p13", "jersey": "13", "name": "Denis"},
+      {"id": "p25", "jersey": "25", "name": "Morgan"},
+      {"id": "p31", "jersey": "31", "name": "Taylor"}
+    ],
+    "currentLineupIds": ["p7", "p13", "p25", "p31"],
+    "allowedEventTypes": [
+      "shot",
+      "rebound",
+      "assist",
+      "steal",
+      "block",
+      "turnover",
+      "foul"
+    ]
+  },
+  "cases": [
+    {
+      "id": "made-two",
+      "transcript": "Number thirteen makes two",
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p13", "shotValue": 2, "made": true}
+      ],
+      "expectWarning": false
+    },
+    {
+      "id": "transition-assist",
+      "transcript": "Seven assist and thirteen makes two in transition",
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p13", "shotValue": 2, "made": true, "shotDetails": {"phase": "transition"}},
+        {"side": "team", "type": "assist", "playerId": "p7"}
+      ],
+      "expectWarning": false
+    },
+    {
+      "id": "missed-free-throw",
+      "transcript": "Number twenty five misses free throw",
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p25", "shotValue": 1, "made": false}
+      ],
+      "expectWarning": false
+    },
+    {
+      "id": "defensive-rebound",
+      "transcript": "Thirteen defensive rebound",
+      "expectedEvents": [
+        {"side": "team", "type": "rebound", "playerId": "p13", "reboundKind": "defensive"}
+      ],
+      "expectWarning": false
+    },
+    {
+      "id": "opponent-defensive-rebound",
+      "transcript": "Opponent defensive rebound",
+      "expectedEvents": [
+        {"side": "opponent", "type": "rebound", "playerId": null, "reboundKind": "defensive"}
+      ],
+      "expectWarning": false
+    },
+    {
+      "id": "opponent-missed-free-throw",
+      "transcript": "Opponent misses free throw",
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 1, "made": false}
+      ],
+      "expectWarning": false
+    },
+    {
+      "id": "turnover",
+      "transcript": "Thirty one turnover",
+      "expectedEvents": [
+        {"side": "team", "type": "turnover", "playerId": "p31"}
+      ],
+      "expectWarning": false
+    },
+    {
+      "id": "ambiguous-shot",
+      "transcript": "He made it",
+      "expectedEvents": [],
+      "expectWarning": true
+    }
+  ]
+}

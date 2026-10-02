@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import __version__
+from .cancellation import CancellationSignal, ProcessingCancelled
 from .config import (
     ALLOWED_AUDIO_TYPES,
     DEFAULT_ALLOWED_ORIGINS,
@@ -63,6 +64,7 @@ class VoiceCompanionServer(ThreadingHTTPServer):
         )
         self.processing_lock = threading.Lock()
         self.processing_requests = 0
+        self.cancellations: dict[str, CancellationSignal] = {}
 
     def begin_processing(self) -> bool:
         if not self.processing_slots.acquire(blocking=False):
@@ -75,6 +77,23 @@ class VoiceCompanionServer(ThreadingHTTPServer):
         with self.processing_lock:
             self.processing_requests -= 1
         self.processing_slots.release()
+
+    def register_request(self, request_id: str) -> CancellationSignal:
+        signal = CancellationSignal()
+        with self.processing_lock:
+            if request_id in self.cancellations:
+                raise ValueError("requestId is already being processed.")
+            self.cancellations[request_id] = signal
+        return signal
+
+    def finish_active_request(self, request_id: str):
+        with self.processing_lock:
+            self.cancellations.pop(request_id, None)
+
+    def cancel_request(self, request_id: str) -> bool:
+        with self.processing_lock:
+            signal = self.cancellations.get(request_id)
+        return signal.cancel() if signal else False
 
 
 class VoiceCompanionHandler(BaseHTTPRequestHandler):
@@ -155,6 +174,14 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 },
             )
             return
+        if path == "/v1/diagnostics":
+            if not self._authorize_api():
+                return
+            self._send_json(
+                HTTPStatus.OK,
+                self._diagnostics(),
+            )
+            return
         self._serve_static(path)
 
     def do_POST(self):
@@ -163,10 +190,14 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             "/v1/voice-command",
             "/v1/interpret-command",
             "/v1/warmup",
+            "/v1/cancel",
         }:
             self._send_error(HTTPStatus.NOT_FOUND, "not_found", "Endpoint was not found.")
             return
         if not self._authorize_api():
+            return
+        if path == "/v1/cancel":
+            self._handle_cancel()
             return
         if path == "/v1/warmup":
             self._handle_warmup()
@@ -175,6 +206,47 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             self._handle_interpret_command()
             return
         self._handle_voice_command()
+
+    def _handle_cancel(self):
+        content_length = self._content_length()
+        if content_length is None:
+            return
+        if content_length > 1024:
+            self._send_error(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "request_too_large",
+                "Cancellation request exceeds the configured limit.",
+            )
+            return
+        try:
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self._send_error(
+                HTTPStatus.BAD_REQUEST,
+                "invalid_request",
+                "Cancellation body must be valid JSON.",
+            )
+            return
+        if (
+            not isinstance(payload, dict)
+            or set(payload) != {"requestId"}
+            or not isinstance(payload["requestId"], str)
+            or not payload["requestId"]
+        ):
+            self._send_error(
+                HTTPStatus.BAD_REQUEST,
+                "invalid_request",
+                "Cancellation requires one non-empty requestId.",
+            )
+            return
+        cancelled = self.server.cancel_request(payload["requestId"])
+        self._send_json(
+            HTTPStatus.ACCEPTED if cancelled else HTTPStatus.NOT_FOUND,
+            {
+                "requestId": payload["requestId"],
+                "status": "cancellation_requested" if cancelled else "not_active",
+            },
+        )
 
     def _handle_warmup(self):
         content_length = self._content_length()
@@ -319,11 +391,16 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
 
         started = time.perf_counter()
         stage = "transcription"
+        cancellation = None
+        timeout_timer = None
         try:
+            cancellation = self.server.register_request(context["requestId"])
+            timeout_timer = self._start_timeout(cancellation)
             transcription_started = time.perf_counter()
             transcription = self.server.transcriber.transcribe(
                 audio, ALLOWED_AUDIO_TYPES[audio_type]
             )
+            cancellation.raise_if_cancelled()
             transcription_ms = round(
                 (time.perf_counter() - transcription_started) * 1000
             )
@@ -332,6 +409,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             interpretation = self._interpret_or_placeholder(
                 transcription.text,
                 context,
+                cancellation,
             )
             interpretation_ms = round(
                 (time.perf_counter() - interpretation_started) * 1000
@@ -371,6 +449,36 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 ),
             )
             return
+        except ProcessingCancelled as error:
+            self._send_error(
+                HTTPStatus.REQUEST_TIMEOUT
+                if error.reason == "timeout"
+                else HTTPStatus.CONFLICT,
+                "processing_timeout"
+                if error.reason == "timeout"
+                else "request_cancelled",
+                str(error),
+                stage=stage,
+                partial_result=(
+                    self._transcription_partial(
+                        context,
+                        transcription,
+                        transcription_ms,
+                        started,
+                    )
+                    if stage == "interpretation"
+                    else None
+                ),
+            )
+            return
+        except MemoryError as error:
+            self._send_error(
+                HTTPStatus.INSUFFICIENT_STORAGE,
+                "model_out_of_memory",
+                str(error) or "The local model ran out of memory.",
+                stage=stage,
+            )
+            return
         except (RuntimeError, subprocess.TimeoutExpired) as error:
             partial_result = (
                 self._transcription_partial(
@@ -395,6 +503,10 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             )
             return
         finally:
+            if timeout_timer:
+                timeout_timer.cancel()
+            if cancellation:
+                self.server.finish_active_request(context["requestId"])
             self.server.end_processing()
 
         total_ms = round((time.perf_counter() - started) * 1000)
@@ -445,9 +557,17 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             return
 
         started = time.perf_counter()
+        cancellation = None
+        timeout_timer = None
         try:
+            cancellation = self.server.register_request(context["requestId"])
+            timeout_timer = self._start_timeout(cancellation)
             interpretation_started = time.perf_counter()
-            interpretation = self.server.interpreter.interpret(transcript, context)
+            interpretation = self.server.interpreter.interpret(
+                transcript,
+                context,
+                cancellation,
+            )
             interpretation_ms = round(
                 (time.perf_counter() - interpretation_started) * 1000
             )
@@ -458,6 +578,26 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 str(error),
             )
             return
+        except ProcessingCancelled as error:
+            self._send_error(
+                HTTPStatus.REQUEST_TIMEOUT
+                if error.reason == "timeout"
+                else HTTPStatus.CONFLICT,
+                "processing_timeout"
+                if error.reason == "timeout"
+                else "request_cancelled",
+                str(error),
+                stage="interpretation",
+            )
+            return
+        except MemoryError as error:
+            self._send_error(
+                HTTPStatus.INSUFFICIENT_STORAGE,
+                "model_out_of_memory",
+                str(error) or "The local model ran out of memory.",
+                stage="interpretation",
+            )
+            return
         except (InvalidInterpretation, RuntimeError) as error:
             self._send_error(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -466,6 +606,10 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             )
             return
         finally:
+            if timeout_timer:
+                timeout_timer.cancel()
+            if cancellation:
+                self.server.finish_active_request(context["requestId"])
             self.server.end_processing()
 
         total_ms = round((time.perf_counter() - started) * 1000)
@@ -483,7 +627,10 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         )
 
     def _interpret_or_placeholder(
-        self, transcript: str, context: dict
+        self,
+        transcript: str,
+        context: dict,
+        cancellation: CancellationSignal,
     ) -> InterpretationResult:
         if isinstance(self.server.interpreter, DisabledCommandInterpreter):
             return InterpretationResult(
@@ -492,7 +639,24 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 warnings=["Local command interpretation is not configured."],
                 model=None,
             )
-        return self.server.interpreter.interpret(transcript, context)
+        return self.server.interpreter.interpret(
+            transcript,
+            context,
+            cancellation,
+        )
+
+    def _start_timeout(
+        self,
+        cancellation: CancellationSignal,
+    ) -> threading.Timer:
+        timer = threading.Timer(
+            self.server.settings.max_processing_seconds,
+            cancellation.cancel,
+            kwargs={"reason": "timeout"},
+        )
+        timer.daemon = True
+        timer.start()
+        return timer
 
     def _command_response(
         self,
@@ -606,6 +770,50 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             "device": None,
             "computeType": None,
             "modelDirectory": None,
+        }
+
+    def _diagnostics(self) -> dict:
+        transcription = self._transcription_metadata()
+        interpretation = self._interpretation_metadata()
+        return {
+            "formatVersion": 1,
+            "protocolVersion": PROTOCOL_VERSION,
+            "serviceVersion": __version__,
+            "profile": self.server.settings.profile,
+            "uptimeSeconds": round(
+                time.monotonic() - self.server.started_at,
+                1,
+            ),
+            "processingRequests": self.server.processing_requests,
+            "transcription": {
+                key: value
+                for key, value in transcription.items()
+                if key != "modelDirectory"
+            },
+            "interpretation": {
+                key: value
+                for key, value in interpretation.items()
+                if key != "modelPath"
+            },
+            "hardware": self.server.hardware,
+            "limits": {
+                "maxAudioBytes": self.server.settings.max_audio_bytes,
+                "maxContextBytes": self.server.settings.max_context_bytes,
+                "maxDurationSeconds": self.server.settings.max_duration_seconds,
+                "maxConcurrentRequests": (
+                    self.server.settings.max_concurrent_requests
+                ),
+                "maxProcessingSeconds": (
+                    self.server.settings.max_processing_seconds
+                ),
+            },
+            "privacy": {
+                "containsAudio": False,
+                "containsTranscript": False,
+                "containsToken": False,
+                "containsRoster": False,
+                "containsModelPaths": False,
+            },
         }
 
     def _interpretation_state(self) -> str:
@@ -768,6 +976,7 @@ def build_server(
     transcriber: Transcriber | None = None,
     interpreter: CommandInterpreter | None = None,
     max_concurrent_requests: int = 1,
+    max_processing_seconds: int = 120,
     profile_name: str = "spike",
 ) -> VoiceCompanionServer:
     web_root = Path(__file__).resolve().parents[2] / "web"
@@ -775,6 +984,7 @@ def build_server(
         token=token,
         allowed_origins=frozenset(allowed_origins),
         max_concurrent_requests=max_concurrent_requests,
+        max_processing_seconds=max_processing_seconds,
         profile=profile_name,
     )
     return VoiceCompanionServer(
@@ -804,6 +1014,11 @@ def main():
         "--max-concurrent-requests",
         type=int,
         default=1,
+    )
+    parser.add_argument(
+        "--processing-timeout-seconds",
+        type=int,
+        default=120,
     )
     parser.add_argument(
         "--transcriber",
@@ -849,6 +1064,8 @@ def main():
         parser.error("Checkpoint 0 binds to loopback only.")
     if args.max_concurrent_requests <= 0:
         parser.error("--max-concurrent-requests must be positive.")
+    if args.processing_timeout_seconds <= 0:
+        parser.error("--processing-timeout-seconds must be positive.")
 
     profile = resolve_profile(
         args.profile,
@@ -884,6 +1101,7 @@ def main():
         token=args.token,
         allowed_origins=parse_origins(args.allowed_origins),
         max_concurrent_requests=args.max_concurrent_requests,
+        max_processing_seconds=args.processing_timeout_seconds,
         profile_name=profile_name,
         transcriber=transcriber,
         interpreter=interpreter,

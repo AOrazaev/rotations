@@ -704,7 +704,7 @@ Verification:
 
 ### Checkpoint 3: Structured command interpretation
 
-**Status: in progress.** The Qwen3 4B Q4_K_M llama.cpp adapter, strict output validation, roster grounding, transcript-only endpoint, proposal workbench, partial-result diagnostics, and native Windows model installation are implemented. Real laptop commands now cover multi-event scoring, ambiguity, free throws, and three-point terminology. Corpus scoring, Phi-4-mini comparison, latency optimization, and automated Windows browser coverage remain open; see [`VOICE_COMPANION_CHECKPOINT_3.md`](VOICE_COMPANION_CHECKPOINT_3.md).
+**Status: complete.** The Qwen3 4B Q4_K_M llama.cpp adapter, strict output validation, roster grounding, transcript-only endpoint, proposal workbench, partial-result diagnostics, native Windows model installation, shared corpus scoring, and automated Windows browser coverage are implemented. Qwen3 passed all eight corpus cases; Phi-4-mini passed four and was not faster, so Qwen3 remains the initial command model. See [`VOICE_COMPANION_CHECKPOINT_3.md`](VOICE_COMPANION_CHECKPOINT_3.md) and [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
 
 Deliver:
 
@@ -731,7 +731,7 @@ Exit gate:
 
 ### Checkpoint 4: Standalone companion readiness
 
-**Status: in progress.** Explicit dual-model warmup, bounded hardware detection, profile recommendation, CPU/GPU placement reporting, and workbench readiness feedback are implemented and manually accepted. Corpus evaluation, redacted export, recovery testing, and long-session resource measurements remain open; see [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
+**Status: in progress.** Explicit dual-model warmup, bounded hardware detection, profile recommendation, CPU/GPU placement reporting, workbench readiness feedback, corpus evaluation, redacted diagnostics, model comparison, cancellation, timeout, out-of-memory handling, and recovery tests are implemented. Longer-session laptop measurements and gaming-PC validation remain open; see [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
 
 Deliver:
 

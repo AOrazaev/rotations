@@ -37,6 +37,7 @@ GET  /v1/capabilities
 POST /v1/voice-command
 POST /v1/interpret-command
 POST /v1/warmup
+POST /v1/cancel
 ```
 
 Health and capability responses expose the protocol version, readiness,
@@ -115,6 +116,18 @@ Install the CPU llama.cpp runtime and official Qwen3 4B Q4_K_M model:
 .\voice-companion\scripts\install-interpretation.ps1
 ```
 
+Qwen3 is the selected default command model. To reproduce the Phi-4-mini
+comparison download without changing the service default:
+
+```powershell
+.\voice-companion\scripts\install-interpretation.ps1 `
+  -ModelCandidate phi4mini
+```
+
+Phi-4-mini uses the community `bartowski` Q4_K_M GGUF of Microsoft's
+MIT-licensed model. It passed 4/8 shared corpus cases on the reference laptop,
+compared with Qwen3's 8/8, and was not faster.
+
 The model is stored outside the repository under:
 
 ```text
@@ -140,6 +153,28 @@ live command. The workbench reports model identities, warmup timing, detected
 CPU/memory/CUDA capabilities, and the recommended profile. Explicit command-line
 device, compute-type, model-path, context-size, and GPU-layer settings override
 the recommendation.
+
+Export a support report with **Export diagnostics**. The report intentionally
+omits audio, transcripts, tokens, rosters, usernames, and model paths.
+
+Run the shared transcript-to-proposal corpus:
+
+```powershell
+$env:PYTHONPATH = "$PWD\voice-companion\src"
+.\voice-companion\.venv\Scripts\python.exe `
+  -m voice_companion.evaluate_commands `
+  --output .\command-evaluation.json
+```
+
+Evaluate an alternate model by supplying its full path with `--model`.
+
+Processing defaults to a 120-second timeout and can be cancelled from the
+workbench. Override the timeout when starting the service:
+
+```powershell
+.\voice-companion\scripts\run.ps1 `
+  -ProcessingTimeoutSeconds 60
+```
 
 ## Tests
 

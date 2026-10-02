@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
 
+from .cancellation import CancellationSignal, ProcessingCancelled
 from .config import ALLOWED_EVENT_TYPES
 from .profiles import default_model_directory
 
@@ -101,7 +102,12 @@ class CommandInterpreter(Protocol):
 
     def warmup(self) -> None: ...
 
-    def interpret(self, transcript: str, context: dict) -> InterpretationResult: ...
+    def interpret(
+        self,
+        transcript: str,
+        context: dict,
+        cancellation: CancellationSignal | None = None,
+    ) -> InterpretationResult: ...
 
 
 class DisabledCommandInterpreter:
@@ -120,7 +126,12 @@ class DisabledCommandInterpreter:
     def warmup(self) -> None:
         return None
 
-    def interpret(self, transcript: str, context: dict) -> InterpretationResult:
+    def interpret(
+        self,
+        transcript: str,
+        context: dict,
+        cancellation: CancellationSignal | None = None,
+    ) -> InterpretationResult:
         raise InterpretationUnavailable(
             "Local command interpretation is not configured."
         )
@@ -171,11 +182,18 @@ class LlamaCppCommandInterpreter:
     def warmup(self) -> None:
         self._load_model()
 
-    def interpret(self, transcript: str, context: dict) -> InterpretationResult:
+    def interpret(
+        self,
+        transcript: str,
+        context: dict,
+        cancellation: CancellationSignal | None = None,
+    ) -> InterpretationResult:
         if not isinstance(transcript, str) or not transcript.strip():
             raise InvalidInterpretation("Transcript must be a non-empty string.")
+        if cancellation:
+            cancellation.raise_if_cancelled()
         model = self._load_model()
-        response = model.create_chat_completion(
+        options = dict(
             messages=[
                 {"role": "system", "content": self._system_prompt()},
                 {
@@ -192,16 +210,41 @@ class LlamaCppCommandInterpreter:
                 "schema": COMMAND_OUTPUT_SCHEMA,
             },
         )
+        if cancellation is None:
+            response = model.create_chat_completion(**options)
+            content = self._response_content(response)
+        else:
+            chunks = model.create_chat_completion(stream=True, **options)
+            content_parts = []
+            try:
+                for chunk in chunks:
+                    cancellation.raise_if_cancelled()
+                    delta = chunk["choices"][0].get("delta", {})
+                    if delta.get("content"):
+                        content_parts.append(delta["content"])
+            finally:
+                close = getattr(chunks, "close", None)
+                if callable(close):
+                    close()
+            content = "".join(content_parts)
         try:
-            content = response["choices"][0]["message"]["content"]
             payload = json.loads(content)
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as error:
+        except (TypeError, json.JSONDecodeError) as error:
             raise InvalidInterpretation(
                 "Command model returned an invalid structured response."
             ) from error
         result = validate_interpretation(payload, context, self.model_name)
         _validate_spoken_event_coverage(transcript, result)
         return result
+
+    @staticmethod
+    def _response_content(response) -> str:
+        try:
+            return response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as error:
+            raise InvalidInterpretation(
+                "Command model returned an invalid structured response."
+            ) from error
 
     def _load_model(self):
         if self._model is not None:
@@ -628,7 +671,13 @@ def create_interpreter(
                 }
 
             @staticmethod
-            def interpret(transcript: str, context: dict):
+            def interpret(
+                transcript: str,
+                context: dict,
+                cancellation: CancellationSignal | None = None,
+            ):
+                if cancellation:
+                    cancellation.raise_if_cancelled()
                 return validate_interpretation(payload, context, "fixture")
 
         return FixtureInterpreter()
