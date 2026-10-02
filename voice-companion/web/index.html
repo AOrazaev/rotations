@@ -22,14 +22,21 @@
       </label>
       <div class="actions">
         <button id="checkConnection" type="button">Check service</button>
+        <button id="warmModels" type="button">Warm models</button>
       </div>
+      <p id="warmupStatus" class="readiness-banner" role="status">Models have not been warmed from this page.</p>
       <div class="status-grid" aria-live="polite">
         <div><span>Service</span><strong id="serviceStatus">Not checked</strong></div>
         <div><span>Protocol</span><strong id="protocolStatus">Unknown</strong></div>
         <div><span>Transcription</span><strong id="transcriptionStatus">Unknown</strong></div>
         <div><span>Interpretation</span><strong id="interpretationStatus">Unavailable</strong></div>
+        <div><span>Recommended profile</span><strong id="hardwareStatus">Unknown</strong></div>
       </div>
       <pre id="connectionResult" aria-live="polite">Not checked.</pre>
+      <details>
+        <summary>Warmup details</summary>
+        <pre id="warmupResult" aria-live="polite">Models not warmed.</pre>
+      </details>
     </section>
 
     <section class="card">

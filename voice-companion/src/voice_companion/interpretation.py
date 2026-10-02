@@ -99,6 +99,8 @@ class CommandInterpreter(Protocol):
 
     def metadata(self) -> dict: ...
 
+    def warmup(self) -> None: ...
+
     def interpret(self, transcript: str, context: dict) -> InterpretationResult: ...
 
 
@@ -114,6 +116,9 @@ class DisabledCommandInterpreter:
             "modelPath": None,
             "lastError": None,
         }
+
+    def warmup(self) -> None:
+        return None
 
     def interpret(self, transcript: str, context: dict) -> InterpretationResult:
         raise InterpretationUnavailable(
@@ -162,6 +167,9 @@ class LlamaCppCommandInterpreter:
             "gpuLayers": self.gpu_layers,
             "lastError": self._last_error,
         }
+
+    def warmup(self) -> None:
+        self._load_model()
 
     def interpret(self, transcript: str, context: dict) -> InterpretationResult:
         if not isinstance(transcript, str) or not transcript.strip():

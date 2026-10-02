@@ -14,6 +14,10 @@ const serviceStatus = document.querySelector('#serviceStatus');
 const protocolStatus = document.querySelector('#protocolStatus');
 const transcriptionStatus = document.querySelector('#transcriptionStatus');
 const interpretationStatus = document.querySelector('#interpretationStatus');
+const hardwareStatus = document.querySelector('#hardwareStatus');
+const warmModels = document.querySelector('#warmModels');
+const warmupResult = document.querySelector('#warmupResult');
+const warmupStatus = document.querySelector('#warmupStatus');
 const transcriptInput = document.querySelector('#transcriptInput');
 const transcriptFixture = document.querySelector('#transcriptFixture');
 const interpretTranscript = document.querySelector('#interpretTranscript');
@@ -123,6 +127,7 @@ document.querySelector('#checkConnection').addEventListener('click', async () =>
     interpretationStatus.textContent = capabilities.eventInterpretation
       ? (capabilities.commandModel || 'Ready')
       : 'Not implemented';
+    hardwareStatus.textContent = capabilities.hardware?.recommendedProfile || 'Unknown';
     show(connectionResult, { health, capabilities });
   } catch (error) {
     serviceStatus.textContent = 'Error';
@@ -130,6 +135,39 @@ document.querySelector('#checkConnection').addEventListener('click', async () =>
     transcriptionStatus.textContent = 'Unknown';
     interpretationStatus.textContent = 'Unknown';
     show(connectionResult, error.message);
+  }
+});
+
+warmModels.addEventListener('click', async () => {
+  show(warmupResult, 'Warming models...');
+  warmupStatus.className = 'readiness-banner loading';
+  warmupStatus.textContent = 'Loading transcription and command models. The first warmup can take several seconds.';
+  warmModels.textContent = 'Warming...';
+  warmModels.disabled = true;
+  try {
+    const response = await fetch('/v1/warmup', {
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'Content-Type': 'application/json'
+      },
+      body: '{}'
+    });
+    const payload = await readJson(response);
+    transcriptionStatus.textContent = payload.transcription?.model || 'Ready';
+    interpretationStatus.textContent = payload.interpretation?.model || 'Not configured';
+    hardwareStatus.textContent = payload.hardware?.recommendedProfile || 'Unknown';
+    warmupStatus.className = 'readiness-banner ready';
+    warmupStatus.textContent = `Models ready in ${payload.timingMs.total} ms: ${payload.transcription?.model || 'transcription unavailable'} + ${payload.interpretation?.model || 'interpretation disabled'}.`;
+    warmModels.textContent = 'Models ready';
+    show(warmupResult, payload);
+  } catch (error) {
+    warmupStatus.className = 'readiness-banner error';
+    warmupStatus.textContent = `Model warmup failed: ${error.message}`;
+    warmModels.textContent = 'Retry warmup';
+    show(warmupResult, error.payload || error.message);
+  } finally {
+    warmModels.disabled = false;
   }
 });
 

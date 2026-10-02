@@ -44,6 +44,8 @@ class Transcriber(Protocol):
 
     def metadata(self) -> dict: ...
 
+    def warmup(self) -> None: ...
+
     def transcribe(self, audio: bytes, suffix: str) -> TranscriptionResult: ...
 
 
@@ -76,6 +78,12 @@ class ExternalCommandTranscriber:
             "computeType": None,
             "modelDirectory": None,
         }
+
+    def warmup(self) -> None:
+        if not self.ready:
+            raise TranscriptionUnavailable(
+                "External transcription is not configured."
+            )
 
     def transcribe(self, audio: bytes, suffix: str) -> TranscriptionResult:
         if self.fixture_transcript:
@@ -158,6 +166,9 @@ class FasterWhisperTranscriber:
             "modelDirectory": str(self.model_directory),
             "lastError": self._last_error,
         }
+
+    def warmup(self) -> None:
+        self._load_model()
 
     def transcribe(self, audio: bytes, suffix: str) -> TranscriptionResult:
         model = self._load_model()

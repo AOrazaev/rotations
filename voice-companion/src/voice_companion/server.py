@@ -30,6 +30,7 @@ from .interpretation import (
     InvalidInterpretation,
     create_interpreter,
 )
+from .hardware import detect_hardware
 from .transcription import (
     Transcriber,
     TranscriptionUnavailable,
@@ -55,6 +56,7 @@ class VoiceCompanionServer(ThreadingHTTPServer):
         self.web_root = web_root
         self.transcriber = transcriber
         self.interpreter = interpreter
+        self.hardware = detect_hardware()
         self.started_at = time.monotonic()
         self.processing_slots = threading.BoundedSemaphore(
             settings.max_concurrent_requests
@@ -144,6 +146,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     "eventInterpretation": (
                         interpretation_metadata["runtime"] != "disabled"
                     ),
+                    "hardware": self.server.hardware,
                     "security": {
                         "loopbackOnly": True,
                         "tokenRequired": True,
@@ -156,15 +159,108 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        if path not in {"/v1/voice-command", "/v1/interpret-command"}:
+        if path not in {
+            "/v1/voice-command",
+            "/v1/interpret-command",
+            "/v1/warmup",
+        }:
             self._send_error(HTTPStatus.NOT_FOUND, "not_found", "Endpoint was not found.")
             return
         if not self._authorize_api():
+            return
+        if path == "/v1/warmup":
+            self._handle_warmup()
             return
         if path == "/v1/interpret-command":
             self._handle_interpret_command()
             return
         self._handle_voice_command()
+
+    def _handle_warmup(self):
+        content_length = self._content_length()
+        if content_length is None:
+            return
+        if content_length > 1024:
+            self._send_error(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "request_too_large",
+                "Warmup request exceeds the configured limit.",
+            )
+            return
+        if content_length:
+            try:
+                payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                self._send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_request",
+                    "Warmup body must be valid JSON.",
+                )
+                return
+            if payload != {}:
+                self._send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_request",
+                    "Warmup request does not accept options.",
+                )
+                return
+        if not self.server.begin_processing():
+            self._send_error(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                "service_busy",
+                "The voice companion is already processing a request.",
+            )
+            return
+
+        started = time.perf_counter()
+        timings = {}
+        try:
+            timings["transcription"] = self._warm_adapter(
+                self.server.transcriber,
+            )
+            timings["interpretation"] = self._warm_adapter(
+                self.server.interpreter,
+            )
+        except (TranscriptionUnavailable, InterpretationUnavailable) as error:
+            self._send_error(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "warmup_unavailable",
+                str(error),
+                stage="warmup",
+            )
+            return
+        except (RuntimeError, OSError, ValueError) as error:
+            self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "warmup_failed",
+                str(error),
+                stage="warmup",
+            )
+            return
+        finally:
+            self.server.end_processing()
+
+        timings["total"] = round((time.perf_counter() - started) * 1000)
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "protocolVersion": PROTOCOL_VERSION,
+                "status": "ready",
+                "profile": self.server.settings.profile,
+                "transcription": self._transcription_metadata(),
+                "interpretation": self._interpretation_metadata(),
+                "hardware": self.server.hardware,
+                "timingMs": timings,
+            },
+        )
+
+    @staticmethod
+    def _warm_adapter(adapter) -> int:
+        started = time.perf_counter()
+        warmup = getattr(adapter, "warmup", None)
+        if callable(warmup):
+            warmup()
+        return round((time.perf_counter() - started) * 1000)
 
     def _handle_voice_command(self):
         content_length = self._content_length()

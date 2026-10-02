@@ -318,6 +318,33 @@ class InterpretationServerTest(unittest.TestCase):
             "fixture-command-model",
         )
 
+    def test_warmup_reports_models_hardware_and_timing(self):
+        body = b"{}"
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            self.server.server_address[1],
+            timeout=2,
+        )
+        connection.request(
+            "POST",
+            "/v1/warmup",
+            body=body,
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            },
+        )
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        connection.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(payload["status"], "ready")
+        self.assertIn("recommendedProfile", payload["hardware"])
+        self.assertGreaterEqual(payload["timingMs"]["total"], 0)
+
     def test_voice_error_preserves_successful_transcript(self):
         self.server.interpreter = FailingInterpreter()
         context = {

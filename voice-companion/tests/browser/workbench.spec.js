@@ -11,6 +11,12 @@ test('workbench checks service and processes an audio file', async ({ page }) =>
   await expect(page.locator('#protocolStatus')).toHaveText('v1');
   await expect(page.locator('#transcriptionStatus')).toHaveText('fixture');
   await expect(page.locator('#interpretationStatus')).toHaveText('fixture');
+  await expect(page.locator('#hardwareStatus')).not.toHaveText('Unknown');
+
+  await page.locator('#warmModels').click();
+  await expect(page.locator('#warmupResult')).toContainText('"status": "ready"');
+  await expect(page.locator('#warmupStatus')).toContainText('Models ready');
+  await expect(page.locator('#warmModels')).toHaveText('Models ready');
 
   await page.locator('#videoSeconds').fill('42.5');
   await page.locator('#audioFile').setInputFiles({

@@ -36,6 +36,7 @@ GET  /v1/health
 GET  /v1/capabilities
 POST /v1/voice-command
 POST /v1/interpret-command
+POST /v1/warmup
 ```
 
 Health and capability responses expose the protocol version, readiness,
@@ -133,6 +134,12 @@ Use the workbench's **Transcript interpretation** section to exercise Qwen
 without recording audio. When transcription succeeds but interpretation fails,
 the API returns the transcript in `partialResult` and the workbench keeps it
 visible under **Latest transcript**.
+
+Choose **Warm models** after connecting to load both models before the first
+live command. The workbench reports model identities, warmup timing, detected
+CPU/memory/CUDA capabilities, and the recommended profile. Explicit command-line
+device, compute-type, model-path, context-size, and GPU-layer settings override
+the recommendation.
 
 ## Tests
 

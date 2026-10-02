@@ -731,6 +731,8 @@ Exit gate:
 
 ### Checkpoint 4: Standalone companion readiness
 
+**Status: in progress.** Explicit dual-model warmup, bounded hardware detection, profile recommendation, CPU/GPU placement reporting, and workbench readiness feedback are implemented and manually accepted. Corpus evaluation, redacted export, recovery testing, and long-session resource measurements remain open; see [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
+
 Deliver:
 
 - Complete workbench recording-to-proposal workflow.
