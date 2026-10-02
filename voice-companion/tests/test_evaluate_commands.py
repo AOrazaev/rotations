@@ -75,6 +75,32 @@ class CommandEvaluationTest(unittest.TestCase):
         self.assertEqual(report["summary"]["warningExpectationsMet"], 2)
         self.assertEqual(report["summary"]["errorCount"], 0)
 
+    def test_reports_case_progress(self):
+        events = []
+        corpus = {
+            "context": {"roster": []},
+            "cases": [
+                {
+                    "id": "assist",
+                    "transcript": "assist",
+                    "expectedEvents": [
+                        {
+                            "side": "team",
+                            "type": "assist",
+                            "playerId": "p7",
+                        }
+                    ],
+                    "expectWarning": False,
+                }
+            ],
+        }
+
+        evaluate_corpus(corpus, FakeInterpreter(), progress=events.append)
+
+        self.assertEqual(events[0]["stage"], "case_started")
+        self.assertEqual(events[1]["stage"], "case_finished")
+        self.assertTrue(events[1]["passed"])
+
     def test_load_corpus_rejects_missing_cases(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "corpus.json"

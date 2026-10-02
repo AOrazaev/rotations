@@ -50,9 +50,19 @@ def semantic_events(events: list[dict]) -> list[dict]:
     ]
 
 
-def evaluate_corpus(corpus: dict, interpreter) -> dict:
+def evaluate_corpus(corpus: dict, interpreter, progress=None) -> dict:
     results = []
-    for case in corpus["cases"]:
+    case_count = len(corpus["cases"])
+    for index, case in enumerate(corpus["cases"]):
+        if progress:
+            progress(
+                {
+                    "stage": "case_started",
+                    "caseIndex": index + 1,
+                    "caseCount": case_count,
+                    "caseId": case["id"],
+                }
+            )
         started = time.perf_counter()
         try:
             result = interpreter.interpret(
@@ -97,6 +107,21 @@ def evaluate_corpus(corpus: dict, interpreter) -> dict:
                         "type": type(error).__name__,
                         "message": str(error),
                     },
+                }
+            )
+        if progress:
+            progress(
+                {
+                    "stage": "case_finished",
+                    "caseIndex": index + 1,
+                    "caseCount": case_count,
+                    "caseId": case["id"],
+                    "latencyMs": results[-1]["latencyMs"],
+                    "passed": (
+                        results[-1]["eventArrayExact"]
+                        and results[-1]["warningExpectationMet"]
+                        and results[-1]["error"] is None
+                    ),
                 }
             )
 

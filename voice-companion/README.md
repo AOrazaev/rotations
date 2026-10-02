@@ -226,6 +226,9 @@ rounds of the eight-case corpus with five-minute gaps and records:
 - Process working-set and private-memory samples.
 - NVIDIA memory, temperature, utilization, and performance-state samples.
 
+The console reports model warmup, every command result, round summaries,
+elapsed time, and a countdown during each five-minute gap.
+
 The command prints the path of one JSON report under
 `voice-companion\validation-results\`. Return that file for review. It contains
 only the committed curated transcripts, not microphone audio, tokens, model

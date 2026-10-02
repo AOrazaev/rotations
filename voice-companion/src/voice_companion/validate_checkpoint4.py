@@ -163,6 +163,18 @@ def _memory_delta(start: dict, end: dict, key: str) -> int | None:
     return end[key] - start[key]
 
 
+def _format_duration(seconds: float) -> str:
+    rounded = max(0, round(seconds))
+    minutes, remaining_seconds = divmod(rounded, 60)
+    if minutes:
+        return f"{minutes}m {remaining_seconds:02d}s"
+    return f"{remaining_seconds}s"
+
+
+def _print_progress(message: str) -> None:
+    print(f"[checkpoint-4] {message}", flush=True)
+
+
 def run_validation(
     *,
     corpus_path: Path,
@@ -176,6 +188,7 @@ def run_validation(
     delay_between_rounds_seconds: int,
     source_revision: str | None,
 ) -> dict:
+    validation_started = time.perf_counter()
     corpus = load_corpus(corpus_path)
     interpreter = LlamaCppCommandInterpreter(
         model_path=model_path,
@@ -186,6 +199,9 @@ def run_validation(
         {"label": "beforeWarmup", **process_memory()},
     ]
     gpu_samples = [gpu_snapshot("beforeWarmup")]
+    _print_progress(
+        f"Warming transcription model ({transcription_profile})..."
+    )
     transcriber = FasterWhisperTranscriber(
         resolve_profile(
             transcription_profile,
@@ -198,32 +214,83 @@ def run_validation(
     transcription_warmup_ms = round(
         (time.perf_counter() - transcription_warmup_started) * 1000
     )
+    _print_progress(
+        "Transcription model ready in "
+        f"{_format_duration(transcription_warmup_ms / 1000)}."
+    )
     memory_samples.append(
         {"label": "afterTranscriptionWarmup", **process_memory()}
     )
     gpu_samples.append(gpu_snapshot("afterTranscriptionWarmup"))
 
+    _print_progress(
+        f"Warming command model with {gpu_layers} GPU layers..."
+    )
     command_warmup_started = time.perf_counter()
     interpreter.warmup()
     command_warmup_ms = round(
         (time.perf_counter() - command_warmup_started) * 1000
+    )
+    _print_progress(
+        "Command model ready in "
+        f"{_format_duration(command_warmup_ms / 1000)}."
     )
     memory_samples.append({"label": "afterCommandWarmup", **process_memory()})
     gpu_samples.append(gpu_snapshot("afterCommandWarmup"))
 
     rounds = []
     for index in range(repetitions):
-        report = evaluate_corpus(corpus, interpreter)
+        round_number = index + 1
+        _print_progress(
+            f"Starting round {round_number}/{repetitions} "
+            f"({len(corpus['cases'])} commands)."
+        )
+
+        def report_case(event: dict) -> None:
+            if event["stage"] == "case_started":
+                _print_progress(
+                    f"Round {round_number}/{repetitions}, command "
+                    f"{event['caseIndex']}/{event['caseCount']}: "
+                    f"{event['caseId']}..."
+                )
+                return
+            outcome = "passed" if event["passed"] else "FAILED"
+            _print_progress(
+                f"Round {round_number}/{repetitions}, command "
+                f"{event['caseIndex']}/{event['caseCount']} {outcome} "
+                f"in {_format_duration(event['latencyMs'] / 1000)}."
+            )
+
+        report = evaluate_corpus(
+            corpus,
+            interpreter,
+            progress=report_case,
+        )
         report["round"] = index + 1
         rounds.append(report)
         label = f"afterRound{index + 1}"
         memory_samples.append({"label": label, **process_memory()})
         gpu_samples.append(gpu_snapshot(label))
+        _print_progress(
+            f"Round {round_number}/{repetitions} complete: "
+            f"{report['summary']['exactEventArrays']}/"
+            f"{report['summary']['caseCount']} exact, "
+            f"median "
+            f"{_format_duration(report['summary']['medianLatencyMs'] / 1000)}. "
+            f"Elapsed {_format_duration(time.perf_counter() - validation_started)}."
+        )
         if (
             delay_between_rounds_seconds > 0
             and index + 1 < repetitions
         ):
-            time.sleep(delay_between_rounds_seconds)
+            remaining = delay_between_rounds_seconds
+            while remaining > 0:
+                wait = min(30, remaining)
+                _print_progress(
+                    f"Next round in {_format_duration(remaining)}."
+                )
+                time.sleep(wait)
+                remaining -= wait
 
     summary = summarize_rounds(rounds)
     after_warmup = memory_samples[2]
@@ -237,6 +304,12 @@ def run_validation(
         after_warmup,
         final_memory,
         "privateBytes",
+    )
+    _print_progress(
+        f"Validation complete in "
+        f"{_format_duration(time.perf_counter() - validation_started)}: "
+        f"{summary['exactEventArrays']}/{summary['commandCount']} exact, "
+        f"{summary['errorCount']} errors."
     )
     return {
         "formatVersion": 1,
