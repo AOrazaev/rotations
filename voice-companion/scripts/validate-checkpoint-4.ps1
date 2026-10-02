@@ -4,6 +4,9 @@ param(
   [int]$DelayBetweenRoundsSeconds = 300,
   [ValidateSet("lightweight", "balanced", "high_accuracy")]
   [string]$TranscriptionProfile = "balanced",
+  [ValidateSet("", "auto", "cpu", "cuda")]
+  [string]$TranscriptionDevice = "",
+  [string]$TranscriptionComputeType = "",
   [string]$CommandModel = "",
   [string]$ResultsDirectory = ""
 )
@@ -46,12 +49,24 @@ $Arguments = @(
   "--source-revision", $Revision,
   "--output", $Output
 )
+if ($TranscriptionDevice) {
+  $Arguments += @("--transcription-device", $TranscriptionDevice)
+}
+if ($TranscriptionComputeType) {
+  $Arguments += @(
+    "--transcription-compute-type",
+    $TranscriptionComputeType
+  )
+}
 
 Write-Host "Running Checkpoint 4 validation."
 Write-Host "Repetitions: $Repetitions (8 commands each)"
 Write-Host "Delay between rounds: $DelayBetweenRoundsSeconds seconds"
 Write-Host "GPU layers: $CommandGpuLayers"
 Write-Host "Transcription profile: $TranscriptionProfile"
+if ($TranscriptionDevice) {
+  Write-Host "Transcription device override: $TranscriptionDevice"
+}
 Write-Host "Report: $Output"
 & $VirtualPython @Arguments
 $ValidationExitCode = $LASTEXITCODE

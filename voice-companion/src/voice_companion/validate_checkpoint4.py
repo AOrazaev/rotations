@@ -170,6 +170,8 @@ def run_validation(
     context_size: int,
     gpu_layers: int,
     transcription_profile: str,
+    transcription_device: str | None,
+    transcription_compute_type: str | None,
     repetitions: int,
     delay_between_rounds_seconds: int,
     source_revision: str | None,
@@ -185,7 +187,11 @@ def run_validation(
     ]
     gpu_samples = [gpu_snapshot("beforeWarmup")]
     transcriber = FasterWhisperTranscriber(
-        resolve_profile(transcription_profile)
+        resolve_profile(
+            transcription_profile,
+            device=transcription_device,
+            compute_type=transcription_compute_type,
+        )
     )
     transcription_warmup_started = time.perf_counter()
     transcriber.warmup()
@@ -294,6 +300,8 @@ def main():
         choices=["lightweight", "balanced", "high_accuracy"],
         default="balanced",
     )
+    parser.add_argument("--transcription-device")
+    parser.add_argument("--transcription-compute-type")
     parser.add_argument("--repetitions", type=int, default=7)
     parser.add_argument("--delay-between-rounds-seconds", type=int, default=300)
     parser.add_argument("--source-revision")
@@ -311,6 +319,8 @@ def main():
             context_size=args.context_size,
             gpu_layers=args.gpu_layers,
             transcription_profile=args.transcription_profile,
+            transcription_device=args.transcription_device,
+            transcription_compute_type=args.transcription_compute_type,
             repetitions=args.repetitions,
             delay_between_rounds_seconds=(
                 args.delay_between_rounds_seconds
@@ -337,6 +347,8 @@ def main():
                 "contextSize": args.context_size,
                 "gpuLayers": args.gpu_layers,
                 "transcriptionProfile": args.transcription_profile,
+                "transcriptionDevice": args.transcription_device,
+                "transcriptionComputeType": args.transcription_compute_type,
                 "repetitions": args.repetitions,
                 "delayBetweenRoundsSeconds": (
                     args.delay_between_rounds_seconds

@@ -178,7 +178,9 @@ workbench. Override the timeout when starting the service:
 
 ## Gaming-PC Checkpoint 4 validation
 
-On a fresh Windows clone with Python 3.12 and current NVIDIA drivers, run:
+On a fresh Windows clone with Python 3.12, current NVIDIA drivers, the CUDA
+12.4 runtime/toolkit, and the current Microsoft Visual C++ x64 redistributable,
+run:
 
 ```powershell
 .\voice-companion\scripts\prepare-gaming-pc.ps1
@@ -186,8 +188,33 @@ On a fresh Windows clone with Python 3.12 and current NVIDIA drivers, run:
 ```
 
 The setup script installs the balanced faster-whisper model, Qwen3 Q4_K_M, and
-the CUDA 12.4 llama.cpp wheel. Override `-LlamaWheelIndexUrl` if the machine
-requires a different supported wheel index.
+the CUDA 12.4 llama.cpp wheel. It now verifies that the native llama.cpp DLL can
+load before reporting success.
+
+To keep transcription on CPU while testing Qwen on the GPU, run:
+
+```powershell
+.\voice-companion\scripts\validate-checkpoint-4.ps1 `
+  -TranscriptionDevice cpu `
+  -TranscriptionComputeType int8
+```
+
+This configuration does not require cuDNN. Full faster-whisper GPU execution
+with CTranslate2 4.8 requires CUDA 12 and cuDNN 9.
+
+If the CUDA runtime cannot be installed immediately, replace the broken CUDA
+wheel with the CPU wheel and validate in CPU mode:
+
+```powershell
+.\voice-companion\scripts\prepare-gaming-pc.ps1 `
+  -CommandRuntime cpu `
+  -ForceRuntimeReinstall
+
+.\voice-companion\scripts\validate-checkpoint-4.ps1 `
+  -CommandGpuLayers 0 `
+  -TranscriptionDevice cpu `
+  -TranscriptionComputeType int8
+```
 
 The validation command takes at least 30 minutes by default. It runs seven
 rounds of the eight-case corpus with five-minute gaps and records:

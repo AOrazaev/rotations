@@ -4,6 +4,7 @@ param(
   [string]$WheelIndexUrl = "https://abetlen.github.io/llama-cpp-python/whl/cpu",
   [ValidateSet("qwen3", "phi4mini")]
   [string]$ModelCandidate = "qwen3",
+  [switch]$ForceRuntimeReinstall,
   [switch]$SkipModelDownload,
   [switch]$ForceModelDownload
 )
@@ -27,6 +28,9 @@ $pipArguments = @(
   "llama-cpp-python==0.3.35",
   "--extra-index-url", $WheelIndexUrl
 )
+if ($ForceRuntimeReinstall) {
+  $pipArguments += @("--force-reinstall", "--no-cache-dir")
+}
 if ($PackageIndexUrl) {
   $pipArguments += @("--index-url", $PackageIndexUrl)
 }
@@ -37,6 +41,17 @@ if ($TrustedHost) {
 & $VirtualPython @pipArguments
 if ($LASTEXITCODE -ne 0) {
   throw "Command interpretation dependency installation failed."
+}
+
+& $VirtualPython -c "import llama_cpp; print(f'llama-cpp-python {llama_cpp.__version__} loaded')"
+if ($LASTEXITCODE -ne 0) {
+  throw @"
+llama-cpp-python was installed but its native runtime could not be loaded.
+
+For the CUDA 12.4 wheel, install the CUDA 12.4 runtime/toolkit and the current
+Microsoft Visual C++ x64 redistributable, then open a new PowerShell window.
+For a CPU fallback, rerun prepare-gaming-pc.ps1 -CommandRuntime cpu
+"@
 }
 
 if (-not $SkipModelDownload) {
