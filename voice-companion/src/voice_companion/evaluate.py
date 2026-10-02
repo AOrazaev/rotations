@@ -11,8 +11,60 @@ from .profiles import default_model_directory, resolve_profile
 from .transcription import FasterWhisperTranscriber
 
 
+NUMBER_WORDS = {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+}
+TENS_WORDS = {
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+}
+
+
 def normalize_transcript(value: str) -> str:
-    return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
+    tokens = re.findall(r"[a-z0-9]+", value.lower())
+    normalized = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token in TENS_WORDS:
+            number = TENS_WORDS[token]
+            if index + 1 < len(tokens) and tokens[index + 1] in NUMBER_WORDS:
+                next_number = NUMBER_WORDS[tokens[index + 1]]
+                if 0 < next_number < 10:
+                    number += next_number
+                    index += 1
+            normalized.append(str(number))
+        elif token in NUMBER_WORDS:
+            normalized.append(str(NUMBER_WORDS[token]))
+        else:
+            normalized.append(token)
+        index += 1
+    return " ".join(normalized)
 
 
 def load_cases(audio_paths: list[str], manifest_path: str | None):

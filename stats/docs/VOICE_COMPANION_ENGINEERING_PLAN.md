@@ -681,7 +681,7 @@ Verification:
 
 ### Checkpoint 2: Local transcription
 
-**Status: in progress.** The Python 3.12 faster-whisper adapter, model profiles, native installer, model-download helper, evaluation command, and unit coverage are implemented. Real-model installation and native Windows transcription measurements remain open; see [`VOICE_COMPANION_CHECKPOINT_2.md`](VOICE_COMPANION_CHECKPOINT_2.md).
+**Status: in progress.** The Python 3.12 faster-whisper adapter, basketball decoding vocabulary, model profiles, native installer, model-download helper, evaluation command, and unit coverage are implemented. The balanced `base.en` model now passes native Windows model-load, evaluation, localhost API, and microphone/workbench checks. A representative command corpus and broader hardware measurements remain open; see [`VOICE_COMPANION_CHECKPOINT_2.md`](VOICE_COMPANION_CHECKPOINT_2.md).
 
 Deliver:
 

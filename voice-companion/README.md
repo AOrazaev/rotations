@@ -13,9 +13,8 @@ Requirements:
 Run from PowerShell:
 
 ```powershell
-$repo = '\\wsl.localhost\Ubuntu\home\orazaev\proj\bask\rotations'
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File "$repo\voice-companion\scripts\run.ps1"
+Set-Location 'C:\path\to\rotations'
+.\voice-companion\scripts\run.ps1
 ```
 
 The command prints a random pairing token and starts:
@@ -51,11 +50,8 @@ receive `429 service_busy`.
 Install the balanced local transcription profile from Windows PowerShell:
 
 ```powershell
-$repo = '\\wsl.localhost\Ubuntu\home\orazaev\proj\bask\rotations'
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File "$repo\voice-companion\scripts\install-transcription.ps1" `
-  -Profile balanced
+Set-Location 'C:\path\to\rotations'
+.\voice-companion\scripts\install-transcription.ps1 -Profile balanced
 ```
 
 This creates `voice-companion/.venv`, installs `faster-whisper`, and downloads
@@ -78,9 +74,7 @@ Available profiles:
 Install all three:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File "$repo\voice-companion\scripts\install-transcription.ps1" `
-  -AllProfiles
+.\voice-companion\scripts\install-transcription.ps1 -AllProfiles
 ```
 
 The package index is configurable for corporate environments:
@@ -94,8 +88,7 @@ The package index is configurable for corporate environments:
 Then start the selected profile:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File "$repo\voice-companion\scripts\run.ps1" `
+.\voice-companion\scripts\run.ps1 `
   -Token manual-test-token `
   -Profile balanced
 ```

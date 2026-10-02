@@ -10,7 +10,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from voice_companion.profiles import resolve_profile
-from voice_companion.transcription import FasterWhisperTranscriber
+from voice_companion.transcription import (
+    BASKETBALL_HOTWORDS,
+    FasterWhisperTranscriber,
+)
 
 
 class FakeSegment:
@@ -61,6 +64,7 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
             self.assertFalse(model.audio_path.exists())
             self.assertEqual(model.options["language"], "en")
             self.assertTrue(model.options["vad_filter"])
+            self.assertEqual(model.options["hotwords"], BASKETBALL_HOTWORDS)
 
     def test_reports_model_load_failure(self):
         def factory(*args, **kwargs):

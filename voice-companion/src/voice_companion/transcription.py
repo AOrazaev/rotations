@@ -12,6 +12,13 @@ from typing import Callable, Protocol
 from .profiles import TranscriptionProfile, default_model_directory
 
 
+BASKETBALL_HOTWORDS = (
+    "basketball player number point points one two three free throw free throws "
+    "makes made misses missed shot rebound offensive defensive assist steal "
+    "block turnover foul transition"
+)
+
+
 class TranscriptionUnavailable(RuntimeError):
     pass
 
@@ -166,6 +173,7 @@ class FasterWhisperTranscriber:
                 best_of=1,
                 condition_on_previous_text=False,
                 vad_filter=True,
+                hotwords=BASKETBALL_HOTWORDS,
             )
             transcript = " ".join(
                 segment.text.strip() for segment in segments if segment.text.strip()
