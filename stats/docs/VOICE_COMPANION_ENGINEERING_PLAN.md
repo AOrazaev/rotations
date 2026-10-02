@@ -731,7 +731,7 @@ Exit gate:
 
 ### Checkpoint 4: Standalone companion readiness
 
-**Status: in progress.** Explicit dual-model warmup, bounded hardware detection, profile recommendation, CPU/GPU placement reporting, workbench readiness feedback, corpus evaluation, redacted diagnostics, model comparison, cancellation, timeout, out-of-memory handling, and recovery tests are implemented. Longer-session laptop measurements and gaming-PC validation remain open; see [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
+**Status: complete.** Explicit dual-model warmup, bounded hardware detection, profile recommendation, CPU/GPU placement reporting, workbench readiness feedback, corpus evaluation, redacted diagnostics, model comparison, cancellation, timeout, out-of-memory handling, recovery tests, and long-session validation are implemented. The gaming-PC CPU profile completed 56/56 exact commands with zero errors, 3.7-second median latency, and stable memory. CPU execution is the accepted initial baseline; CUDA acceleration is deferred as an optional optimization. See [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
 
 Deliver:
 

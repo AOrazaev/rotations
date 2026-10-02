@@ -2,8 +2,10 @@
 
 ## Status
 
-In progress. The standalone workbench now exposes explicit model warmup,
-hardware/profile diagnostics, and clear readiness feedback.
+Complete. The standalone companion is independently useful, diagnosable, and
+stable on the capable laptop and gaming PC. The accepted initial configuration
+uses CPU transcription and CPU Qwen3 interpretation; GPU acceleration remains
+an optional optimization.
 
 ## Implemented
 
@@ -134,10 +136,50 @@ Real laptop resilience measurements:
 | Working-set change | +7.9 MB |
 | Private-memory change | +12.8 MB |
 
-## Remaining gates
+## Gaming-PC acceptance
 
-- Run a longer game-length session and record resource and thermal
-  observations.
-- Run the corpus on the gaming PC.
-- Confirm that Qwen3 latency remains acceptable during the longer session and
-  on the gaming PC.
+Validation machine:
+
+- 20 logical processors.
+- 63.8 GB physical memory.
+- NVIDIA GeForce RTX 4070 with 12 GB VRAM.
+- faster-whisper `base.en`, CPU `int8`.
+- Qwen3 4B Q4_K_M, CPU-only.
+
+The CUDA llama.cpp wheel could not load its native CUDA 12.4 dependencies on
+the validation installation. The CPU fallback was accepted because it met the
+accuracy, latency, and stability gates without requiring machine-level CUDA or
+cuDNN setup.
+
+Seven-round, 56-command result:
+
+| Measurement | Result |
+| --- | ---: |
+| Exact event arrays | 56 / 56 |
+| Warning expectations | 56 / 56 |
+| Errors | 0 |
+| Dual-model warmup | 1,952 ms |
+| Median interpretation latency | 3,725 ms |
+| P95 interpretation latency | 6,099 ms |
+| Maximum interpretation latency | 8,548 ms |
+| Round-median range | 3,650–3,766 ms |
+
+The first round brought model pages into the process working set. From the end
+of round 1 through round 7:
+
+- Working set increased approximately 11.8 MB.
+- Private memory increased approximately 11.8 MB.
+- Both measurements peaked in round 6 and declined before the final sample.
+- No command failures or latency degradation were observed.
+
+Direct CPU temperature was not available through the bounded diagnostic
+interface. Stable per-round latency over the approximately 34-minute run
+showed no evidence of material thermal throttling.
+
+## Exit decision
+
+- Qwen3 4B Q4_K_M remains the initial command model.
+- The accepted laptop profile is balanced CPU execution.
+- The accepted gaming-PC baseline is balanced CPU execution.
+- CUDA acceleration is deferred and does not block stats integration.
+- Checkpoint 5 stats recording and proposal-preview work may begin.
