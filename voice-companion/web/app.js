@@ -52,9 +52,10 @@ document.querySelector('#checkConnection').addEventListener('click', async () =>
     }
     serviceStatus.textContent = health.status;
     protocolStatus.textContent = `v${health.protocolVersion}`;
+    const transcriptionModel = capabilities.transcriptionModel || 'Not configured';
     transcriptionStatus.textContent = health.transcriptionReady
-      ? (capabilities.transcriptionModel || 'Ready')
-      : 'Configuration required';
+      ? transcriptionModel
+      : `${transcriptionModel} · ${health.transcriptionState}`;
     interpretationStatus.textContent = capabilities.eventInterpretation
       ? (capabilities.commandModel || 'Ready')
       : 'Not implemented';

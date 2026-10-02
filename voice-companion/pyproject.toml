@@ -6,11 +6,17 @@ build-backend = "setuptools.build_meta"
 name = "bask-voice-companion"
 version = "0.1.0"
 description = "Local feasibility service for basketball voice commands"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 
 [project.scripts]
 bask-voice-companion = "voice_companion.server:main"
+bask-voice-evaluate = "voice_companion.evaluate:main"
+
+[project.optional-dependencies]
+transcription = [
+  "faster-whisper==1.2.1"
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

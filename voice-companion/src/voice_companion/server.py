@@ -23,11 +23,12 @@ from .config import (
     ServiceSettings,
 )
 from .transcription import (
-    ExternalCommandTranscriber,
     Transcriber,
     TranscriptionUnavailable,
+    create_transcriber,
 )
 from .validation import RequestValidationError, validate_context
+from .profiles import default_model_directory, resolve_profile
 
 
 class VoiceCompanionServer(ThreadingHTTPServer):
@@ -89,14 +90,16 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         if path == "/v1/health":
             if not self._authorize_api():
                 return
+            transcription_state = self._transcription_state()
             self._send_json(
                 HTTPStatus.OK,
                 {
-                    "status": "ready" if self.server.transcriber.ready else "configuration_required",
+                    "status": self._service_status(transcription_state),
                     "protocolVersion": PROTOCOL_VERSION,
                     "serviceVersion": __version__,
                     "profile": self.server.settings.profile,
-                    "transcriptionReady": self.server.transcriber.ready,
+                    "transcriptionReady": transcription_state == "ready",
+                    "transcriptionState": transcription_state,
                     "commandModelReady": False,
                     "processingRequests": self.server.processing_requests,
                     "uptimeSeconds": round(
@@ -108,6 +111,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         if path == "/v1/capabilities":
             if not self._authorize_api():
                 return
+            transcription_metadata = self._transcription_metadata()
             self._send_json(
                 HTTPStatus.OK,
                 {
@@ -121,6 +125,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                         self.server.settings.max_concurrent_requests
                     ),
                     "transcriptionModel": self.server.transcriber.model_name,
+                    "transcription": transcription_metadata,
                     "commandModel": None,
                     "eventInterpretation": False,
                     "security": {
@@ -260,6 +265,34 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _transcription_state(self) -> str:
+        state = getattr(self.server.transcriber, "state", None)
+        if isinstance(state, str):
+            return state
+        return "ready" if self.server.transcriber.ready else "configuration_required"
+
+    def _transcription_metadata(self) -> dict:
+        metadata = getattr(self.server.transcriber, "metadata", None)
+        if callable(metadata):
+            return metadata()
+        return {
+            "runtime": "test-adapter",
+            "model": self.server.transcriber.model_name,
+            "device": None,
+            "computeType": None,
+            "modelDirectory": None,
+        }
+
+    @staticmethod
+    def _service_status(transcription_state: str) -> str:
+        if transcription_state == "ready":
+            return "ready"
+        if transcription_state in {"not_loaded", "loading"}:
+            return transcription_state
+        if transcription_state == "configuration_required":
+            return "configuration_required"
+        return "error"
+
     def _origin_allowed(self, origin: str | None) -> bool:
         if origin is None or origin in self.server.settings.allowed_origins:
             return True
@@ -385,19 +418,22 @@ def build_server(
     allowed_origins: set[str],
     transcriber: Transcriber | None = None,
     max_concurrent_requests: int = 1,
+    profile_name: str = "spike",
 ) -> VoiceCompanionServer:
     web_root = Path(__file__).resolve().parents[2] / "web"
     settings = ServiceSettings(
         token=token,
         allowed_origins=frozenset(allowed_origins),
         max_concurrent_requests=max_concurrent_requests,
+        profile=profile_name,
     )
     return VoiceCompanionServer(
         (host, port),
         VoiceCompanionHandler,
         settings=settings,
         web_root=web_root,
-        transcriber=transcriber or ExternalCommandTranscriber(),
+        transcriber=transcriber
+        or create_transcriber("external-command"),
     )
 
 
@@ -418,9 +454,53 @@ def main():
         type=int,
         default=1,
     )
+    parser.add_argument(
+        "--transcriber",
+        choices=["faster-whisper", "external-command"],
+        default=os.environ.get("BASK_VOICE_TRANSCRIBER", "external-command"),
+    )
+    parser.add_argument(
+        "--profile",
+        choices=["lightweight", "balanced", "high_accuracy"],
+        default=os.environ.get("BASK_VOICE_PROFILE", "balanced"),
+    )
+    parser.add_argument("--model", default=os.environ.get("BASK_VOICE_MODEL"))
+    parser.add_argument("--device", default=os.environ.get("BASK_VOICE_DEVICE"))
+    parser.add_argument(
+        "--compute-type",
+        default=os.environ.get("BASK_VOICE_COMPUTE_TYPE"),
+    )
+    parser.add_argument(
+        "--model-directory",
+        default=os.environ.get("BASK_VOICE_MODEL_DIRECTORY"),
+    )
     args = parser.parse_args()
     if args.host not in {"127.0.0.1", "::1", "localhost"}:
         parser.error("Checkpoint 0 binds to loopback only.")
+    if args.max_concurrent_requests <= 0:
+        parser.error("--max-concurrent-requests must be positive.")
+
+    profile = resolve_profile(
+        args.profile,
+        model=args.model,
+        device=args.device,
+        compute_type=args.compute_type,
+    )
+    model_directory = (
+        Path(args.model_directory)
+        if args.model_directory
+        else default_model_directory()
+    )
+    transcriber = create_transcriber(
+        args.transcriber,
+        profile=profile,
+        model_directory=model_directory,
+    )
+    profile_name = (
+        "spike"
+        if getattr(transcriber, "model_name", None) == "fixture"
+        else profile.name
+    )
 
     server = build_server(
         host=args.host,
@@ -428,12 +508,16 @@ def main():
         token=args.token,
         allowed_origins=parse_origins(args.allowed_origins),
         max_concurrent_requests=args.max_concurrent_requests,
+        profile_name=profile_name,
+        transcriber=transcriber,
     )
     print(f"Voice companion workbench: http://127.0.0.1:{args.port}/")
     print(f"Pairing token: {args.token}")
     print(
         "Transcription: "
-        + ("configured" if server.transcriber.ready else "configuration required")
+        + VoiceCompanionHandler._service_status(
+            getattr(server.transcriber, "state", "configuration_required")
+        )
     )
     try:
         server.serve_forever()

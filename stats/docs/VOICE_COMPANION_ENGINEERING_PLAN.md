@@ -681,6 +681,8 @@ Verification:
 
 ### Checkpoint 2: Local transcription
 
+**Status: in progress.** The Python 3.12 faster-whisper adapter, model profiles, native installer, model-download helper, evaluation command, and unit coverage are implemented. Real-model installation and native Windows transcription measurements remain open; see [`VOICE_COMPANION_CHECKPOINT_2.md`](VOICE_COMPANION_CHECKPOINT_2.md).
+
 Deliver:
 
 - Local speech-to-text adapter.

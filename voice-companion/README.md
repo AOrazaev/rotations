@@ -7,7 +7,7 @@ This directory contains the local-only voice companion feasibility spike. It doe
 Requirements:
 
 - Windows 11
-- Python 3.11 or newer
+- Python 3.12
 - Chrome or Edge
 
 Run from PowerShell:
@@ -48,16 +48,60 @@ receive `429 service_busy`.
 
 ## Configure local transcription
 
-Checkpoint 0 intentionally does not choose or download a speech model automatically. Configure any local transcription CLI that writes only the transcript to standard output:
+Install the balanced local transcription profile from Windows PowerShell:
 
 ```powershell
-$env:BASK_VOICE_TRANSCRIBE_COMMAND = 'your-local-transcriber --audio {audio}'
-.\scripts\run.ps1
+$repo = '\\wsl.localhost\Ubuntu\home\orazaev\proj\bask\rotations'
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File "$repo\voice-companion\scripts\install-transcription.ps1" `
+  -Profile balanced
 ```
 
-`{audio}` is replaced with a temporary audio path. The file is deleted after the command succeeds or fails. The command must not write extra diagnostics to standard output; use standard error for diagnostics.
+This creates `voice-companion/.venv`, installs `faster-whisper`, and downloads
+`base.en` under:
 
-The final transcription runtime will be selected from measured gaming-PC and laptop results, not assumed by the spike.
+```text
+%LOCALAPPDATA%\BaskVoiceCompanion\models\
+```
+
+The installer intentionally uses `py -3.12`. Python 3.13 may work for parts of
+the stack, but Python 3.12 has broader Windows AI-runtime and binary-wheel
+compatibility and is the supported companion version.
+
+Available profiles:
+
+- `lightweight`: `tiny.en`, CPU, `int8`
+- `balanced`: `base.en`, automatic device selection, `int8`
+- `high_accuracy`: `small.en`, CUDA, `float16`
+
+Install all three:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File "$repo\voice-companion\scripts\install-transcription.ps1" `
+  -AllProfiles
+```
+
+The package index is configurable for corporate environments:
+
+```powershell
+.\scripts\install-transcription.ps1 `
+  -PackageIndexUrl 'https://approved.example/simple' `
+  -TrustedHost 'approved.example'
+```
+
+Then start the selected profile:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File "$repo\voice-companion\scripts\run.ps1" `
+  -Token manual-test-token `
+  -Profile balanced
+```
+
+An external transcription CLI remains available through
+`BASK_VOICE_TRANSCRIBE_COMMAND` and `-Transcriber external-command`.
 
 For browser automation only, a fixed transcript can be enabled without model weights:
 
