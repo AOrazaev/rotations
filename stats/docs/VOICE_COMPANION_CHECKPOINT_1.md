@@ -92,6 +92,10 @@ Automated coverage includes:
 
 The normal stats and planner suites remain independent of the companion.
 
+Manual acceptance completed on October 1, 2026. The native Windows workbench
+reported the expected ready, unauthorized, strict-validation, normal-processing,
+and configuration-required states in the target browser workflow.
+
 ## Next checkpoint
 
 Checkpoint 2 adds a real local speech-to-text adapter, audio normalization, model setup, cancellation and timeout behavior, evaluation tooling, and gaming-PC/laptop measurements.
