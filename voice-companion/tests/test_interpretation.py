@@ -126,6 +126,53 @@ class CommandInterpreterTest(unittest.TestCase):
         with self.assertRaisesRegex(InvalidInterpretation, "supplied roster"):
             validate_interpretation(payload, context(), "test-model")
 
+    def test_rejects_team_player_on_opponent_event(self):
+        payload = {
+            "events": [
+                {
+                    "side": "opponent",
+                    "type": "shot",
+                    "playerId": "p13",
+                    "shotValue": 1,
+                    "made": False,
+                    "confidence": 0.9,
+                }
+            ],
+            "overallConfidence": 0.9,
+            "warnings": [],
+        }
+
+        with self.assertRaisesRegex(InvalidInterpretation, "playerId null"):
+            validate_interpretation(payload, context(), "test-model")
+
+    def test_accepts_team_level_opponent_statistics(self):
+        payload = {
+            "events": [
+                {
+                    "side": "opponent",
+                    "type": "rebound",
+                    "playerId": None,
+                    "reboundKind": "defensive",
+                    "confidence": 0.95,
+                },
+                {
+                    "side": "opponent",
+                    "type": "shot",
+                    "playerId": None,
+                    "shotValue": 1,
+                    "made": False,
+                    "confidence": 0.95,
+                },
+            ],
+            "overallConfidence": 0.95,
+            "warnings": [],
+        }
+
+        result = validate_interpretation(payload, context(), "test-model")
+
+        self.assertEqual(result.events[0]["side"], "opponent")
+        self.assertIsNone(result.events[1]["playerId"])
+
     def test_rejects_event_type_not_allowed_by_request(self):
         request_context = context()
         request_context["allowedEventTypes"] = ["shot"]

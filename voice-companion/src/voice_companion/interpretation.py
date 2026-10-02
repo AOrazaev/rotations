@@ -263,7 +263,10 @@ class LlamaCppCommandInterpreter:
             "shotValue 1. A made basket is a shot with made true. A missed "
             "basket is a shot with made false. Put a scoring shot before its "
             "related assist so equivalent phrasings produce the same order. "
-            "For 'A assist and B makes two', emit B's shot and A's assist."
+            "For 'A assist and B makes two', emit B's shot and A's assist. "
+            "Opponent statistics are team-level: always use side 'opponent' and "
+            "playerId null. Never assign a team roster player to an opponent "
+            "event. Team statistics require a resolved supplied roster ID."
         )
 
     @staticmethod
@@ -307,6 +310,43 @@ class LlamaCppCommandInterpreter:
                     },
                 }
             )
+        examples.append(
+            {
+                "transcript": "Opponent defensive rebound",
+                "result": {
+                    "events": [
+                        {
+                            "side": "opponent",
+                            "type": "rebound",
+                            "playerId": None,
+                            "reboundKind": "defensive",
+                            "confidence": 0.99,
+                        }
+                    ],
+                    "overallConfidence": 0.99,
+                    "warnings": [],
+                },
+            }
+        )
+        examples.append(
+            {
+                "transcript": "Opponent misses free throw",
+                "result": {
+                    "events": [
+                        {
+                            "side": "opponent",
+                            "type": "shot",
+                            "playerId": None,
+                            "shotValue": 1,
+                            "made": False,
+                            "confidence": 0.99,
+                        }
+                    ],
+                    "overallConfidence": 0.99,
+                    "warnings": [],
+                },
+            }
+        )
         examples.append(
             {
                 "transcript": "He made it",
@@ -400,6 +440,14 @@ def _validate_event(
     if player_id is not None and player_id not in roster_ids:
         raise InvalidInterpretation(
             f"events[{index}].playerId is absent from the supplied roster."
+        )
+    if event["side"] == "opponent" and player_id is not None:
+        raise InvalidInterpretation(
+            f"events[{index}] opponent statistics must use playerId null."
+        )
+    if event["side"] == "team" and player_id is None:
+        raise InvalidInterpretation(
+            f"events[{index}] team statistics require a supplied roster player."
         )
     if not _is_confidence(event["confidence"]):
         raise InvalidInterpretation(

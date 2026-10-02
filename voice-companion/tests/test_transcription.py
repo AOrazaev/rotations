@@ -66,6 +66,7 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
             self.assertTrue(model.options["vad_filter"])
             self.assertEqual(model.options["hotwords"], BASKETBALL_HOTWORDS)
             self.assertIn("three pointer", model.options["hotwords"])
+            self.assertIn("opponent", model.options["hotwords"])
 
     def test_reports_model_load_failure(self):
         def factory(*args, **kwargs):

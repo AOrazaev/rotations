@@ -13,8 +13,8 @@ from .profiles import TranscriptionProfile, default_model_directory
 
 
 BASKETBALL_HOTWORDS = (
-    "basketball player number point points one two three two pointer three pointer "
-    "two point three point free throw free throws "
+    "basketball team opponent opponents opposing team player number point points "
+    "one two three two pointer three pointer two point three point free throw free throws "
     "makes made misses missed shot rebound offensive defensive assist steal "
     "block turnover foul transition"
 )

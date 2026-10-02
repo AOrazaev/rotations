@@ -77,6 +77,18 @@ Proposal: succeeded without an error
 The user also confirmed that the transcript remains visible when interpretation
 returns an error.
 
+Opponent statistics are supported as team-level events with `playerId: null`.
+The interpreter now rejects any opponent proposal that references a player from
+the tracked roster. Native Qwen3 checks produced the expected proposals for:
+
+```text
+Opponent defensive rebound
+Opponent misses free throw
+```
+
+The transcription vocabulary includes `opponent`, `opponents`, and `opposing
+team` to preserve the spoken side marker.
+
 ## Remaining gates
 
 - Build and score a representative transcript corpus.
