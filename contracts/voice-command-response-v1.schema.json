@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aorazaev.github.io/rotations/contracts/voice-command-response-v1.schema.json",
+  "title": "Voice command response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "requestId",
+    "transcript",
+    "events",
+    "overallConfidence",
+    "warnings",
+    "processor",
+    "timingMs"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "const": 1
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "transcript": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "overallConfidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "processor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transcriptionModel", "commandModel", "profile"],
+      "properties": {
+        "transcriptionModel": {
+          "type": ["string", "null"],
+          "maxLength": 120
+        },
+        "commandModel": {
+          "type": ["string", "null"],
+          "maxLength": 120
+        },
+        "profile": {
+          "type": "string",
+          "enum": ["spike", "lightweight", "balanced", "high_accuracy"]
+        }
+      }
+    },
+    "timingMs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transcription", "interpretation", "total"],
+      "properties": {
+        "transcription": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interpretation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["side", "type", "playerId", "confidence"],
+      "properties": {
+        "side": {
+          "type": "string",
+          "enum": ["team", "opponent"]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "shot",
+            "rebound",
+            "assist",
+            "steal",
+            "block",
+            "turnover",
+            "foul"
+          ]
+        },
+        "playerId": {
+          "type": ["string", "null"],
+          "maxLength": 128
+        },
+        "shotValue": {
+          "type": "integer",
+          "enum": [1, 2, 3]
+        },
+        "made": {
+          "type": "boolean"
+        },
+        "reboundKind": {
+          "type": "string",
+          "enum": ["offensive", "defensive"]
+        },
+        "shotDetails": {
+          "type": "object"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

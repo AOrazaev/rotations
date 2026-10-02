@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bask Voice Companion Spike</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Checkpoint 0 workbench</p>
+      <h1>Local voice companion</h1>
+      <p>Verify loopback connectivity, microphone capture, timestamp behavior, and local transcription before stats integration.</p>
+    </header>
+
+    <section class="card">
+      <h2>Connection</h2>
+      <label>
+        Pairing token
+        <input id="token" type="password" autocomplete="off">
+      </label>
+      <div class="actions">
+        <button id="checkConnection" type="button">Check service</button>
+      </div>
+      <pre id="connectionResult" aria-live="polite">Not checked.</pre>
+    </section>
+
+    <section class="card">
+      <h2>Request context</h2>
+      <label>
+        Video timestamp in seconds
+        <input id="videoSeconds" type="number" min="0" step="0.1" value="0">
+      </label>
+      <label>
+        Mock roster JSON
+        <textarea id="roster" rows="7">[
+  {"id":"p7","jersey":"7","name":"Alex"},
+  {"id":"p13","jersey":"13","name":"Denis"}
+]</textarea>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Microphone spike</h2>
+      <p>The timestamp is frozen when recording starts. Audio is sent only after you stop and choose process.</p>
+      <div class="actions">
+        <button id="startRecording" type="button">Start recording</button>
+        <button id="stopRecording" type="button" disabled>Stop</button>
+        <button id="processRecording" type="button" disabled>Process recording</button>
+        <button id="discardRecording" type="button" disabled>Discard</button>
+      </div>
+      <p id="recordingStatus" role="status">Idle.</p>
+      <audio id="audioPreview" controls hidden></audio>
+    </section>
+
+    <section class="card">
+      <h2>Audio-file spike</h2>
+      <input id="audioFile" type="file" accept="audio/*">
+      <div class="actions">
+        <button id="processFile" type="button">Process file</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Result</h2>
+      <pre id="requestResult" aria-live="polite">No request sent.</pre>
+    </section>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

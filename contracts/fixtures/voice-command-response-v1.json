@@ -1,0 +1,20 @@
+{
+  "protocolVersion": 1,
+  "requestId": "fixture-request-1",
+  "transcript": "Seven assist and thirteen makes two in transition",
+  "events": [],
+  "overallConfidence": null,
+  "warnings": [
+    "Command interpretation is not implemented in checkpoint 0."
+  ],
+  "processor": {
+    "transcriptionModel": "external-command",
+    "commandModel": null,
+    "profile": "spike"
+  },
+  "timingMs": {
+    "transcription": 620,
+    "interpretation": 0,
+    "total": 620
+  }
+}
