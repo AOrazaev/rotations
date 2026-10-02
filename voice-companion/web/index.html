@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bask Voice Companion Spike</title>
+  <title>Bask Voice Companion Workbench</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <main>
     <header>
-      <p class="eyebrow">Checkpoint 0 workbench</p>
+      <p class="eyebrow">Standalone workbench</p>
       <h1>Local voice companion</h1>
-      <p>Verify loopback connectivity, microphone capture, timestamp behavior, and local transcription before stats integration.</p>
+      <p>Exercise local transcription and structured basketball-event proposals before stats integration.</p>
     </header>
 
     <section class="card">
@@ -58,6 +58,10 @@
       </div>
       <p id="recordingStatus" role="status">Idle.</p>
       <audio id="audioPreview" controls hidden></audio>
+      <div class="transcript-panel">
+        <strong>Latest transcript</strong>
+        <p id="transcriptResult">No transcript yet.</p>
+      </div>
     </section>
 
     <section class="card">
@@ -69,7 +73,31 @@
     </section>
 
     <section class="card">
-      <h2>Result</h2>
+      <h2>Transcript interpretation</h2>
+      <p>Test the command model independently from microphone and transcription behavior.</p>
+      <label>
+        Transcript
+        <textarea id="transcriptInput" rows="3">Seven assist and thirteen makes two in transition</textarea>
+      </label>
+      <label>
+        Fixture
+        <select id="transcriptFixture">
+          <option value="Seven assist and thirteen makes two in transition">Multi-event transition score</option>
+          <option value="Number twenty five misses free throw">Missed free throw</option>
+          <option value="Thirteen defensive rebound">Defensive rebound</option>
+          <option value="He made it">Ambiguous command</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button id="loadFixture" type="button">Load fixture</button>
+        <button id="interpretTranscript" type="button">Interpret transcript</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Proposal</h2>
+      <div id="proposalResult" class="proposal-result" aria-live="polite">No proposal.</div>
+      <h3>Raw response</h3>
       <pre id="requestResult" aria-live="polite">No request sent.</pre>
     </section>
   </main>

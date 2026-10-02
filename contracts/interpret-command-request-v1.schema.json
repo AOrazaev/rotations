@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aorazaev.github.io/rotations/contracts/interpret-command-request-v1.schema.json",
+  "title": "Interpret command request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transcript",
+    "context"
+  ],
+  "properties": {
+    "transcript": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "context": {
+      "$ref": "voice-command-request-v1.schema.json"
+    }
+  }
+}

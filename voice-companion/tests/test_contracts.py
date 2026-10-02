@@ -32,6 +32,17 @@ class ContractFixtureTest(unittest.TestCase):
         self.assertEqual(fixture["events"], [])
         self.assertIsNone(fixture["processor"]["commandModel"])
 
+    def test_interpret_request_fixture_matches_checkpoint_contract(self):
+        schema = self.load("contracts/interpret-command-request-v1.schema.json")
+        fixture = self.load("contracts/fixtures/interpret-command-request-v1.json")
+
+        self.assertEqual(set(schema["required"]) - set(fixture), set())
+        self.assertLessEqual(
+            len(fixture["transcript"]),
+            schema["properties"]["transcript"]["maxLength"],
+        )
+        self.assertEqual(fixture["context"]["protocolVersion"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

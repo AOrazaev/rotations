@@ -22,6 +22,14 @@ from .config import (
     PROTOCOL_VERSION,
     ServiceSettings,
 )
+from .interpretation import (
+    CommandInterpreter,
+    DisabledCommandInterpreter,
+    InterpretationResult,
+    InterpretationUnavailable,
+    InvalidInterpretation,
+    create_interpreter,
+)
 from .transcription import (
     Transcriber,
     TranscriptionUnavailable,
@@ -40,11 +48,13 @@ class VoiceCompanionServer(ThreadingHTTPServer):
         settings: ServiceSettings,
         web_root: Path,
         transcriber: Transcriber,
+        interpreter: CommandInterpreter,
     ):
         super().__init__(server_address, handler_class)
         self.settings = settings
         self.web_root = web_root
         self.transcriber = transcriber
+        self.interpreter = interpreter
         self.started_at = time.monotonic()
         self.processing_slots = threading.BoundedSemaphore(
             settings.max_concurrent_requests
@@ -91,6 +101,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             if not self._authorize_api():
                 return
             transcription_state = self._transcription_state()
+            interpretation_state = self._interpretation_state()
             self._send_json(
                 HTTPStatus.OK,
                 {
@@ -100,7 +111,8 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     "profile": self.server.settings.profile,
                     "transcriptionReady": transcription_state == "ready",
                     "transcriptionState": transcription_state,
-                    "commandModelReady": False,
+                    "commandModelReady": interpretation_state == "ready",
+                    "commandModelState": interpretation_state,
                     "processingRequests": self.server.processing_requests,
                     "uptimeSeconds": round(
                         time.monotonic() - self.server.started_at, 1
@@ -112,6 +124,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             if not self._authorize_api():
                 return
             transcription_metadata = self._transcription_metadata()
+            interpretation_metadata = self._interpretation_metadata()
             self._send_json(
                 HTTPStatus.OK,
                 {
@@ -126,8 +139,11 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     ),
                     "transcriptionModel": self.server.transcriber.model_name,
                     "transcription": transcription_metadata,
-                    "commandModel": None,
-                    "eventInterpretation": False,
+                    "commandModel": self.server.interpreter.model_name,
+                    "interpretation": interpretation_metadata,
+                    "eventInterpretation": (
+                        interpretation_metadata["runtime"] != "disabled"
+                    ),
                     "security": {
                         "loopbackOnly": True,
                         "tokenRequired": True,
@@ -139,12 +155,18 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         self._serve_static(path)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/v1/voice-command":
+        path = urlparse(self.path).path
+        if path not in {"/v1/voice-command", "/v1/interpret-command"}:
             self._send_error(HTTPStatus.NOT_FOUND, "not_found", "Endpoint was not found.")
             return
         if not self._authorize_api():
             return
+        if path == "/v1/interpret-command":
+            self._handle_interpret_command()
+            return
+        self._handle_voice_command()
 
+    def _handle_voice_command(self):
         content_length = self._content_length()
         if content_length is None:
             return
@@ -200,6 +222,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             return
 
         started = time.perf_counter()
+        stage = "transcription"
         try:
             transcription_started = time.perf_counter()
             transcription = self.server.transcriber.transcribe(
@@ -208,6 +231,15 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             transcription_ms = round(
                 (time.perf_counter() - transcription_started) * 1000
             )
+            stage = "interpretation"
+            interpretation_started = time.perf_counter()
+            interpretation = self._interpret_or_placeholder(
+                transcription.text,
+                context,
+            )
+            interpretation_ms = round(
+                (time.perf_counter() - interpretation_started) * 1000
+            )
         except TranscriptionUnavailable as error:
             self._send_error(
                 HTTPStatus.SERVICE_UNAVAILABLE,
@@ -215,10 +247,125 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 str(error),
             )
             return
-        except (RuntimeError, subprocess.TimeoutExpired) as error:
+        except InterpretationUnavailable as error:
+            self._send_error(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "interpretation_not_configured",
+                str(error),
+                stage="interpretation",
+                partial_result=self._transcription_partial(
+                    context,
+                    transcription,
+                    transcription_ms,
+                    started,
+                ),
+            )
+            return
+        except InvalidInterpretation as error:
             self._send_error(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
-                "transcription_failed",
+                "interpretation_failed",
+                str(error),
+                stage="interpretation",
+                partial_result=self._transcription_partial(
+                    context,
+                    transcription,
+                    transcription_ms,
+                    started,
+                ),
+            )
+            return
+        except (RuntimeError, subprocess.TimeoutExpired) as error:
+            partial_result = (
+                self._transcription_partial(
+                    context,
+                    transcription,
+                    transcription_ms,
+                    started,
+                )
+                if stage == "interpretation"
+                else None
+            )
+            self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                (
+                    "interpretation_failed"
+                    if stage == "interpretation"
+                    else "transcription_failed"
+                ),
+                str(error),
+                stage=stage,
+                partial_result=partial_result,
+            )
+            return
+        finally:
+            self.server.end_processing()
+
+        total_ms = round((time.perf_counter() - started) * 1000)
+        self._send_json(
+            HTTPStatus.OK,
+            self._command_response(
+                context=context,
+                transcript=transcription.text,
+                transcription_model=transcription.model,
+                transcription_ms=transcription_ms,
+                interpretation=interpretation,
+                interpretation_ms=interpretation_ms,
+                total_ms=total_ms,
+            ),
+        )
+
+    def _handle_interpret_command(self):
+        content_length = self._content_length()
+        if content_length is None:
+            return
+        if content_length > self.server.settings.max_context_bytes:
+            self._send_error(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "request_too_large",
+                "Interpretation request exceeds the configured limit.",
+            )
+            return
+        if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
+            self._send_error(
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                "json_required",
+                "Use application/json for transcript interpretation.",
+            )
+            return
+        try:
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            transcript, context = self._validate_interpret_request(payload)
+            validate_context(context)
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RequestValidationError) as error:
+            self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(error))
+            return
+        if not self.server.begin_processing():
+            self._send_error(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                "service_busy",
+                "The voice companion is already processing a request.",
+            )
+            return
+
+        started = time.perf_counter()
+        try:
+            interpretation_started = time.perf_counter()
+            interpretation = self.server.interpreter.interpret(transcript, context)
+            interpretation_ms = round(
+                (time.perf_counter() - interpretation_started) * 1000
+            )
+        except InterpretationUnavailable as error:
+            self._send_error(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "interpretation_not_configured",
+                str(error),
+            )
+            return
+        except (InvalidInterpretation, RuntimeError) as error:
+            self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "interpretation_failed",
                 str(error),
             )
             return
@@ -228,27 +375,109 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         total_ms = round((time.perf_counter() - started) * 1000)
         self._send_json(
             HTTPStatus.OK,
-            {
-                "protocolVersion": PROTOCOL_VERSION,
-                "requestId": context["requestId"],
-                "transcript": transcription.text,
-                "events": [],
-                "overallConfidence": None,
-                "warnings": [
-                    "Command interpretation is not implemented in checkpoint 0."
-                ],
-                "processor": {
-                    "transcriptionModel": transcription.model,
-                    "commandModel": None,
-                    "profile": self.server.settings.profile,
-                },
-                "timingMs": {
-                    "transcription": transcription_ms,
-                    "interpretation": 0,
-                    "total": total_ms,
-                },
-            },
+            self._command_response(
+                context=context,
+                transcript=transcript,
+                transcription_model=None,
+                transcription_ms=0,
+                interpretation=interpretation,
+                interpretation_ms=interpretation_ms,
+                total_ms=total_ms,
+            ),
         )
+
+    def _interpret_or_placeholder(
+        self, transcript: str, context: dict
+    ) -> InterpretationResult:
+        if isinstance(self.server.interpreter, DisabledCommandInterpreter):
+            return InterpretationResult(
+                events=[],
+                overall_confidence=None,
+                warnings=["Local command interpretation is not configured."],
+                model=None,
+            )
+        return self.server.interpreter.interpret(transcript, context)
+
+    def _command_response(
+        self,
+        *,
+        context: dict,
+        transcript: str,
+        transcription_model: str | None,
+        transcription_ms: int,
+        interpretation: InterpretationResult,
+        interpretation_ms: int,
+        total_ms: int,
+    ) -> dict:
+        return {
+            "protocolVersion": PROTOCOL_VERSION,
+            "requestId": context["requestId"],
+            "transcript": transcript,
+            "events": interpretation.events,
+            "overallConfidence": interpretation.overall_confidence,
+            "warnings": interpretation.warnings,
+            "processor": {
+                "transcriptionModel": transcription_model,
+                "commandModel": interpretation.model,
+                "profile": self.server.settings.profile,
+            },
+            "timingMs": {
+                "transcription": transcription_ms,
+                "interpretation": interpretation_ms,
+                "total": total_ms,
+            },
+        }
+
+    def _transcription_partial(
+        self,
+        context: dict,
+        transcription,
+        transcription_ms: int,
+        started: float,
+    ) -> dict:
+        return {
+            "protocolVersion": PROTOCOL_VERSION,
+            "requestId": context["requestId"],
+            "transcript": transcription.text,
+            "processor": {
+                "transcriptionModel": transcription.model,
+                "commandModel": self.server.interpreter.model_name,
+                "profile": self.server.settings.profile,
+            },
+            "timingMs": {
+                "transcription": transcription_ms,
+                "totalBeforeFailure": round(
+                    (time.perf_counter() - started) * 1000
+                ),
+            },
+        }
+
+    @staticmethod
+    def _validate_interpret_request(payload: object) -> tuple[str, dict]:
+        if not isinstance(payload, dict):
+            raise ValueError("Interpretation request must be a JSON object.")
+        required = {"transcript", "context"}
+        unexpected = sorted(set(payload) - required)
+        missing = sorted(required - set(payload))
+        if unexpected:
+            raise ValueError(
+                f"Interpretation request has unsupported fields: "
+                f"{', '.join(unexpected)}."
+            )
+        if missing:
+            raise ValueError(
+                f"Interpretation request is missing fields: {', '.join(missing)}."
+            )
+        transcript = payload["transcript"]
+        if (
+            not isinstance(transcript, str)
+            or not transcript.strip()
+            or len(transcript) > 4000
+        ):
+            raise ValueError(
+                "transcript must be a non-empty string of at most 4000 characters."
+            )
+        return transcript.strip(), payload["context"]
 
     def _authorize_api(self) -> bool:
         origin = self.headers.get("Origin")
@@ -281,6 +510,23 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             "device": None,
             "computeType": None,
             "modelDirectory": None,
+        }
+
+    def _interpretation_state(self) -> str:
+        state = getattr(self.server.interpreter, "state", None)
+        if isinstance(state, str):
+            return state
+        return "ready" if self.server.interpreter.ready else "configuration_required"
+
+    def _interpretation_metadata(self) -> dict:
+        metadata = getattr(self.server.interpreter, "metadata", None)
+        if callable(metadata):
+            return metadata()
+        return {
+            "runtime": "test-adapter",
+            "model": self.server.interpreter.model_name,
+            "modelPath": None,
+            "lastError": None,
         }
 
     @staticmethod
@@ -387,17 +633,24 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def _send_error(
-        self, status: HTTPStatus, code: str, message: str
+        self,
+        status: HTTPStatus,
+        code: str,
+        message: str,
+        *,
+        stage: str | None = None,
+        partial_result: dict | None = None,
     ):
-        self._send_json(
-            status,
-            {
-                "error": {
-                    "code": code,
-                    "message": message,
-                }
-            },
-        )
+        error = {
+            "code": code,
+            "message": message,
+        }
+        if stage:
+            error["stage"] = stage
+        payload = {"error": error}
+        if partial_result is not None:
+            payload["partialResult"] = partial_result
+        self._send_json(status, payload)
 
     def log_message(self, format, *args):
         print(f"{self.address_string()} - {format % args}")
@@ -417,6 +670,7 @@ def build_server(
     token: str,
     allowed_origins: set[str],
     transcriber: Transcriber | None = None,
+    interpreter: CommandInterpreter | None = None,
     max_concurrent_requests: int = 1,
     profile_name: str = "spike",
 ) -> VoiceCompanionServer:
@@ -434,6 +688,7 @@ def build_server(
         web_root=web_root,
         transcriber=transcriber
         or create_transcriber("external-command"),
+        interpreter=interpreter or create_interpreter("none"),
     )
 
 
@@ -474,6 +729,25 @@ def main():
         "--model-directory",
         default=os.environ.get("BASK_VOICE_MODEL_DIRECTORY"),
     )
+    parser.add_argument(
+        "--command-interpreter",
+        choices=["none", "llama-cpp"],
+        default=os.environ.get("BASK_VOICE_COMMAND_INTERPRETER", "none"),
+    )
+    parser.add_argument(
+        "--command-model",
+        default=os.environ.get("BASK_VOICE_COMMAND_MODEL"),
+    )
+    parser.add_argument(
+        "--command-context-size",
+        type=int,
+        default=int(os.environ.get("BASK_VOICE_COMMAND_CONTEXT_SIZE", "4096")),
+    )
+    parser.add_argument(
+        "--command-gpu-layers",
+        type=int,
+        default=int(os.environ.get("BASK_VOICE_COMMAND_GPU_LAYERS", "0")),
+    )
     args = parser.parse_args()
     if args.host not in {"127.0.0.1", "::1", "localhost"}:
         parser.error("Checkpoint 0 binds to loopback only.")
@@ -496,6 +770,12 @@ def main():
         profile=profile,
         model_directory=model_directory,
     )
+    interpreter = create_interpreter(
+        args.command_interpreter,
+        model_path=Path(args.command_model) if args.command_model else None,
+        context_size=args.command_context_size,
+        gpu_layers=args.command_gpu_layers,
+    )
     profile_name = (
         "spike"
         if getattr(transcriber, "model_name", None) == "fixture"
@@ -510,6 +790,7 @@ def main():
         max_concurrent_requests=args.max_concurrent_requests,
         profile_name=profile_name,
         transcriber=transcriber,
+        interpreter=interpreter,
     )
     print(f"Voice companion workbench: http://127.0.0.1:{args.port}/")
     print(f"Pairing token: {args.token}")
@@ -518,6 +799,10 @@ def main():
         + VoiceCompanionHandler._service_status(
             getattr(server.transcriber, "state", "configuration_required")
         )
+    )
+    print(
+        "Interpretation: "
+        + getattr(server.interpreter, "state", "configuration_required")
     )
     try:
         server.serve_forever()

@@ -17,6 +17,10 @@ bask-voice-evaluate = "voice_companion.evaluate:main"
 transcription = [
   "faster-whisper==1.2.1"
 ]
+interpretation = [
+  "huggingface-hub>=0.34,<2",
+  "llama-cpp-python==0.3.35"
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

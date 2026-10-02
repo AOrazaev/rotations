@@ -35,6 +35,7 @@ configured development origins, or the production GitHub Pages origin.
 GET  /v1/health
 GET  /v1/capabilities
 POST /v1/voice-command
+POST /v1/interpret-command
 ```
 
 Health and capability responses expose the protocol version, readiness,
@@ -104,6 +105,34 @@ $env:BASK_VOICE_TRANSCRIPT_FIXTURE = 'Seven assist and thirteen makes two in tra
 ```
 
 This mode is visibly reported as `fixture` and must not be used for transcription measurements.
+
+## Configure command interpretation
+
+Install the CPU llama.cpp runtime and official Qwen3 4B Q4_K_M model:
+
+```powershell
+.\voice-companion\scripts\install-interpretation.ps1
+```
+
+The model is stored outside the repository under:
+
+```text
+%LOCALAPPDATA%\BaskVoiceCompanion\models\
+```
+
+Start transcription and interpretation together:
+
+```powershell
+.\voice-companion\scripts\run.ps1 `
+  -Token manual-test-token `
+  -Profile balanced `
+  -CommandInterpreter llama-cpp
+```
+
+Use the workbench's **Transcript interpretation** section to exercise Qwen
+without recording audio. When transcription succeeds but interpretation fails,
+the API returns the transcript in `partialResult` and the workbench keeps it
+visible under **Latest transcript**.
 
 ## Tests
 

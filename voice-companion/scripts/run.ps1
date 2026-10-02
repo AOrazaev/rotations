@@ -7,7 +7,12 @@ param(
   [string]$Profile = "balanced",
   [string]$Model = "",
   [string]$Device = "",
-  [string]$ComputeType = ""
+  [string]$ComputeType = "",
+  [ValidateSet("none", "llama-cpp")]
+  [string]$CommandInterpreter = "none",
+  [string]$CommandModel = "",
+  [int]$CommandContextSize = 4096,
+  [int]$CommandGpuLayers = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,10 +29,14 @@ $arguments = @(
   "--port", $Port,
   "--token", $Token,
   "--transcriber", $Transcriber,
-  "--profile", $Profile
+  "--profile", $Profile,
+  "--command-interpreter", $CommandInterpreter,
+  "--command-context-size", $CommandContextSize,
+  "--command-gpu-layers", $CommandGpuLayers
 )
 if ($Model) { $arguments += @("--model", $Model) }
 if ($Device) { $arguments += @("--device", $Device) }
 if ($ComputeType) { $arguments += @("--compute-type", $ComputeType) }
+if ($CommandModel) { $arguments += @("--command-model", $CommandModel) }
 
 & $Python @arguments

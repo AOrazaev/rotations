@@ -12,8 +12,8 @@ header, .card { padding: 20px; border: 1px solid #26334d; border-radius: 14px; b
 h1, h2, p { margin-top: 0; }
 .eyebrow { color: #8ea0ff; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 label { display: grid; gap: 6px; margin: 12px 0; color: #b9c4dd; font-weight: 700; }
-input, textarea, button { font: inherit; }
-input, textarea { width: 100%; padding: 10px; color: inherit; background: #080e1b; border: 1px solid #34425f; border-radius: 9px; }
+input, textarea, select, button { font: inherit; }
+input, textarea, select { width: 100%; padding: 10px; color: inherit; background: #080e1b; border: 1px solid #34425f; border-radius: 9px; }
 button { padding: 10px 14px; color: #fff; background: #5367e8; border: 0; border-radius: 9px; font-weight: 800; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
@@ -23,6 +23,12 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .status-grid strong { overflow-wrap: anywhere; }
 pre { min-height: 48px; margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; background: #080e1b; border-radius: 9px; }
 audio { width: 100%; margin-top: 12px; }
+.proposal-result { display: grid; gap: 8px; margin-bottom: 16px; }
+.proposal-event, .proposal-warning { padding: 10px 12px; border-radius: 9px; background: #080e1b; }
+.proposal-warning { border-left: 3px solid #f0b35a; }
+.transcript-panel { margin-top: 14px; padding: 12px; border-radius: 9px; background: #080e1b; }
+.transcript-panel strong { color: #91a0bd; font-size: .78rem; text-transform: uppercase; }
+.transcript-panel p { margin: 6px 0 0; }
 
 @media (max-width: 640px) {
   .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

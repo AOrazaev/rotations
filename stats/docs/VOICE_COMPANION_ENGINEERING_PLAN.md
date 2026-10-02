@@ -704,6 +704,8 @@ Verification:
 
 ### Checkpoint 3: Structured command interpretation
 
+**Status: in progress.** The Qwen3 4B Q4_K_M llama.cpp adapter, strict output validation, roster grounding, transcript-only endpoint, proposal workbench, partial-result diagnostics, and native Windows model installation are implemented. Real laptop commands now cover multi-event scoring, ambiguity, free throws, and three-point terminology. Corpus scoring, Phi-4-mini comparison, latency optimization, and automated Windows browser coverage remain open; see [`VOICE_COMPANION_CHECKPOINT_3.md`](VOICE_COMPANION_CHECKPOINT_3.md).
+
 Deliver:
 
 - Qwen3 4B command-model adapter.

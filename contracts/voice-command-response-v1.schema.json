@@ -125,7 +125,14 @@
           "enum": ["offensive", "defensive"]
         },
         "shotDetails": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "phase": {
+              "type": "string",
+              "enum": ["half_court", "transition"]
+            }
+          }
         },
         "confidence": {
           "type": "number",

@@ -14,6 +14,11 @@ const serviceStatus = document.querySelector('#serviceStatus');
 const protocolStatus = document.querySelector('#protocolStatus');
 const transcriptionStatus = document.querySelector('#transcriptionStatus');
 const interpretationStatus = document.querySelector('#interpretationStatus');
+const transcriptInput = document.querySelector('#transcriptInput');
+const transcriptFixture = document.querySelector('#transcriptFixture');
+const interpretTranscript = document.querySelector('#interpretTranscript');
+const proposalResult = document.querySelector('#proposalResult');
+const transcriptResult = document.querySelector('#transcriptResult');
 const processButtons = [...document.querySelectorAll('.process-audio')];
 
 let recorder = null;
@@ -30,13 +35,72 @@ function headers() {
 async function readJson(response) {
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(`${response.status} ${payload.error?.code || 'request_failed'}: ${payload.error?.message || 'Request failed.'}`);
+    const error = new Error(`${response.status} ${payload.error?.code || 'request_failed'}: ${payload.error?.message || 'Request failed.'}`);
+    error.payload = payload;
+    throw error;
   }
   return payload;
 }
 
 function show(element, value) {
   element.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
+function buildContext(seconds) {
+  const roster = JSON.parse(rosterInput.value);
+  return {
+    protocolVersion: 1,
+    requestId: crypto.randomUUID(),
+    capturedSeconds: seconds,
+    language: 'en',
+    sideHint: null,
+    roster,
+    currentLineupIds: roster.slice(0, 5).map(player => player.id),
+    allowedEventTypes: ['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul']
+  };
+}
+
+function renderProposal(payload) {
+  proposalResult.replaceChildren();
+  if (!payload.events?.length) {
+    const empty = document.createElement('div');
+    empty.className = 'proposal-event';
+    empty.textContent = 'No events proposed.';
+    proposalResult.append(empty);
+  }
+  payload.events?.forEach((event, index) => {
+    const item = document.createElement('div');
+    item.className = 'proposal-event';
+    const details = [
+      `${index + 1}. ${event.side} ${event.type}`,
+      event.playerId ? `player ${event.playerId}` : 'player unresolved',
+      event.shotValue ? `${event.made ? 'made' : 'missed'} ${event.shotValue}` : null,
+      event.reboundKind ? `${event.reboundKind} rebound` : null,
+      `confidence ${Math.round(event.confidence * 100)}%`
+    ].filter(Boolean);
+    item.textContent = details.join(' · ');
+    proposalResult.append(item);
+  });
+  payload.warnings?.forEach(warning => {
+    const item = document.createElement('div');
+    item.className = 'proposal-warning';
+    item.textContent = warning;
+    proposalResult.append(item);
+  });
+}
+
+function showResponse(payload) {
+  transcriptResult.textContent = payload.transcript || 'No transcript returned.';
+  renderProposal(payload);
+  show(requestResult, payload);
+}
+
+function showRequestError(error) {
+  const payload = error.payload;
+  if (payload?.partialResult?.transcript) {
+    transcriptResult.textContent = payload.partialResult.transcript;
+  }
+  show(requestResult, payload || error.message);
 }
 
 document.querySelector('#checkConnection').addEventListener('click', async () => {
@@ -125,17 +189,7 @@ async function processAudio(blob, seconds) {
     button.disabled = true;
   });
   try {
-    const roster = JSON.parse(rosterInput.value);
-    const context = {
-      protocolVersion: 1,
-      requestId: crypto.randomUUID(),
-      capturedSeconds: seconds,
-      language: 'en',
-      sideHint: null,
-      roster,
-      currentLineupIds: roster.slice(0, 5).map(player => player.id),
-      allowedEventTypes: ['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul']
-    };
+    const context = buildContext(seconds);
     const form = new FormData();
     form.append('context', new Blob([JSON.stringify(context)], { type: 'application/json' }));
     form.append('audio', blob, `voice-command.${blob.type.includes('ogg') ? 'ogg' : 'webm'}`);
@@ -144,9 +198,9 @@ async function processAudio(blob, seconds) {
       headers: headers(),
       body: form
     });
-    show(requestResult, await readJson(response));
+    showResponse(await readJson(response));
   } catch (error) {
-    show(requestResult, error.message);
+    showRequestError(error);
   } finally {
     document.querySelector('#processFile').disabled = false;
     processRecording.disabled = !recordedBlob;
@@ -166,4 +220,31 @@ document.querySelector('#processFile').addEventListener('click', () => {
     return;
   }
   processAudio(file, Number(videoSeconds.value));
+});
+
+document.querySelector('#loadFixture').addEventListener('click', () => {
+  transcriptInput.value = transcriptFixture.value;
+});
+
+interpretTranscript.addEventListener('click', async () => {
+  show(requestResult, 'Interpreting...');
+  interpretTranscript.disabled = true;
+  try {
+    const response = await fetch('/v1/interpret-command', {
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        transcript: transcriptInput.value,
+        context: buildContext(Number(videoSeconds.value))
+      })
+    });
+    showResponse(await readJson(response));
+  } catch (error) {
+    showRequestError(error);
+  } finally {
+    interpretTranscript.disabled = false;
+  }
 });
