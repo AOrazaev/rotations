@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 
 class TranscriptionUnavailable(RuntimeError):
@@ -16,6 +17,16 @@ class TranscriptionUnavailable(RuntimeError):
 class TranscriptionResult:
     text: str
     model: str
+
+
+class Transcriber(Protocol):
+    @property
+    def ready(self) -> bool: ...
+
+    @property
+    def model_name(self) -> str | None: ...
+
+    def transcribe(self, audio: bytes, suffix: str) -> TranscriptionResult: ...
 
 
 class ExternalCommandTranscriber:

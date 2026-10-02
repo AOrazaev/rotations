@@ -23,6 +23,12 @@
       <div class="actions">
         <button id="checkConnection" type="button">Check service</button>
       </div>
+      <div class="status-grid" aria-live="polite">
+        <div><span>Service</span><strong id="serviceStatus">Not checked</strong></div>
+        <div><span>Protocol</span><strong id="protocolStatus">Unknown</strong></div>
+        <div><span>Transcription</span><strong id="transcriptionStatus">Unknown</strong></div>
+        <div><span>Interpretation</span><strong id="interpretationStatus">Unavailable</strong></div>
+      </div>
       <pre id="connectionResult" aria-live="polite">Not checked.</pre>
     </section>
 
@@ -47,7 +53,7 @@
       <div class="actions">
         <button id="startRecording" type="button">Start recording</button>
         <button id="stopRecording" type="button" disabled>Stop</button>
-        <button id="processRecording" type="button" disabled>Process recording</button>
+        <button id="processRecording" class="process-audio" type="button" disabled>Process recording</button>
         <button id="discardRecording" type="button" disabled>Discard</button>
       </div>
       <p id="recordingStatus" role="status">Idle.</p>
@@ -58,7 +64,7 @@
       <h2>Audio-file spike</h2>
       <input id="audioFile" type="file" accept="audio/*">
       <div class="actions">
-        <button id="processFile" type="button">Process file</button>
+        <button id="processFile" class="process-audio" type="button">Process file</button>
       </div>
     </section>
 

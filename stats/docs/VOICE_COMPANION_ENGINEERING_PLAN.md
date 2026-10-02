@@ -658,6 +658,8 @@ Exit gate:
 
 ### Checkpoint 1: Companion service foundation
 
+**Status: complete.** The companion now has centralized typed settings, versioned health and capability metadata, strict request-context validation, loopback/token/origin security, bounded processing concurrency, adapter interfaces, and a status-aware localhost workbench. Native and browser coverage is documented in [`VOICE_COMPANION_CHECKPOINT_1.md`](VOICE_COMPANION_CHECKPOINT_1.md).
+
 Deliver:
 
 - `voice-companion/` package and development instructions.

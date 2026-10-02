@@ -10,6 +10,11 @@ const discardRecording = document.querySelector('#discardRecording');
 const recordingStatus = document.querySelector('#recordingStatus');
 const audioPreview = document.querySelector('#audioPreview');
 const audioFile = document.querySelector('#audioFile');
+const serviceStatus = document.querySelector('#serviceStatus');
+const protocolStatus = document.querySelector('#protocolStatus');
+const transcriptionStatus = document.querySelector('#transcriptionStatus');
+const interpretationStatus = document.querySelector('#interpretationStatus');
+const processButtons = [...document.querySelectorAll('.process-audio')];
 
 let recorder = null;
 let stream = null;
@@ -36,13 +41,29 @@ function show(element, value) {
 
 document.querySelector('#checkConnection').addEventListener('click', async () => {
   show(connectionResult, 'Checking...');
+  serviceStatus.textContent = 'Checking';
   try {
     const [health, capabilities] = await Promise.all([
       fetch('/v1/health', { headers: headers() }).then(readJson),
       fetch('/v1/capabilities', { headers: headers() }).then(readJson)
     ]);
+    if (health.protocolVersion !== 1 || capabilities.protocolVersion !== 1) {
+      throw new Error(`Incompatible protocol. Workbench requires v1; service reported health v${health.protocolVersion} and capabilities v${capabilities.protocolVersion}.`);
+    }
+    serviceStatus.textContent = health.status;
+    protocolStatus.textContent = `v${health.protocolVersion}`;
+    transcriptionStatus.textContent = health.transcriptionReady
+      ? (capabilities.transcriptionModel || 'Ready')
+      : 'Configuration required';
+    interpretationStatus.textContent = capabilities.eventInterpretation
+      ? (capabilities.commandModel || 'Ready')
+      : 'Not implemented';
     show(connectionResult, { health, capabilities });
   } catch (error) {
+    serviceStatus.textContent = 'Error';
+    protocolStatus.textContent = 'Unknown';
+    transcriptionStatus.textContent = 'Unknown';
+    interpretationStatus.textContent = 'Unknown';
     show(connectionResult, error.message);
   }
 });
@@ -99,6 +120,9 @@ discardRecording.addEventListener('click', () => {
 
 async function processAudio(blob, seconds) {
   show(requestResult, 'Processing...');
+  processButtons.forEach(button => {
+    button.disabled = true;
+  });
   try {
     const roster = JSON.parse(rosterInput.value);
     const context = {
@@ -122,6 +146,9 @@ async function processAudio(blob, seconds) {
     show(requestResult, await readJson(response));
   } catch (error) {
     show(requestResult, error.message);
+  } finally {
+    document.querySelector('#processFile').disabled = false;
+    processRecording.disabled = !recordedBlob;
   }
 }
 

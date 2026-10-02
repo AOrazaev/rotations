@@ -17,5 +17,13 @@ input, textarea { width: 100%; padding: 10px; color: inherit; background: #080e1
 button { padding: 10px 14px; color: #fff; background: #5367e8; border: 0; border-radius: 9px; font-weight: 800; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.status-grid div { display: grid; gap: 4px; padding: 10px; background: #080e1b; border-radius: 9px; }
+.status-grid span { color: #91a0bd; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.status-grid strong { overflow-wrap: anywhere; }
 pre { min-height: 48px; margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; background: #080e1b; border-radius: 9px; }
 audio { width: 100%; margin-top: 12px; }
+
+@media (max-width: 640px) {
+  .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

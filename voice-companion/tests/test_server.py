@@ -57,6 +57,19 @@ class ServerTest(unittest.TestCase):
         connection.close()
         return response.status, response.getheaders(), payload
 
+    def voice_body(self, context, audio=b"audio-bytes"):
+        boundary = "voice-boundary"
+        body = (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="context"\r\n'
+            "Content-Type: application/json\r\n\r\n"
+            f"{json.dumps(context)}\r\n"
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="audio"; filename="sample.webm"\r\n'
+            "Content-Type: audio/webm\r\n\r\n"
+        ).encode() + audio + f"\r\n--{boundary}--\r\n".encode()
+        return boundary, body
+
     def test_health_requires_token(self):
         status, _, payload = self.request("GET", "/v1/health")
         self.assertEqual(status, 401)
@@ -102,7 +115,6 @@ class ServerTest(unittest.TestCase):
         )
 
     def test_voice_command_returns_transcript_without_events(self):
-        boundary = "voice-boundary"
         context = {
             "protocolVersion": 1,
             "requestId": "request-1",
@@ -112,15 +124,7 @@ class ServerTest(unittest.TestCase):
             "currentLineupIds": [],
             "allowedEventTypes": ["shot"],
         }
-        body = (
-            f"--{boundary}\r\n"
-            'Content-Disposition: form-data; name="context"\r\n'
-            "Content-Type: application/json\r\n\r\n"
-            f"{json.dumps(context)}\r\n"
-            f"--{boundary}\r\n"
-            'Content-Disposition: form-data; name="audio"; filename="sample.webm"\r\n'
-            "Content-Type: audio/webm\r\n\r\n"
-        ).encode() + b"audio-bytes" + f"\r\n--{boundary}--\r\n".encode()
+        boundary, body = self.voice_body(context)
         status, _, payload = self.request(
             "POST",
             "/v1/voice-command",
@@ -137,6 +141,43 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(result["requestId"], "request-1")
         self.assertEqual(result["events"], [])
         self.assertIn("Seven assist", result["transcript"])
+
+    def test_voice_command_rejects_unknown_context_fields(self):
+        context = {
+            "protocolVersion": 1,
+            "requestId": "request-1",
+            "capturedSeconds": 12.3,
+            "language": "en",
+            "roster": [],
+            "currentLineupIds": [],
+            "allowedEventTypes": ["shot"],
+            "game": {"events": []},
+        }
+        boundary, body = self.voice_body(context)
+        status, _, payload = self.request(
+            "POST",
+            "/v1/voice-command",
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Content-Length": str(len(body)),
+            },
+            body=body,
+        )
+        self.assertEqual(status, 400)
+        error = json.loads(payload)["error"]
+        self.assertEqual(error["code"], "invalid_request")
+        self.assertIn("unsupported fields: game", error["message"])
+
+    def test_processing_slots_are_bounded(self):
+        self.assertTrue(self.server.begin_processing())
+        try:
+            self.assertFalse(self.server.begin_processing())
+        finally:
+            self.server.end_processing()
+        self.assertTrue(self.server.begin_processing())
+        self.server.end_processing()
 
 
 if __name__ == "__main__":

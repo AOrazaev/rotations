@@ -6,6 +6,7 @@ import mimetypes
 import os
 import secrets
 import subprocess
+import threading
 import time
 from email.parser import BytesParser
 from email.policy import default
@@ -15,24 +16,18 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import __version__
-from .transcription import ExternalCommandTranscriber, TranscriptionUnavailable
-
-PROTOCOL_VERSION = 1
-MAX_AUDIO_BYTES = 8 * 1024 * 1024
-MAX_CONTEXT_BYTES = 64 * 1024
-DEFAULT_ALLOWED_ORIGINS = {
-    "https://aorazaev.github.io",
-    "http://127.0.0.1:4173",
-    "http://localhost:4173",
-}
-ALLOWED_AUDIO_TYPES = {
-    "audio/webm": ".webm",
-    "audio/ogg": ".ogg",
-    "audio/wav": ".wav",
-    "audio/x-wav": ".wav",
-    "audio/mpeg": ".mp3",
-    "audio/mp4": ".m4a",
-}
+from .config import (
+    ALLOWED_AUDIO_TYPES,
+    DEFAULT_ALLOWED_ORIGINS,
+    PROTOCOL_VERSION,
+    ServiceSettings,
+)
+from .transcription import (
+    ExternalCommandTranscriber,
+    Transcriber,
+    TranscriptionUnavailable,
+)
+from .validation import RequestValidationError, validate_context
 
 
 class VoiceCompanionServer(ThreadingHTTPServer):
@@ -41,16 +36,32 @@ class VoiceCompanionServer(ThreadingHTTPServer):
         server_address,
         handler_class,
         *,
-        token: str,
-        allowed_origins: set[str],
+        settings: ServiceSettings,
         web_root: Path,
-        transcriber: ExternalCommandTranscriber,
+        transcriber: Transcriber,
     ):
         super().__init__(server_address, handler_class)
-        self.token = token
-        self.allowed_origins = allowed_origins
+        self.settings = settings
         self.web_root = web_root
         self.transcriber = transcriber
+        self.started_at = time.monotonic()
+        self.processing_slots = threading.BoundedSemaphore(
+            settings.max_concurrent_requests
+        )
+        self.processing_lock = threading.Lock()
+        self.processing_requests = 0
+
+    def begin_processing(self) -> bool:
+        if not self.processing_slots.acquire(blocking=False):
+            return False
+        with self.processing_lock:
+            self.processing_requests += 1
+        return True
+
+    def end_processing(self):
+        with self.processing_lock:
+            self.processing_requests -= 1
+        self.processing_slots.release()
 
 
 class VoiceCompanionHandler(BaseHTTPRequestHandler):
@@ -84,9 +95,13 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     "status": "ready" if self.server.transcriber.ready else "configuration_required",
                     "protocolVersion": PROTOCOL_VERSION,
                     "serviceVersion": __version__,
-                    "profile": "spike",
+                    "profile": self.server.settings.profile,
                     "transcriptionReady": self.server.transcriber.ready,
                     "commandModelReady": False,
+                    "processingRequests": self.server.processing_requests,
+                    "uptimeSeconds": round(
+                        time.monotonic() - self.server.started_at, 1
+                    ),
                 },
             )
             return
@@ -99,11 +114,20 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     "protocolVersion": PROTOCOL_VERSION,
                     "audioTypes": sorted(ALLOWED_AUDIO_TYPES),
                     "languages": ["en"],
-                    "maxAudioBytes": MAX_AUDIO_BYTES,
-                    "maxDurationSeconds": 20,
+                    "maxAudioBytes": self.server.settings.max_audio_bytes,
+                    "maxContextBytes": self.server.settings.max_context_bytes,
+                    "maxDurationSeconds": self.server.settings.max_duration_seconds,
+                    "maxConcurrentRequests": (
+                        self.server.settings.max_concurrent_requests
+                    ),
                     "transcriptionModel": self.server.transcriber.model_name,
                     "commandModel": None,
                     "eventInterpretation": False,
+                    "security": {
+                        "loopbackOnly": True,
+                        "tokenRequired": True,
+                        "originValidation": True,
+                    },
                 },
             )
             return
@@ -119,7 +143,11 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         content_length = self._content_length()
         if content_length is None:
             return
-        if content_length > MAX_AUDIO_BYTES + MAX_CONTEXT_BYTES + 64 * 1024:
+        if content_length > (
+            self.server.settings.max_audio_bytes
+            + self.server.settings.max_context_bytes
+            + 64 * 1024
+        ):
             self._send_error(
                 HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
                 "request_too_large",
@@ -138,8 +166,8 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(content_length)
         try:
             context, audio, audio_type = self._parse_multipart(content_type, body)
-            self._validate_context(context)
-        except ValueError as error:
+            validate_context(context)
+        except (ValueError, RequestValidationError) as error:
             self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(error))
             return
 
@@ -150,11 +178,19 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 f"Unsupported audio type: {audio_type or 'missing'}.",
             )
             return
-        if len(audio) > MAX_AUDIO_BYTES:
+        if len(audio) > self.server.settings.max_audio_bytes:
             self._send_error(
                 HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
                 "audio_too_large",
                 "Audio exceeds the configured limit.",
+            )
+            return
+
+        if not self.server.begin_processing():
+            self._send_error(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                "service_busy",
+                "The voice companion is already processing a request.",
             )
             return
 
@@ -181,6 +217,8 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 str(error),
             )
             return
+        finally:
+            self.server.end_processing()
 
         total_ms = round((time.perf_counter() - started) * 1000)
         self._send_json(
@@ -197,7 +235,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 "processor": {
                     "transcriptionModel": transcription.model,
                     "commandModel": None,
-                    "profile": "spike",
+                    "profile": self.server.settings.profile,
                 },
                 "timingMs": {
                     "transcription": transcription_ms,
@@ -213,7 +251,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             self._send_error(HTTPStatus.FORBIDDEN, "origin_not_allowed", "Origin is not allowed.")
             return False
         supplied = self.headers.get("X-Bask-Voice-Token", "")
-        if not secrets.compare_digest(supplied, self.server.token):
+        if not secrets.compare_digest(supplied, self.server.settings.token):
             self._send_error(
                 HTTPStatus.UNAUTHORIZED,
                 "unauthorized",
@@ -223,7 +261,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         return True
 
     def _origin_allowed(self, origin: str | None) -> bool:
-        if origin is None or origin in self.server.allowed_origins:
+        if origin is None or origin in self.server.settings.allowed_origins:
             return True
         parsed = urlparse(origin)
         return (
@@ -264,7 +302,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 continue
             payload = part.get_payload(decode=True) or b""
             if name == "context":
-                if len(payload) > MAX_CONTEXT_BYTES:
+                if len(payload) > self.server.settings.max_context_bytes:
                     raise ValueError("Context exceeds the configured limit.")
                 try:
                     context = json.loads(payload.decode("utf-8"))
@@ -279,30 +317,6 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         if audio is None or not audio:
             raise ValueError("Missing audio part.")
         return context, audio, audio_type
-
-    def _validate_context(self, context):
-        if not isinstance(context, dict):
-            raise ValueError("Context must be a JSON object.")
-        if context.get("protocolVersion") != PROTOCOL_VERSION:
-            raise ValueError("Unsupported protocolVersion.")
-        request_id = context.get("requestId")
-        if not isinstance(request_id, str) or not request_id or len(request_id) > 128:
-            raise ValueError("requestId must be a non-empty string up to 128 characters.")
-        captured_seconds = context.get("capturedSeconds")
-        if (
-            not isinstance(captured_seconds, (int, float))
-            or isinstance(captured_seconds, bool)
-            or captured_seconds < 0
-        ):
-            raise ValueError("capturedSeconds must be a non-negative number.")
-        if context.get("language") != "en":
-            raise ValueError("Checkpoint 0 supports language 'en' only.")
-        if not isinstance(context.get("roster"), list) or len(context["roster"]) > 30:
-            raise ValueError("roster must be an array with at most 30 players.")
-        if not isinstance(context.get("currentLineupIds"), list):
-            raise ValueError("currentLineupIds must be an array.")
-        if not isinstance(context.get("allowedEventTypes"), list):
-            raise ValueError("allowedEventTypes must be an array.")
 
     def _serve_static(self, path: str):
         relative = "index.html" if path in {"", "/"} else path.lstrip("/")
@@ -369,14 +383,19 @@ def build_server(
     port: int,
     token: str,
     allowed_origins: set[str],
-    transcriber: ExternalCommandTranscriber | None = None,
+    transcriber: Transcriber | None = None,
+    max_concurrent_requests: int = 1,
 ) -> VoiceCompanionServer:
     web_root = Path(__file__).resolve().parents[2] / "web"
+    settings = ServiceSettings(
+        token=token,
+        allowed_origins=frozenset(allowed_origins),
+        max_concurrent_requests=max_concurrent_requests,
+    )
     return VoiceCompanionServer(
         (host, port),
         VoiceCompanionHandler,
-        token=token,
-        allowed_origins=allowed_origins,
+        settings=settings,
         web_root=web_root,
         transcriber=transcriber or ExternalCommandTranscriber(),
     )
@@ -394,6 +413,11 @@ def main():
         "--allowed-origins",
         default=os.environ.get("BASK_VOICE_ALLOWED_ORIGINS"),
     )
+    parser.add_argument(
+        "--max-concurrent-requests",
+        type=int,
+        default=1,
+    )
     args = parser.parse_args()
     if args.host not in {"127.0.0.1", "::1", "localhost"}:
         parser.error("Checkpoint 0 binds to loopback only.")
@@ -403,6 +427,7 @@ def main():
         port=args.port,
         token=args.token,
         allowed_origins=parse_origins(args.allowed_origins),
+        max_concurrent_requests=args.max_concurrent_requests,
     )
     print(f"Voice companion workbench: http://127.0.0.1:{args.port}/")
     print(f"Pairing token: {args.token}")

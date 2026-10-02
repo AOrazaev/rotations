@@ -26,6 +26,26 @@ http://127.0.0.1:8766/
 
 Paste the token into the workbench and choose **Check service**.
 
+The service binds to loopback only. API requests require the pairing token in
+`X-Bask-Voice-Token`, and browser requests must come from the workbench,
+configured development origins, or the production GitHub Pages origin.
+
+## API
+
+```text
+GET  /v1/health
+GET  /v1/capabilities
+POST /v1/voice-command
+```
+
+Health and capability responses expose the protocol version, readiness,
+configured models, request limits, security mode, active processing count, and
+uptime. Voice requests use bounded `multipart/form-data` containing `context`
+JSON and an `audio` file.
+
+Only one voice request is processed at a time by default. Additional requests
+receive `429 service_busy`.
+
 ## Configure local transcription
 
 Checkpoint 0 intentionally does not choose or download a speech model automatically. Configure any local transcription CLI that writes only the transcript to standard output:
