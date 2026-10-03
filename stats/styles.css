@@ -458,12 +458,19 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-list-item.voice-command-draft { background: rgba(104, 211, 145, .07); border-color: rgba(104, 211, 145, .65); }
 .event-list-item.voice-command-error { background: rgba(239, 123, 134, .07); border-color: rgba(239, 123, 134, .65); }
 .voice-command-time { padding-top: 4px; color: var(--accent2); font-variant-numeric: tabular-nums; }
-.voice-command-content { min-width: 0; display: grid; gap: 8px; }
+.voice-command-content { min-width: 0; display: grid; gap: 6px; }
 .voice-command-heading { display: flex; gap: 8px; align-items: center; min-height: 28px; }
+.voice-command-heading strong { min-width: 0; }
+.voice-command-accept { margin-left: auto; }
 .voice-command-spinner { width: 15px; height: 15px; border: 2px solid rgba(184, 193, 255, .28); border-top-color: #b8c1ff; border-radius: 999px; animation: voice-spin .8s linear infinite; }
 .voice-command-transcript { margin: 0; overflow: hidden; color: var(--muted); font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.voice-command-event-summary { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.voice-command-event-summary-item { display: flex; gap: 8px; justify-content: space-between; min-width: 0; font-size: .86rem; }
+.voice-command-event-summary-item > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-command-event-confidence, .voice-command-event-more { flex: 0 0 auto; color: var(--muted); font-size: .76rem; }
 .voice-command-details { min-width: 0; padding: 8px 10px; background: rgba(7, 12, 22, .55); border: 1px solid var(--line); border-radius: 9px; }
-.voice-command-details > summary { cursor: pointer; font-weight: 700; }
+.voice-command-details:not([open]) { width: fit-content; padding: 5px 9px; }
+.voice-command-details > summary { cursor: pointer; color: var(--accent2); font-size: .8rem; font-weight: 700; }
 .voice-command-details > * + * { margin-top: 9px; }
 .voice-command-actions { display: flex; gap: 7px; flex-wrap: wrap; }
 .voice-command-actions button { flex: 0 1 auto; }

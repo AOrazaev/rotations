@@ -303,12 +303,20 @@ test('uses one compact microphone control and keeps drafts out of game storage',
   await waitForDrafts(page, 1);
   const draft = page.locator('.voice-command-draft');
   await expect(draft.locator('.voice-proposal-event')).toHaveCount(2);
+  await expect(draft.locator('.voice-command-details')).not.toHaveAttribute('open', '');
+  await expect(draft.locator('.voice-command-event-summary-item')).toHaveCount(2);
+  await expect(draft.locator('.voice-command-event-summary')).toContainText('assist');
+  await expect(draft.locator('.voice-command-event-summary')).toContainText('made 2PT');
+  await expect(draft.locator('[data-voice-action="confirm"]')).toHaveText('Accept');
+  await expect(draft.locator('.voice-proposal-event').first()).not.toBeVisible();
   await expect(draft).toContainText('Seven assist and thirteen makes two');
   expect(await page.evaluate(() => window.__voiceRequests[0].capturedSeconds)).toBe(42.4);
   expect(await page.evaluate(
     () => window.__voiceRequests[0].audioChannelPreference
   )).toBe('auto');
 
+  await draft.locator('.voice-command-details > summary').click();
+  await expect(draft.locator('.voice-proposal-event').first()).toBeVisible();
   await draft.locator('[data-voice-field="type"]').first().selectOption('steal');
   await page.evaluate(() => { window.__statsFakePlayer.current = 99; });
   await draft.locator('[data-voice-action="replace-timestamp"]').click();
@@ -461,6 +469,7 @@ test('rejects the full batch when an edited draft event is invalid', async ({ pa
   await waitForDrafts(page, 1);
 
   const draft = page.locator('.voice-command-draft');
+  await draft.locator('.voice-command-details > summary').click();
   await draft.locator('[data-voice-field="playerId"]').first().selectOption('');
   await draft.locator('[data-voice-action="confirm"]').click();
   await expect(draft).toContainText('player who is not on court');

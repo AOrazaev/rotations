@@ -123,6 +123,7 @@ export function createEventListController({
   let activeEventId = null;
   let highlightedEventIds = new Set();
   let voiceCommands = [];
+  const expandedVoiceCommandIds = new Set();
   let lastPlaybackSeconds = 0;
   let playbackFollowing = true;
   let suppressManualScrollUntil = 0;
@@ -671,6 +672,37 @@ export function createEventListController({
     return fieldset;
   }
 
+  function renderVoiceDraftSummary(command, players) {
+    const playersById = Object.fromEntries(players.map(player => [
+      player.id,
+      {
+        ...player,
+        name: player.number ? `#${player.number} ${player.name}` : player.name
+      }
+    ]));
+    const summary = documentObject.createElement('ul');
+    summary.className = 'voice-command-event-summary';
+    const visibleEvents = command.events.slice(0, 3);
+    visibleEvents.forEach(event => {
+      const item = documentObject.createElement('li');
+      item.className = 'voice-command-event-summary-item';
+      const description = documentObject.createElement('span');
+      description.textContent = describeEvent(event, playersById);
+      const confidence = documentObject.createElement('span');
+      confidence.className = 'voice-command-event-confidence';
+      confidence.textContent = `${Math.round(event.confidence * 100)}%`;
+      item.append(description, confidence);
+      summary.append(item);
+    });
+    if (command.events.length > visibleEvents.length) {
+      const more = documentObject.createElement('li');
+      more.className = 'voice-command-event-more';
+      more.textContent = `+${command.events.length - visibleEvents.length} more`;
+      summary.append(more);
+    }
+    return summary;
+  }
+
   function renderVoiceCommand(command, players) {
     const item = documentObject.createElement('li');
     item.className = `event-list-item voice-command-item voice-command-${command.state}`;
@@ -700,6 +732,11 @@ export function createEventListController({
       heading.append(spinner);
     }
     heading.append(title);
+    if (command.state === 'draft') {
+      const confirm = voiceAction('Accept', 'confirm', 'primary small voice-command-accept');
+      confirm.disabled = !command.events.length;
+      heading.append(confirm);
+    }
     content.append(heading);
 
     if (command.errorMessage) {
@@ -714,13 +751,22 @@ export function createEventListController({
       content.append(transcript);
     }
 
+    if (command.state === 'draft') {
+      content.append(renderVoiceDraftSummary(command, players));
+    }
+
     if (command.state === 'draft' || (command.state === 'error' && command.audioUrl)) {
       const details = documentObject.createElement('details');
       details.className = 'voice-command-details';
-      details.open = command.state === 'draft';
+      details.open = expandedVoiceCommandIds.has(command.id)
+        || (command.state === 'draft' && Boolean(command.errorMessage));
       const summary = documentObject.createElement('summary');
-      summary.textContent = command.state === 'draft' ? 'Review voice proposal' : 'Recording details';
+      summary.textContent = command.state === 'draft' ? 'Edit voice events' : 'Recording details';
       details.append(summary);
+      details.addEventListener('toggle', () => {
+        if (details.open) expandedVoiceCommandIds.add(command.id);
+        else expandedVoiceCommandIds.delete(command.id);
+      });
       if (command.audioUrl) {
         const audio = documentObject.createElement('audio');
         audio.controls = true;
@@ -774,6 +820,17 @@ export function createEventListController({
           proposals.append(renderVoiceDraftEvent(command, event, index, players));
         });
         details.append(proposals);
+        const editActions = documentObject.createElement('div');
+        editActions.className = 'voice-command-actions voice-command-edit-actions';
+        editActions.append(
+          voiceAction('Use current time', 'replace-timestamp'),
+          voiceAction('Retry', 'retry'),
+          voiceAction('Discard', 'discard', 'danger small')
+        );
+        if (command.canSaveEvaluation) {
+          editActions.append(voiceAction('Save sample', 'save-evaluation'));
+        }
+        details.append(editActions);
       }
       if (command.evaluationStatus) {
         const status = documentObject.createElement('p');
@@ -790,18 +847,6 @@ export function createEventListController({
       actions.append(voiceAction('Discard', 'discard', 'danger small'));
     } else if (command.state === 'processing') {
       actions.append(voiceAction('Cancel', 'cancel'));
-    } else if (command.state === 'draft') {
-      const confirm = voiceAction('Add events', 'confirm', 'primary small');
-      confirm.disabled = !command.events.length;
-      actions.append(
-        confirm,
-        voiceAction('Use current time', 'replace-timestamp'),
-        voiceAction('Retry', 'retry'),
-        voiceAction('Discard', 'discard', 'danger small')
-      );
-      if (command.canSaveEvaluation) {
-        actions.append(voiceAction('Save sample', 'save-evaluation'));
-      }
     } else if (command.state === 'error') {
       actions.append(
         voiceAction('Retry', 'retry', 'primary small'),
@@ -811,7 +856,7 @@ export function createEventListController({
         actions.append(voiceAction('Save sample', 'save-evaluation'));
       }
     }
-    content.append(actions);
+    if (actions.childElementCount) content.append(actions);
     item.append(time, content);
     return item;
   }
@@ -1233,6 +1278,10 @@ export function createEventListController({
     getFilters: getFilterState,
     setVoiceCommands(commands) {
       voiceCommands = structuredClone(commands);
+      const commandIds = new Set(voiceCommands.map(command => command.id));
+      for (const commandId of expandedVoiceCommandIds) {
+        if (!commandIds.has(commandId)) expandedVoiceCommandIds.delete(commandId);
+      }
       render(game);
     },
     highlightEvents(eventIds) {

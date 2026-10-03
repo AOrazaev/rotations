@@ -848,10 +848,12 @@ The microphone is a start/stop toggle. After recording stops, the browser adds a
 UI-only command row to the event timeline at the captured video timestamp. A
 row moves through queued, processing, draft, error, and committing states.
 Queued and processing rows show progress and cancellation. Draft rows expose
-the transcript, editable proposed events, and explicit Add events, Retry, and
-Discard actions. Confirmed rows become normal persisted game events with
-temporary highlighting and full-batch undo. Temporary rows never enter game
-data, IndexedDB, reports, backups, or shared links.
+the transcript and a compact read-only summary of recognized events with an
+Accept action. The full event editors, timestamp replacement, retry, discard,
+and evaluation controls remain folded until requested, while validation errors
+reopen the editor for correction. Confirmed rows become normal persisted game
+events with temporary highlighting and full-batch undo. Temporary rows never
+enter game data, IndexedDB, reports, backups, or shared links.
 
 Recording remains available while earlier commands are pending. The browser
 queues audio immediately and sends commands to the companion sequentially to
