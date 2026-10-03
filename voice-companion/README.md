@@ -232,6 +232,20 @@ $env:PYTHONPATH = "$PWD\voice-companion\src"
 
 Evaluate an alternate model by supplying its full path with `--model`.
 
+Run the committed eight-recording real-audio evaluation set:
+
+```powershell
+$env:PYTHONPATH = "$PWD\voice-companion\src"
+.\voice-companion\.venv\Scripts\python.exe `
+  -m voice_companion.evaluate_real_samples `
+  --output .\real-audio-evaluation.json
+```
+
+The set lives under `voice-companion/evaluation/real-audio-v1`. Its manifest
+uses synthetic player identities and manually curated transcripts/events.
+Reports score raw transcription, active-lineup-aware transcript normalization,
+and exact end-to-end semantic event arrays separately.
+
 Processing defaults to a 120-second timeout and can be cancelled from the
 workbench. Override the timeout when starting the service:
 

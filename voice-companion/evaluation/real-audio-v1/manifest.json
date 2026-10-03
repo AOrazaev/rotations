@@ -1,0 +1,105 @@
+{
+  "formatVersion": 1,
+  "description": "First curated real-recording evaluation set collected during local voice companion development.",
+  "roster": [
+    {"id": "p13", "jersey": "13", "name": "Player 13"},
+    {"id": "p7", "jersey": "7", "name": "Player 7"},
+    {"id": "p50", "jersey": "50", "name": "Player 50"},
+    {"id": "p40", "jersey": "40", "name": "Player 40"},
+    {"id": "p5", "jersey": "5", "name": "Player 5"},
+    {"id": "p60", "jersey": "60", "name": "Player 60"},
+    {"id": "p70", "jersey": "70", "name": "Player 70"}
+  ],
+  "allowedEventTypes": [
+    "shot",
+    "rebound",
+    "assist",
+    "steal",
+    "block",
+    "turnover",
+    "foul",
+    "timeout",
+    "substitution"
+  ],
+  "cases": [
+    {
+      "id": "opponent-miss-defensive-rebound",
+      "audio": "01-opponent-miss-rebound.webm",
+      "expectedTranscript": "Opponent misses two pointer. Number thirteen defensive rebound.",
+      "currentLineupIds": ["p13", "p7", "p50", "p5", "p60"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 2, "made": false},
+        {"side": "team", "type": "rebound", "playerId": "p13", "reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "number-50-misses-two",
+      "audio": "02-number-50-miss.webm",
+      "expectedTranscript": "Number 50 misses two pointer.",
+      "currentLineupIds": ["p13", "p7", "p50", "p5", "p60"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p50", "shotValue": 2, "made": false}
+      ]
+    },
+    {
+      "id": "fifty-fifteen-confusion",
+      "audio": "03-fifty-fifteen.webm",
+      "expectedTranscript": "Fifty misses two pointer.",
+      "currentLineupIds": ["p13", "p7", "p50", "p5", "p60"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p50", "shotValue": 2, "made": false}
+      ]
+    },
+    {
+      "id": "number-70-miss-opponent-rebound",
+      "audio": "04-seventy-miss-opponent-rebound.webm",
+      "expectedTranscript": "Number seventy misses three pointer. Opponent defensive rebound.",
+      "currentLineupIds": ["p13", "p7", "p40", "p5", "p70"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p70", "shotValue": 3, "made": false},
+        {"side": "opponent", "type": "rebound", "playerId": null, "reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "assist-number-5-made-three-number-13",
+      "audio": "05-assist-made-three.webm",
+      "expectedTranscript": "Number five assist number 13 makes three pointer.",
+      "currentLineupIds": ["p13", "p7", "p40", "p5", "p70"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p13", "shotValue": 3, "made": true},
+        {"side": "team", "type": "assist", "playerId": "p5"}
+      ]
+    },
+    {
+      "id": "opponent-timeout",
+      "audio": "06-opponent-timeout.webm",
+      "expectedTranscript": "Opponent timeout.",
+      "currentLineupIds": ["p13", "p7", "p40", "p60", "p70"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "timeout", "playerId": null}
+      ]
+    },
+    {
+      "id": "four-event-sequence",
+      "audio": "07-four-event-sequence.webm",
+      "expectedTranscript": "Number 40 missed two pointer defensive rebound by opponent steal by 13. 13 makes two points in transition.",
+      "currentLineupIds": ["p13", "p50", "p40", "p60", "p70"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p40", "shotValue": 2, "made": false},
+        {"side": "opponent", "type": "rebound", "playerId": null, "reboundKind": "defensive"},
+        {"side": "team", "type": "steal", "playerId": "p13"},
+        {"side": "team", "type": "shot", "playerId": "p13", "shotValue": 2, "made": true, "shotDetails": {"phase": "transition"}}
+      ]
+    },
+    {
+      "id": "transition-miss-opponent-foul",
+      "audio": "08-transition-miss-opponent-foul.webm",
+      "expectedTranscript": "Number 50 misses two pointer in transition. Opponent foul.",
+      "currentLineupIds": ["p13", "p50", "p40", "p60", "p70"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p50", "shotValue": 2, "made": false, "shotDetails": {"phase": "transition"}},
+        {"side": "opponent", "type": "foul", "playerId": null}
+      ]
+    }
+  ]
+}

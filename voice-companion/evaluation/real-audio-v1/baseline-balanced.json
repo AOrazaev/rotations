@@ -1,0 +1,365 @@
+{
+  "formatVersion": 1,
+  "transcriptionModel": "base.en",
+  "commandModel": "Qwen3-4B-Q4_K_M.gguf",
+  "caseResults": [
+    {
+      "id": "opponent-miss-defensive-rebound",
+      "audio": "01-opponent-miss-rebound.webm",
+      "expectedTranscript": "Opponent misses two pointer. Number thirteen defensive rebound.",
+      "expectedEvents": [
+        {
+          "side": "opponent",
+          "type": "shot",
+          "playerId": null,
+          "shotValue": 2,
+          "made": false
+        },
+        {
+          "side": "team",
+          "type": "rebound",
+          "playerId": "p13",
+          "reboundKind": "defensive"
+        }
+      ],
+      "rawTranscript": "Opponent misses two pointer. Number thirteen defensive rebound.",
+      "normalizedTranscript": "Opponent misses two pointer. Number thirteen defensive rebound.",
+      "rawTranscriptMatch": true,
+      "normalizedTranscriptMatch": true,
+      "actualEvents": [
+        {
+          "side": "opponent",
+          "type": "shot",
+          "playerId": null,
+          "shotValue": 2,
+          "made": false
+        },
+        {
+          "side": "team",
+          "type": "rebound",
+          "playerId": "p13",
+          "reboundKind": "defensive"
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [
+        "Removed unspoken shot phase 'transition'."
+      ],
+      "latencyMs": 65978,
+      "error": null
+    },
+    {
+      "id": "number-50-misses-two",
+      "audio": "02-number-50-miss.webm",
+      "expectedTranscript": "Number 50 misses two pointer.",
+      "expectedEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p50",
+          "shotValue": 2,
+          "made": false
+        }
+      ],
+      "rawTranscript": "Number 50 misses two pointer.",
+      "normalizedTranscript": "Number 50 misses two pointer.",
+      "rawTranscriptMatch": true,
+      "normalizedTranscriptMatch": true,
+      "actualEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p50",
+          "shotValue": 2,
+          "made": false
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [
+        "Removed 1 unspoken model event."
+      ],
+      "latencyMs": 17643,
+      "error": null
+    },
+    {
+      "id": "fifty-fifteen-confusion",
+      "audio": "03-fifty-fifteen.webm",
+      "expectedTranscript": "Fifty misses two pointer.",
+      "expectedEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p50",
+          "shotValue": 2,
+          "made": false
+        }
+      ],
+      "rawTranscript": "Fifteen misses two pointer.",
+      "normalizedTranscript": "Fifty misses two pointer.",
+      "rawTranscriptMatch": false,
+      "normalizedTranscriptMatch": true,
+      "actualEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p50",
+          "shotValue": 2,
+          "made": false
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [
+        "Normalized jersey Fifteen to Fifty using the active lineup.",
+        "Removed 1 unspoken model event."
+      ],
+      "latencyMs": 19059,
+      "error": null
+    },
+    {
+      "id": "number-70-miss-opponent-rebound",
+      "audio": "04-seventy-miss-opponent-rebound.webm",
+      "expectedTranscript": "Number seventy misses three pointer. Opponent defensive rebound.",
+      "expectedEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p70",
+          "shotValue": 3,
+          "made": false
+        },
+        {
+          "side": "opponent",
+          "type": "rebound",
+          "playerId": null,
+          "reboundKind": "defensive"
+        }
+      ],
+      "rawTranscript": "Number seven T misses three pointer. Opponent defensively rebound.",
+      "normalizedTranscript": "Number seven T misses three pointer. Opponent defensively rebound.",
+      "rawTranscriptMatch": false,
+      "normalizedTranscriptMatch": false,
+      "actualEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p7",
+          "shotValue": 3,
+          "made": false
+        },
+        {
+          "side": "opponent",
+          "type": "rebound",
+          "playerId": null,
+          "reboundKind": "defensive"
+        }
+      ],
+      "eventArrayExact": false,
+      "warnings": [
+        "Removed unspoken shot phase 'transition'."
+      ],
+      "latencyMs": 41908,
+      "error": null
+    },
+    {
+      "id": "assist-number-5-made-three-number-13",
+      "audio": "05-assist-made-three.webm",
+      "expectedTranscript": "Number five assist number 13 makes three pointer.",
+      "expectedEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p13",
+          "shotValue": 3,
+          "made": true
+        },
+        {
+          "side": "team",
+          "type": "assist",
+          "playerId": "p5"
+        }
+      ],
+      "rawTranscript": "Number five assist number 13 makes three pointer",
+      "normalizedTranscript": "Number five assist number 13 makes three pointer",
+      "rawTranscriptMatch": true,
+      "normalizedTranscriptMatch": true,
+      "actualEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p13",
+          "shotValue": 3,
+          "made": true
+        },
+        {
+          "side": "team",
+          "type": "assist",
+          "playerId": "p5"
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [
+        "Removed unspoken shot phase 'transition'."
+      ],
+      "latencyMs": 17204,
+      "error": null
+    },
+    {
+      "id": "opponent-timeout",
+      "audio": "06-opponent-timeout.webm",
+      "expectedTranscript": "Opponent timeout.",
+      "expectedEvents": [
+        {
+          "side": "opponent",
+          "type": "timeout",
+          "playerId": null
+        }
+      ],
+      "rawTranscript": "Opponent timeout.",
+      "normalizedTranscript": "Opponent timeout.",
+      "rawTranscriptMatch": true,
+      "normalizedTranscriptMatch": true,
+      "actualEvents": [
+        {
+          "side": "opponent",
+          "type": "timeout",
+          "playerId": null
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [],
+      "latencyMs": 33775,
+      "error": null
+    },
+    {
+      "id": "four-event-sequence",
+      "audio": "07-four-event-sequence.webm",
+      "expectedTranscript": "Number 40 missed two pointer defensive rebound by opponent steal by 13. 13 makes two points in transition.",
+      "expectedEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p40",
+          "shotValue": 2,
+          "made": false
+        },
+        {
+          "side": "opponent",
+          "type": "rebound",
+          "playerId": null,
+          "reboundKind": "defensive"
+        },
+        {
+          "side": "team",
+          "type": "steal",
+          "playerId": "p13"
+        },
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p13",
+          "shotValue": 2,
+          "made": true,
+          "shotDetails": {
+            "phase": "transition"
+          }
+        }
+      ],
+      "rawTranscript": "Number 40 missed two pointer defensive rebound by opponent steal by 13. 13 makes two points in transition",
+      "normalizedTranscript": "Number 40 missed two pointer defensive rebound by opponent steal by 13. 13 makes two points in transition",
+      "rawTranscriptMatch": true,
+      "normalizedTranscriptMatch": true,
+      "actualEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p40",
+          "shotValue": 2,
+          "made": false
+        },
+        {
+          "side": "opponent",
+          "type": "rebound",
+          "playerId": null,
+          "reboundKind": "defensive"
+        },
+        {
+          "side": "team",
+          "type": "steal",
+          "playerId": "p13"
+        },
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p13",
+          "shotValue": 2,
+          "made": true,
+          "shotDetails": {
+            "phase": "transition"
+          }
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [
+        "Removed unspoken shot phase 'transition'."
+      ],
+      "latencyMs": 62252,
+      "error": null
+    },
+    {
+      "id": "transition-miss-opponent-foul",
+      "audio": "08-transition-miss-opponent-foul.webm",
+      "expectedTranscript": "Number 50 misses two pointer in transition. Opponent foul.",
+      "expectedEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p50",
+          "shotValue": 2,
+          "made": false,
+          "shotDetails": {
+            "phase": "transition"
+          }
+        },
+        {
+          "side": "opponent",
+          "type": "foul",
+          "playerId": null
+        }
+      ],
+      "rawTranscript": "number 50 misses two pointer in transition. Opponent foul.",
+      "normalizedTranscript": "number 50 misses two pointer in transition. Opponent foul.",
+      "rawTranscriptMatch": true,
+      "normalizedTranscriptMatch": true,
+      "actualEvents": [
+        {
+          "side": "team",
+          "type": "shot",
+          "playerId": "p50",
+          "shotValue": 2,
+          "made": false,
+          "shotDetails": {
+            "phase": "transition"
+          }
+        },
+        {
+          "side": "opponent",
+          "type": "foul",
+          "playerId": null
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [],
+      "latencyMs": 17479,
+      "error": null
+    }
+  ],
+  "summary": {
+    "caseCount": 8,
+    "rawTranscriptMatches": 6,
+    "normalizedTranscriptMatches": 7,
+    "exactEventArrays": 7,
+    "errorCount": 0,
+    "medianLatencyMs": 26417,
+    "maxLatencyMs": 65978
+  }
+}
