@@ -56,6 +56,7 @@ async function openVoiceTracker(page) {
     window.__voiceRequests = [];
     window.__voiceCommandCount = 0;
     window.__microphoneRequestCount = 0;
+    window.__evaluationSamples = [];
     window.__voiceTestMode = 'success';
     window.__STATS_VOICE_CLIENT_FACTORY__ = options => {
       window.__voiceClientOptions = structuredClone(options);
@@ -154,6 +155,39 @@ async function openVoiceTracker(page) {
           ));
           window.__rejectVoiceRequest = null;
           return { status: 'cancellation_requested' };
+        },
+        async saveEvaluationSample({ audio, metadata }) {
+          const sample = {
+            sampleId: `sample-${window.__evaluationSamples.length + 1}`,
+            createdAt: new Date().toISOString(),
+            originalTranscript: metadata.originalTranscript,
+            correctedTranscript: metadata.correctedTranscript,
+            outcome: metadata.outcome
+          };
+          window.__evaluationSamples.unshift({
+            ...structuredClone(sample),
+            metadata: structuredClone(metadata),
+            audioSize: audio.size
+          });
+          return { sample };
+        },
+        async listEvaluationSamples() {
+          return {
+            samples: window.__evaluationSamples.map(({
+              metadata,
+              audioSize,
+              ...sample
+            }) => structuredClone(sample))
+          };
+        },
+        async deleteEvaluationSample(sampleId) {
+          window.__evaluationSamples = window.__evaluationSamples.filter(
+            sample => sample.sampleId !== sampleId
+          );
+          return { sampleId, status: 'deleted' };
+        },
+        async exportEvaluationSample() {
+          return new Blob(['evaluation-zip'], { type: 'application/zip' });
         }
       });
     };
@@ -205,7 +239,7 @@ async function openVoiceTracker(page) {
 }
 
 async function connectVoiceCompanion(page) {
-  await page.locator('.voice-connection-settings > summary').click();
+  await page.locator('#voiceConnectionSettings > summary').click();
   await page.locator('#voiceCompanionToken').fill('test-token');
   await page.locator('#voiceConnect').click();
   await expect(page.locator('#voiceConnectionStatus')).toContainText('Connected');
@@ -231,11 +265,29 @@ test('records and edits a voice proposal without writing game events', async ({ 
   await expect(page.locator('.voice-proposal-event').first().locator('[data-voice-field="type"]')).toHaveValue('steal');
   await page.locator('#voiceReplaceTimestamp').click();
   await expect(page.locator('#voiceCapturedTimestamp')).toHaveText('1:39.0');
+  await page.locator('#voiceExpectedTranscript').fill(
+    'Seven steal and thirteen makes two'
+  );
+  await page.locator('#voiceSaveEvaluation').click();
+  await expect(page.locator('#voiceEvaluationStatus')).toContainText(
+    'Saved evaluation sample'
+  );
+  await expect(page.locator('.voice-evaluation-item')).toHaveCount(1);
 
   const game = await page.evaluate(() => window.__statsApp.eventController.getGame());
   const stored = await page.evaluate(async () => (await window.__statsApp.store.listGames())[0]);
+  const sample = await page.evaluate(() => window.__evaluationSamples[0]);
   expect(game.events).toEqual([]);
   expect(stored.events).toEqual([]);
+  expect(sample.audioSize).toBeGreaterThan(0);
+  expect(sample.metadata.originalTranscript).toBe(
+    'Seven assist and thirteen makes two'
+  );
+  expect(sample.metadata.correctedTranscript).toBe(
+    'Seven steal and thirteen makes two'
+  );
+  expect(sample.metadata.correctedEvents[0].type).toBe('steal');
+  expect(sample.metadata.outcome).toBe('corrected');
 });
 
 test('prevents overlapping recordings and reports microphone permission failures', async ({ page }) => {
@@ -298,7 +350,7 @@ test('shows partial transcripts and rejects invalid companion proposals', async 
 
 test('reports unavailable and incompatible companions without breaking tracking', async ({ page }) => {
   await openVoiceTracker(page);
-  await page.locator('.voice-connection-settings > summary').click();
+  await page.locator('#voiceConnectionSettings > summary').click();
   await page.locator('#voiceCompanionToken').fill('test-token');
 
   await page.evaluate(() => { window.__voiceTestMode = 'unavailable'; });
@@ -320,7 +372,7 @@ test('reports unavailable and incompatible companions without breaking tracking'
 test('connects without a token when the companion advertises tokenless mode', async ({ page }) => {
   await openVoiceTracker(page);
   await page.evaluate(() => { window.__voiceTestMode = 'tokenless'; });
-  await page.locator('.voice-connection-settings > summary').click();
+  await page.locator('#voiceConnectionSettings > summary').click();
   await page.locator('#voiceConnect').click();
 
   await expect(page.locator('#voiceConnectionStatus')).toContainText(

@@ -149,4 +149,64 @@ export class VoiceCompanionClient {
       body: JSON.stringify({ requestId })
     });
   }
+
+  saveEvaluationSample({ audio, metadata }) {
+    const form = new FormData();
+    form.append(
+      'metadata',
+      new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+    );
+    const extension = audio.type.includes('ogg') ? 'ogg' : 'webm';
+    form.append('audio', audio, `evaluation-sample.${extension}`);
+    return this.request('/v1/evaluation-samples', {
+      method: 'POST',
+      body: form
+    });
+  }
+
+  listEvaluationSamples() {
+    return this.request('/v1/evaluation-samples');
+  }
+
+  deleteEvaluationSample(sampleId) {
+    return this.request(`/v1/evaluation-samples/${encodeURIComponent(sampleId)}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async exportEvaluationSample(sampleId) {
+    let response;
+    try {
+      response = await this.fetch(
+        `${this.baseUrl}/v1/evaluation-samples/${encodeURIComponent(sampleId)}/export`,
+        {
+          headers: {
+            ...(this.token ? { 'X-Bask-Voice-Token': this.token } : {})
+          }
+        }
+      );
+    } catch (error) {
+      throw new VoiceCompanionClientError(
+        'Could not reach the local voice companion.',
+        { code: 'companion_unavailable', cause: error }
+      );
+    }
+    if (!response.ok) {
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        // The status still provides an actionable fallback.
+      }
+      throw new VoiceCompanionClientError(
+        payload?.error?.message
+          || `Companion request failed with HTTP ${response.status}.`,
+        {
+          code: payload?.error?.code || 'request_failed',
+          status: response.status
+        }
+      );
+    }
+    return response.blob();
+  }
 }

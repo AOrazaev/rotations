@@ -155,7 +155,7 @@
               <p>Record and edit a proposal. Checkpoint 5 never writes it to the game.</p>
             </div>
           </div>
-          <details class="voice-connection-settings">
+          <details id="voiceConnectionSettings" class="voice-connection-settings">
             <summary>Companion connection</summary>
             <div class="voice-connection-grid">
               <label>URL<input id="voiceCompanionUrl" type="url" value="http://127.0.0.1:8766" /></label>
@@ -182,12 +182,27 @@
             Latest transcript
             <textarea id="voiceTranscript" rows="2" readonly placeholder="Transcript appears after processing."></textarea>
           </label>
+          <label class="voice-transcript-label">
+            Expected transcript for evaluation
+            <textarea id="voiceExpectedTranscript" rows="2" placeholder="Correct the transcript before saving an evaluation sample."></textarea>
+          </label>
           <ul id="voiceWarnings" class="voice-warnings hidden"></ul>
           <div id="voiceProposalEvents" class="voice-proposal-events"></div>
           <div class="voice-actions voice-proposal-actions">
             <button id="voiceRetryProcessing" class="secondary small" type="button" disabled>Retry processing</button>
+            <button id="voiceSaveEvaluation" class="secondary small" type="button" disabled>Save evaluation sample</button>
             <button id="voiceDiscardProposal" class="danger small" type="button" disabled>Discard</button>
           </div>
+          <p id="voiceEvaluationStatus" class="message voice-status" aria-live="polite"></p>
+          <details id="voiceEvaluationSamples" class="voice-connection-settings">
+            <summary>Saved evaluation samples</summary>
+            <div class="voice-actions">
+              <button id="voiceRefreshEvaluations" class="secondary small" type="button" disabled>Refresh</button>
+            </div>
+            <div id="voiceEvaluationList" class="voice-evaluation-list">
+              <p class="message">Connect the companion to review saved samples.</p>
+            </div>
+          </details>
         </section>
         <section id="eventEntryPanel" class="card event-entry-card hidden">
             <div class="section-head">

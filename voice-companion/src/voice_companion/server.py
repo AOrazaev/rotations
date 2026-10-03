@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import mimetypes
 import os
+import re
 import secrets
 import subprocess
 import threading
 import time
+import uuid
+import zipfile
+from datetime import datetime, timezone
 from email.parser import BytesParser
 from email.policy import default
 from http import HTTPStatus
@@ -51,12 +56,15 @@ class VoiceCompanionServer(ThreadingHTTPServer):
         web_root: Path,
         transcriber: Transcriber,
         interpreter: CommandInterpreter,
+        evaluation_directory: Path,
     ):
         super().__init__(server_address, handler_class)
         self.settings = settings
         self.web_root = web_root
         self.transcriber = transcriber
         self.interpreter = interpreter
+        self.evaluation_directory = evaluation_directory
+        self.evaluation_lock = threading.Lock()
         self.hardware = detect_hardware()
         self.started_at = time.monotonic()
         self.processing_slots = threading.BoundedSemaphore(
@@ -106,7 +114,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             return
         self.send_response(HTTPStatus.NO_CONTENT)
         self._write_cors_headers(origin)
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header(
             "Access-Control-Allow-Headers",
             "Content-Type, X-Bask-Voice-Token",
@@ -165,6 +173,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     "eventInterpretation": (
                         interpretation_metadata["runtime"] != "disabled"
                     ),
+                    "evaluationSamples": True,
                     "hardware": self.server.hardware,
                     "security": {
                         "loopbackOnly": True,
@@ -184,6 +193,32 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 self._diagnostics(),
             )
             return
+        if path == "/v1/evaluation-samples":
+            if not self._authorize_api():
+                return
+            try:
+                samples = self._list_evaluation_samples()
+            except (OSError, json.JSONDecodeError, KeyError, TypeError):
+                self._send_error(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    "sample_storage_invalid",
+                    "Saved evaluation samples could not be read.",
+                )
+                return
+            self._send_json(
+                HTTPStatus.OK,
+                {"samples": samples},
+            )
+            return
+        match = re.fullmatch(
+            r"/v1/evaluation-samples/([0-9a-f-]{36})/export",
+            path,
+        )
+        if match:
+            if not self._authorize_api():
+                return
+            self._export_evaluation_sample(match.group(1))
+            return
         self._serve_static(path)
 
     def do_POST(self):
@@ -193,6 +228,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             "/v1/interpret-command",
             "/v1/warmup",
             "/v1/cancel",
+            "/v1/evaluation-samples",
         }:
             self._send_error(HTTPStatus.NOT_FOUND, "not_found", "Endpoint was not found.")
             return
@@ -207,7 +243,164 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         if path == "/v1/interpret-command":
             self._handle_interpret_command()
             return
+        if path == "/v1/evaluation-samples":
+            self._handle_save_evaluation_sample()
+            return
         self._handle_voice_command()
+
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        match = re.fullmatch(r"/v1/evaluation-samples/([0-9a-f-]{36})", path)
+        if not match:
+            self._send_error(HTTPStatus.NOT_FOUND, "not_found", "Endpoint was not found.")
+            return
+        if not self._authorize_api():
+            return
+        self._delete_evaluation_sample(match.group(1))
+
+    def _handle_save_evaluation_sample(self):
+        content_length = self._content_length()
+        if content_length is None:
+            return
+        maximum = self.server.settings.max_audio_bytes + self.server.settings.max_context_bytes
+        if content_length > maximum:
+            self._send_error(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "request_too_large",
+                "Evaluation sample exceeds the configured limit.",
+            )
+            return
+        content_type = self.headers.get("Content-Type", "")
+        if not content_type.startswith("multipart/form-data;"):
+            self._send_error(
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                "multipart_required",
+                "Use multipart/form-data with audio and metadata parts.",
+            )
+            return
+        try:
+            metadata, audio, audio_type = self._parse_evaluation_multipart(
+                content_type,
+                self.rfile.read(content_length),
+            )
+            self._validate_evaluation_metadata(metadata)
+            if audio_type not in ALLOWED_AUDIO_TYPES:
+                raise ValueError("Evaluation audio type is not supported.")
+        except ValueError as error:
+            self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(error))
+            return
+
+        sample_id = str(uuid.uuid4())
+        created_at = datetime.now(timezone.utc).isoformat()
+        extension = ALLOWED_AUDIO_TYPES[audio_type]
+        record = {
+            "formatVersion": 1,
+            "sampleId": sample_id,
+            "createdAt": created_at,
+            "audioFile": f"{sample_id}{extension}",
+            "audioContentType": audio_type,
+            **metadata,
+        }
+        directory = self.server.evaluation_directory
+        audio_path = directory / record["audioFile"]
+        metadata_path = directory / f"{sample_id}.json"
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            with self.server.evaluation_lock:
+                audio_path.write_bytes(audio)
+                metadata_path.write_text(
+                    json.dumps(record, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+        except OSError:
+            audio_path.unlink(missing_ok=True)
+            self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "sample_storage_failed",
+                "Could not save the evaluation sample locally.",
+            )
+            return
+        self._send_json(
+            HTTPStatus.CREATED,
+            {"sample": self._evaluation_summary(record)},
+        )
+
+    def _list_evaluation_samples(self) -> list[dict]:
+        directory = self.server.evaluation_directory
+        if not directory.exists():
+            return []
+        samples = []
+        with self.server.evaluation_lock:
+            for path in sorted(
+                directory.glob("*.json"),
+                key=lambda item: item.stat().st_mtime,
+                reverse=True,
+            ):
+                record = json.loads(path.read_text(encoding="utf-8"))
+                samples.append(self._evaluation_summary(record))
+        return samples
+
+    def _delete_evaluation_sample(self, sample_id: str):
+        directory = self.server.evaluation_directory
+        metadata_path = directory / f"{sample_id}.json"
+        if not metadata_path.is_file():
+            self._send_error(HTTPStatus.NOT_FOUND, "not_found", "Sample was not found.")
+            return
+        try:
+            with self.server.evaluation_lock:
+                record = json.loads(metadata_path.read_text(encoding="utf-8"))
+                audio_path = directory / record["audioFile"]
+                metadata_path.unlink()
+                audio_path.unlink(missing_ok=True)
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "sample_storage_invalid",
+                "The evaluation sample could not be deleted.",
+            )
+            return
+        self._send_json(HTTPStatus.OK, {"sampleId": sample_id, "status": "deleted"})
+
+    def _export_evaluation_sample(self, sample_id: str):
+        directory = self.server.evaluation_directory
+        metadata_path = directory / f"{sample_id}.json"
+        if not metadata_path.is_file():
+            self._send_error(HTTPStatus.NOT_FOUND, "not_found", "Sample was not found.")
+            return
+        try:
+            with self.server.evaluation_lock:
+                record = json.loads(metadata_path.read_text(encoding="utf-8"))
+                audio_path = directory / record["audioFile"]
+                if not audio_path.is_file():
+                    self._send_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR,
+                        "sample_incomplete",
+                        "The sample audio file is missing.",
+                    )
+                    return
+                output = io.BytesIO()
+                with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+                    archive.writestr(metadata_path.name, metadata_path.read_bytes())
+                    archive.writestr(audio_path.name, audio_path.read_bytes())
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "sample_storage_invalid",
+                "The evaluation sample could not be exported.",
+            )
+            return
+        content = output.getvalue()
+        self.send_response(HTTPStatus.OK)
+        self._write_cors_headers(self.headers.get("Origin"))
+        self.send_header("Content-Type", "application/zip")
+        self.send_header(
+            "Content-Disposition",
+            f'attachment; filename="bask-voice-sample-{sample_id}.zip"',
+        )
+        self.send_header("Content-Length", str(len(content)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(content)
 
     def _handle_cancel(self):
         content_length = self._content_length()
@@ -905,6 +1098,83 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             raise ValueError("Missing audio part.")
         return context, audio, audio_type
 
+    def _parse_evaluation_multipart(self, content_type: str, body: bytes):
+        message = BytesParser(policy=default).parsebytes(
+            f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode()
+            + body
+        )
+        if not message.is_multipart():
+            raise ValueError("Malformed multipart request.")
+        metadata = None
+        audio = None
+        audio_type = None
+        for part in message.iter_parts():
+            disposition = part.get("Content-Disposition", "")
+            name = part.get_param("name", header="Content-Disposition")
+            if "form-data" not in disposition or not name:
+                continue
+            payload = part.get_payload(decode=True) or b""
+            if name == "metadata":
+                if len(payload) > self.server.settings.max_context_bytes:
+                    raise ValueError("Evaluation metadata exceeds the configured limit.")
+                try:
+                    metadata = json.loads(payload.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                    raise ValueError(
+                        "Evaluation metadata must be valid UTF-8 JSON."
+                    ) from error
+            elif name == "audio":
+                if len(payload) > self.server.settings.max_audio_bytes:
+                    raise ValueError("Evaluation audio exceeds the configured limit.")
+                audio = payload
+                audio_type = part.get_content_type()
+        if metadata is None:
+            raise ValueError("Missing metadata part.")
+        if audio is None or not audio:
+            raise ValueError("Missing audio part.")
+        return metadata, audio, audio_type
+
+    @staticmethod
+    def _validate_evaluation_metadata(metadata: dict):
+        required = {
+            "capturedSeconds",
+            "context",
+            "originalTranscript",
+            "originalEvents",
+            "correctedTranscript",
+            "correctedEvents",
+            "warnings",
+            "processor",
+            "timingMs",
+            "outcome",
+        }
+        if not isinstance(metadata, dict) or set(metadata) != required:
+            raise ValueError("Evaluation metadata has an invalid shape.")
+        if (
+            not isinstance(metadata["capturedSeconds"], (int, float))
+            or metadata["capturedSeconds"] < 0
+        ):
+            raise ValueError("Evaluation timestamp is invalid.")
+        for field in ("originalTranscript", "correctedTranscript", "outcome"):
+            if not isinstance(metadata[field], str):
+                raise ValueError(f"Evaluation {field} must be text.")
+        for field in ("originalEvents", "correctedEvents", "warnings"):
+            if not isinstance(metadata[field], list):
+                raise ValueError(f"Evaluation {field} must be a list.")
+        for field in ("context", "processor", "timingMs"):
+            if not isinstance(metadata[field], dict):
+                raise ValueError(f"Evaluation {field} must be an object.")
+
+    @staticmethod
+    def _evaluation_summary(record: dict) -> dict:
+        return {
+            "sampleId": record["sampleId"],
+            "createdAt": record["createdAt"],
+            "originalTranscript": record["originalTranscript"],
+            "correctedTranscript": record["correctedTranscript"],
+            "outcome": record["outcome"],
+        }
+
     def _serve_static(self, path: str):
         relative = "index.html" if path in {"", "/"} else path.lstrip("/")
         requested = (self.server.web_root / relative).resolve()
@@ -978,6 +1248,7 @@ def build_server(
     token: str,
     allowed_origins: set[str],
     authentication_required: bool = True,
+    evaluation_directory: Path | None = None,
     transcriber: Transcriber | None = None,
     interpreter: CommandInterpreter | None = None,
     max_concurrent_requests: int = 1,
@@ -1001,6 +1272,10 @@ def build_server(
         transcriber=transcriber
         or create_transcriber("external-command"),
         interpreter=interpreter or create_interpreter("none"),
+        evaluation_directory=(
+            evaluation_directory
+            or default_model_directory().parent / "evaluation-samples"
+        ),
     )
 
 

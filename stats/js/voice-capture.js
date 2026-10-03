@@ -33,8 +33,13 @@ export function createVoiceCaptureController({
   const recordingStatus = documentObject.querySelector('#voiceRecordingStatus');
   const timestampOutput = documentObject.querySelector('#voiceCapturedTimestamp');
   const transcript = documentObject.querySelector('#voiceTranscript');
+  const expectedTranscript = documentObject.querySelector('#voiceExpectedTranscript');
   const warnings = documentObject.querySelector('#voiceWarnings');
   const proposal = documentObject.querySelector('#voiceProposalEvents');
+  const saveEvaluationButton = documentObject.querySelector('#voiceSaveEvaluation');
+  const evaluationStatus = documentObject.querySelector('#voiceEvaluationStatus');
+  const refreshEvaluationsButton = documentObject.querySelector('#voiceRefreshEvaluations');
+  const evaluationList = documentObject.querySelector('#voiceEvaluationList');
 
   let client = null;
   let connected = false;
@@ -46,6 +51,7 @@ export function createVoiceCaptureController({
   let capturedSeconds = null;
   let activeRequestId = null;
   let response = null;
+  let lastContext = null;
   let proposalEvents = [];
   let destroyed = false;
   let discarding = false;
@@ -104,6 +110,13 @@ export function createVoiceCaptureController({
       || state === 'processing'
       || state === 'cancelling'
       || state === 'warming';
+    saveEvaluationButton.disabled = !client
+      || !audio
+      || !lastContext
+      || !transcript.value.trim()
+      || !expectedTranscript.value.trim()
+      || ['recording', 'processing', 'cancelling', 'warming', 'saving'].includes(state);
+    refreshEvaluationsButton.disabled = !client || state === 'saving';
   }
 
   function stopTracks() {
@@ -113,8 +126,10 @@ export function createVoiceCaptureController({
 
   function resetProposal() {
     response = null;
+    lastContext = null;
     proposalEvents = [];
     transcript.value = '';
+    expectedTranscript.value = '';
     warnings.replaceChildren();
     proposal.replaceChildren();
   }
@@ -339,6 +354,7 @@ export function createVoiceCaptureController({
           ? 'Ready to record.'
           : 'Connected. Open a game with a ready video to record.'
       );
+      await loadEvaluationSamples();
     } catch (error) {
       client = null;
       connected = false;
@@ -387,6 +403,7 @@ export function createVoiceCaptureController({
     refresh();
     try {
       const context = buildVoiceCommandContext(game, capturedSeconds, requestId);
+      lastContext = structuredClone(context);
       const payload = await client.voiceCommand({ audio, context });
       if (currentOperation !== operationVersion || destroyed) return;
       if (getGame()?.id !== requestGameId) {
@@ -403,6 +420,7 @@ export function createVoiceCaptureController({
       response = validateVoiceCommandResponse(payload, { requestId, game });
       proposalEvents = structuredClone(response.events);
       transcript.value = response.transcript;
+      expectedTranscript.value = response.transcript;
       renderWarnings();
       renderProposal();
       state = 'proposal';
@@ -414,6 +432,7 @@ export function createVoiceCaptureController({
       if (currentOperation !== operationVersion || destroyed) return;
       if (error.partialResult?.transcript) {
         transcript.value = error.partialResult.transcript;
+        expectedTranscript.value = error.partialResult.transcript;
       }
       state = error.code === 'request_cancelled' ? 'idle' : 'error';
       setRecordingStatus(
@@ -517,6 +536,133 @@ export function createVoiceCaptureController({
     );
   }
 
+  function evaluationOutcome() {
+    if (!response) return 'corrected_after_processing_error';
+    const transcriptChanged = expectedTranscript.value.trim() !== response.transcript.trim();
+    const eventsChanged = JSON.stringify(proposalEvents) !== JSON.stringify(response.events);
+    return transcriptChanged || eventsChanged ? 'corrected' : 'accepted';
+  }
+
+  async function saveEvaluationSample() {
+    if (saveEvaluationButton.disabled || !client) return;
+    const previousState = state;
+    state = 'saving';
+    evaluationStatus.textContent = 'Saving audio and evaluation metadata locally...';
+    evaluationStatus.className = 'message voice-status loading';
+    refresh();
+    try {
+      const result = await client.saveEvaluationSample({
+        audio,
+        metadata: {
+          capturedSeconds,
+          context: lastContext,
+          originalTranscript: transcript.value,
+          originalEvents: structuredClone(response?.events || []),
+          correctedTranscript: expectedTranscript.value.trim(),
+          correctedEvents: structuredClone(proposalEvents),
+          warnings: structuredClone(response?.warnings || []),
+          processor: structuredClone(response?.processor || {}),
+          timingMs: structuredClone(response?.timingMs || {}),
+          outcome: evaluationOutcome()
+        }
+      });
+      evaluationStatus.textContent = `Saved evaluation sample ${result.sample.sampleId}.`;
+      evaluationStatus.className = 'message voice-status ready';
+      await loadEvaluationSamples();
+    } catch (error) {
+      evaluationStatus.textContent = error.message || 'Could not save evaluation sample.';
+      evaluationStatus.className = 'message voice-status error';
+    } finally {
+      state = previousState;
+      refresh();
+    }
+  }
+
+  function renderEvaluationSamples(samples) {
+    evaluationList.replaceChildren();
+    if (!samples.length) {
+      const empty = documentObject.createElement('p');
+      empty.className = 'message';
+      empty.textContent = 'No evaluation samples saved.';
+      evaluationList.append(empty);
+      return;
+    }
+    for (const sample of samples) {
+      const item = documentObject.createElement('article');
+      item.className = 'voice-evaluation-item';
+      item.dataset.sampleId = sample.sampleId;
+      const time = documentObject.createElement('time');
+      time.dateTime = sample.createdAt;
+      time.textContent = new Date(sample.createdAt).toLocaleString();
+      const text = documentObject.createElement('p');
+      text.textContent = sample.correctedTranscript || sample.originalTranscript;
+      const outcome = documentObject.createElement('p');
+      outcome.className = 'message';
+      outcome.textContent = sample.outcome.replaceAll('_', ' ');
+      const actions = documentObject.createElement('div');
+      actions.className = 'voice-actions';
+      const exportButton = documentObject.createElement('button');
+      exportButton.type = 'button';
+      exportButton.className = 'secondary small';
+      exportButton.dataset.evaluationAction = 'export';
+      exportButton.textContent = 'Export';
+      const deleteButton = documentObject.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'danger small';
+      deleteButton.dataset.evaluationAction = 'delete';
+      deleteButton.textContent = 'Delete';
+      actions.append(exportButton, deleteButton);
+      item.append(time, text, outcome, actions);
+      evaluationList.append(item);
+    }
+  }
+
+  async function loadEvaluationSamples() {
+    if (!client) return;
+    try {
+      const result = await client.listEvaluationSamples();
+      renderEvaluationSamples(result.samples);
+    } catch (error) {
+      evaluationList.replaceChildren();
+      const message = documentObject.createElement('p');
+      message.className = 'message error';
+      message.textContent = error.message || 'Could not load evaluation samples.';
+      evaluationList.append(message);
+    }
+  }
+
+  async function handleEvaluationAction(target) {
+    const item = target.closest('[data-sample-id]');
+    const action = target.dataset.evaluationAction;
+    if (!item || !action || !client) return;
+    const sampleId = item.dataset.sampleId;
+    target.disabled = true;
+    try {
+      if (action === 'delete') {
+        if (!documentObject.defaultView.confirm(
+          'Delete this local evaluation sample and its audio recording?'
+        )) {
+          target.disabled = false;
+          return;
+        }
+        await client.deleteEvaluationSample(sampleId);
+        await loadEvaluationSamples();
+      } else if (action === 'export') {
+        const blob = await client.exportEvaluationSample(sampleId);
+        const url = URL.createObjectURL(blob);
+        const link = documentObject.createElement('a');
+        link.href = url;
+        link.download = `bask-voice-sample-${sampleId}.zip`;
+        link.click();
+        documentObject.defaultView.setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    } catch (error) {
+      evaluationStatus.textContent = error.message || `Could not ${action} sample.`;
+      evaluationStatus.className = 'message voice-status error';
+      target.disabled = false;
+    }
+  }
+
   connectButton.addEventListener('click', connect);
   warmupButton.addEventListener('click', warmup);
   startButton.addEventListener('click', startRecording);
@@ -525,6 +671,12 @@ export function createVoiceCaptureController({
   retryButton.addEventListener('click', processAudio);
   discardButton.addEventListener('click', discard);
   replaceTimestampButton.addEventListener('click', replaceTimestamp);
+  saveEvaluationButton.addEventListener('click', saveEvaluationSample);
+  refreshEvaluationsButton.addEventListener('click', loadEvaluationSamples);
+  expectedTranscript.addEventListener('input', refresh);
+  evaluationList.addEventListener('click', event => {
+    handleEvaluationAction(event.target);
+  });
   proposal.addEventListener('change', event => updateProposalEvent(event.target));
   proposal.addEventListener('click', event => {
     if (event.target.dataset.voiceAction === 'remove') {

@@ -766,8 +766,10 @@ timestamps, cancellation and retry, strict browser-side proposal validation,
 partial transcript recovery, and an editable non-persistent proposal preview.
 Tracker tests cover companion and microphone failures, overlapping-recording
 prevention, cancellation, invalid proposals, zero game writes, and removal of
-the voice surface from Review mode. Real browser-to-companion microphone
-validation and optional local corpus collection remain open.
+the voice surface from Review mode. Explicit opt-in evaluation collection now
+stores audio, original and corrected results, and diagnostics in the local
+companion folder with tracker review, ZIP export, and deletion controls. Real
+browser-to-companion microphone validation remains open.
 
 Deliver:
 

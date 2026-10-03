@@ -39,6 +39,23 @@ Leave the token field empty when connecting. This mode still binds to loopback
 and validates browser origins, but any allowed page or local process can call
 the companion, so token authentication remains the default.
 
+## Evaluation samples
+
+The stats tracker can explicitly save a completed recording as an evaluation
+sample. Nothing is collected automatically. Before saving, correct the expected
+transcript and edit the proposed events to the expected result.
+
+Each sample stores the audio, original and corrected transcript, original and
+corrected proposal, request context, warnings, model/profile metadata, timings,
+and outcome under:
+
+```text
+%LOCALAPPDATA%\BaskVoiceCompanion\evaluation-samples
+```
+
+Use **Saved evaluation samples** in the tracker to review, export, or delete
+samples. Export produces one ZIP containing the audio and JSON metadata.
+
 ## API
 
 ```text

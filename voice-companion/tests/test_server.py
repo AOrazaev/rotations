@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import http.client
+import io
 import json
 import sys
+import tempfile
 import threading
 import time
 import unittest
+import zipfile
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -103,12 +106,14 @@ class CrashOnceInterpreter(FixtureInterpreter):
 class ServerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.evaluation_directory = tempfile.TemporaryDirectory()
         cls.server = build_server(
             host="127.0.0.1",
             port=0,
             token="test-token",
             allowed_origins={"https://aorazaev.github.io"},
             transcriber=FixtureTranscriber(),
+            evaluation_directory=Path(cls.evaluation_directory.name),
         )
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -119,6 +124,7 @@ class ServerTest(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=2)
+        cls.evaluation_directory.cleanup()
 
     def request(self, method, path, *, headers=None, body=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=2)
@@ -140,6 +146,98 @@ class ServerTest(unittest.TestCase):
             "Content-Type: audio/webm\r\n\r\n"
         ).encode() + audio + f"\r\n--{boundary}--\r\n".encode()
         return boundary, body
+
+    def evaluation_body(self, metadata, audio=b"evaluation-audio"):
+        boundary = "evaluation-boundary"
+        body = (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="metadata"\r\n'
+            "Content-Type: application/json\r\n\r\n"
+            f"{json.dumps(metadata)}\r\n"
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="audio"; filename="sample.webm"\r\n'
+            "Content-Type: audio/webm\r\n\r\n"
+        ).encode() + audio + f"\r\n--{boundary}--\r\n".encode()
+        return boundary, body
+
+    def test_evaluation_samples_save_list_export_and_delete(self):
+        metadata = {
+            "capturedSeconds": 42.4,
+            "context": {"requestId": "request-1"},
+            "originalTranscript": "opponent misses steal pointer",
+            "originalEvents": [],
+            "correctedTranscript": "opponent misses two pointer",
+            "correctedEvents": [
+                {
+                    "side": "opponent",
+                    "type": "shot",
+                    "playerId": None,
+                    "shotValue": 2,
+                    "made": False,
+                    "confidence": 1,
+                }
+            ],
+            "warnings": [],
+            "processor": {"transcriptionModel": "base.en"},
+            "timingMs": {"total": 1000},
+            "outcome": "corrected",
+        }
+        boundary, body = self.evaluation_body(metadata)
+        headers = {
+            "Origin": "https://aorazaev.github.io",
+            "X-Bask-Voice-Token": "test-token",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Length": str(len(body)),
+        }
+        status, _, payload = self.request(
+            "POST",
+            "/v1/evaluation-samples",
+            headers=headers,
+            body=body,
+        )
+        self.assertEqual(status, 201)
+        sample = json.loads(payload)["sample"]
+        sample_id = sample["sampleId"]
+        self.assertEqual(sample["correctedTranscript"], metadata["correctedTranscript"])
+
+        status, _, payload = self.request(
+            "GET",
+            "/v1/evaluation-samples",
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(payload)["samples"][0]["sampleId"], sample_id)
+
+        status, response_headers, payload = self.request(
+            "GET",
+            f"/v1/evaluation-samples/{sample_id}/export",
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertIn(("Content-Type", "application/zip"), response_headers)
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            self.assertEqual(len(archive.namelist()), 2)
+            exported = json.loads(
+                archive.read(f"{sample_id}.json").decode("utf-8")
+            )
+            self.assertEqual(exported["correctedEvents"], metadata["correctedEvents"])
+
+        status, _, payload = self.request(
+            "DELETE",
+            f"/v1/evaluation-samples/{sample_id}",
+            headers={
+                "Origin": "https://aorazaev.github.io",
+                "X-Bask-Voice-Token": "test-token",
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(payload)["status"], "deleted")
 
     def test_health_requires_token(self):
         status, _, payload = self.request("GET", "/v1/health")
