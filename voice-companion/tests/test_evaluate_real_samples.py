@@ -43,6 +43,26 @@ class FixtureInterpreter:
         )
 
 
+class TranscriptSensitiveInterpreter:
+    model_name = "fixture-interpreter"
+
+    def interpret(self, transcript, context):
+        player_id = "p70" if "seventy" in transcript.lower() else "p7"
+        return InterpretationResult(
+            events=[{
+                "side": "team",
+                "type": "shot",
+                "playerId": player_id,
+                "shotValue": 2,
+                "made": True,
+                "confidence": 0.99,
+            }],
+            overall_confidence=0.99,
+            warnings=[],
+            model=self.model_name,
+        )
+
+
 class RealSampleEvaluationTest(unittest.TestCase):
     def test_committed_manifest_references_present_audio(self):
         manifest_path = (
@@ -102,8 +122,98 @@ class RealSampleEvaluationTest(unittest.TestCase):
         self.assertFalse(case["rawTranscriptMatch"])
         self.assertTrue(case["normalizedTranscriptMatch"])
         self.assertTrue(case["eventArrayExact"])
+        self.assertTrue(case["interpretationOnlyEventArrayExact"])
+        self.assertIsNone(case["failureCause"])
         self.assertEqual(report["summary"]["errorCount"], 0)
+        self.assertEqual(
+            report["summary"]["interpretationOnlyExactEventArrays"],
+            1,
+        )
         self.assertIn("Normalized jersey", case["warnings"][0])
+
+    def test_classifies_failure_when_gold_transcript_interpretation_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "sample.webm").write_bytes(
+                b"Number seven two makes two pointer."
+            )
+            manifest_path = root / "manifest.json"
+            manifest = {
+                "formatVersion": 1,
+                "roster": [
+                    {"id": "p7", "jersey": "7", "name": "Player 7"},
+                    {"id": "p70", "jersey": "70", "name": "Player 70"},
+                ],
+                "allowedEventTypes": ["shot"],
+                "cases": [{
+                    "id": "seventy",
+                    "audio": "sample.webm",
+                    "expectedTranscript": "Number seventy makes two pointer.",
+                    "currentLineupIds": ["p7", "p70"],
+                    "expectedEvents": [{
+                        "side": "team",
+                        "type": "shot",
+                        "playerId": "p70",
+                        "shotValue": 2,
+                        "made": True,
+                    }],
+                }],
+            }
+            manifest_path.write_text(
+                json.dumps(manifest),
+                encoding="utf-8",
+            )
+
+            report = evaluate_samples(
+                manifest_path,
+                manifest,
+                FixtureTranscriber(),
+                TranscriptSensitiveInterpreter(),
+            )
+
+        case = report["caseResults"][0]
+        self.assertFalse(case["eventArrayExact"])
+        self.assertTrue(case["interpretationOnlyEventArrayExact"])
+        self.assertEqual(case["failureCause"], "transcription")
+
+    def test_interpretation_only_mode_does_not_require_transcriber(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            manifest = {
+                "formatVersion": 1,
+                "roster": [
+                    {"id": "p50", "jersey": "50", "name": "Player 50"}
+                ],
+                "allowedEventTypes": ["shot"],
+                "cases": [{
+                    "id": "fifty",
+                    "audio": "missing.webm",
+                    "expectedTranscript": "Fifty misses two pointer.",
+                    "currentLineupIds": ["p50"],
+                    "expectedEvents": [{
+                        "side": "team",
+                        "type": "shot",
+                        "playerId": "p50",
+                        "shotValue": 2,
+                        "made": False,
+                    }],
+                }],
+            }
+
+            report = evaluate_samples(
+                manifest_path,
+                manifest,
+                None,
+                FixtureInterpreter(),
+                mode="interpretation-only",
+            )
+
+        case = report["caseResults"][0]
+        self.assertIsNone(case["rawTranscript"])
+        self.assertIsNone(case["latencyMs"])
+        self.assertTrue(case["interpretationOnlyEventArrayExact"])
+        self.assertIsNone(report["summary"]["exactEventArrays"])
 
     def test_rejects_duplicate_case_ids(self):
         with tempfile.TemporaryDirectory() as directory:

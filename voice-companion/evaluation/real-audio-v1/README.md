@@ -31,8 +31,28 @@ $env:PYTHONPATH = "$PWD\voice-companion\src"
   --output .\real-audio-evaluation.json
 ```
 
-The evaluator reports raw transcription matches separately from
-active-lineup-normalized transcription and exact semantic event arrays.
+The default `both` mode runs the interpreter twice for every case: once with
+the transcribed audio and once with the curated transcript. Run only one stage
+when comparing a transcription or command-model change:
+
+```powershell
+# Audio -> transcription -> events
+.\voice-companion\.venv\Scripts\python.exe `
+  -m voice_companion.evaluate_real_samples `
+  --mode end-to-end `
+  --output .\real-audio-end-to-end.json
+
+# Curated transcript -> events; Whisper is not loaded
+.\voice-companion\.venv\Scripts\python.exe `
+  -m voice_companion.evaluate_real_samples `
+  --mode interpretation-only `
+  --output .\real-audio-interpretation-only.json
+```
+
+Transcript equality remains diagnostic only. Exact semantic event arrays are
+the pass criterion for both paths. In paired mode, an end-to-end event failure
+is classified as `transcription` when curated-transcript interpretation passes;
+otherwise it is classified as `interpretation`.
 
 `baseline-balanced.json` records the sixteen-case balanced-profile run with
 `base.en` and `Qwen3-4B-Q4_K_M.gguf`:
@@ -41,6 +61,16 @@ active-lineup-normalized transcription and exact semantic event arrays.
 - 14/16 roster-normalized transcript matches.
 - 14/16 exact semantic event arrays.
 - 1 processing error.
+
+`baseline-balanced-interpretation-only.json` runs the same command model
+against curated transcripts without loading Whisper:
+
+- 15/16 exact semantic event arrays.
+- 1 interpretation error.
+- `number-70-makes-two-assist-number-60` passes, confirming that its `seven
+  two` failure is caused by transcription.
+- `number-60-defensive-rebound` still fails because the model omits
+  `reboundKind`, confirming an interpretation/grounding defect.
 
 The new `number-7-miss-number-70-rebound-turnover` case passes with all three
 events after adding support for Whisper's two-word `turn over` phrasing.

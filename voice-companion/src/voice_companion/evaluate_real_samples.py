@@ -77,7 +77,12 @@ def evaluate_samples(
     transcriber,
     interpreter,
     progress=None,
+    mode: str = "both",
 ) -> dict:
+    if mode not in {"end-to-end", "interpretation-only", "both"}:
+        raise ValueError(f"Unsupported real-audio evaluation mode: {mode}.")
+    run_end_to_end = mode in {"end-to-end", "both"}
+    run_interpretation_only = mode in {"interpretation-only", "both"}
     results = []
     for index, case in enumerate(manifest["cases"]):
         if progress:
@@ -94,7 +99,6 @@ def evaluate_samples(
             "currentLineupIds": case["currentLineupIds"],
             "allowedEventTypes": manifest["allowedEventTypes"],
         }
-        started = time.perf_counter()
         result = {
             "id": case["id"],
             "audio": case["audio"],
@@ -109,89 +113,191 @@ def evaluate_samples(
             "warnings": [],
             "latencyMs": None,
             "error": None,
+            "interpretationOnlyActualEvents": None,
+            "interpretationOnlyEventArrayExact": False,
+            "interpretationOnlyWarnings": [],
+            "interpretationOnlyLatencyMs": None,
+            "interpretationOnlyError": None,
+            "failureCause": None,
         }
-        try:
-            transcription = transcriber.transcribe(
-                audio_path.read_bytes(),
-                audio_path.suffix or ".audio",
-                channel_preference=case.get(
-                    "audioChannelPreference",
-                    "auto",
-                ),
+        if run_end_to_end:
+            started = time.perf_counter()
+            try:
+                transcription = transcriber.transcribe(
+                    audio_path.read_bytes(),
+                    audio_path.suffix or ".audio",
+                    channel_preference=case.get(
+                        "audioChannelPreference",
+                        "auto",
+                    ),
+                )
+                result["rawTranscript"] = transcription.text
+                normalized, normalization_warnings = (
+                    normalize_active_jersey_confusions(
+                        transcription.text,
+                        context,
+                    )
+                )
+                result["normalizedTranscript"] = normalized
+                expected_normalized = normalize_transcript(
+                    case["expectedTranscript"]
+                )
+                result["rawTranscriptMatch"] = (
+                    normalize_transcript(transcription.text)
+                    == expected_normalized
+                )
+                result["normalizedTranscriptMatch"] = (
+                    normalize_transcript(normalized)
+                    == expected_normalized
+                )
+                interpretation = interpreter.interpret(normalized, context)
+                actual_events = semantic_events(interpretation.events)
+                result["actualEvents"] = actual_events
+                result["eventArrayExact"] = (
+                    actual_events == case["expectedEvents"]
+                )
+                result["warnings"] = [
+                    *normalization_warnings,
+                    *interpretation.warnings,
+                ]
+            except Exception as error:
+                result["error"] = {
+                    "type": type(error).__name__,
+                    "message": str(error),
+                }
+            result["latencyMs"] = round(
+                (time.perf_counter() - started) * 1000
             )
-            result["rawTranscript"] = transcription.text
-            normalized, normalization_warnings = (
-                normalize_active_jersey_confusions(
-                    transcription.text,
+        if run_interpretation_only:
+            started = time.perf_counter()
+            try:
+                interpretation = interpreter.interpret(
+                    case["expectedTranscript"],
                     context,
                 )
+                actual_events = semantic_events(interpretation.events)
+                result["interpretationOnlyActualEvents"] = actual_events
+                result["interpretationOnlyEventArrayExact"] = (
+                    actual_events == case["expectedEvents"]
+                )
+                result["interpretationOnlyWarnings"] = interpretation.warnings
+            except Exception as error:
+                result["interpretationOnlyError"] = {
+                    "type": type(error).__name__,
+                    "message": str(error),
+                }
+            result["interpretationOnlyLatencyMs"] = round(
+                (time.perf_counter() - started) * 1000
             )
-            result["normalizedTranscript"] = normalized
-            expected_normalized = normalize_transcript(
-                case["expectedTranscript"]
+        if (
+            mode == "both"
+            and not result["eventArrayExact"]
+        ):
+            result["failureCause"] = (
+                "transcription"
+                if result["interpretationOnlyEventArrayExact"]
+                else "interpretation"
             )
-            result["rawTranscriptMatch"] = (
-                normalize_transcript(transcription.text)
-                == expected_normalized
-            )
-            result["normalizedTranscriptMatch"] = (
-                normalize_transcript(normalized)
-                == expected_normalized
-            )
-            interpretation = interpreter.interpret(normalized, context)
-            actual_events = semantic_events(interpretation.events)
-            result["actualEvents"] = actual_events
-            result["eventArrayExact"] = (
-                actual_events == case["expectedEvents"]
-            )
-            result["warnings"] = [
-                *normalization_warnings,
-                *interpretation.warnings,
-            ]
-        except Exception as error:
-            result["error"] = {
-                "type": type(error).__name__,
-                "message": str(error),
-            }
-        result["latencyMs"] = round(
-            (time.perf_counter() - started) * 1000
-        )
         results.append(result)
         if progress:
+            if mode == "end-to-end":
+                passed = (
+                    result["eventArrayExact"]
+                    and result["error"] is None
+                )
+            elif mode == "interpretation-only":
+                passed = (
+                    result["interpretationOnlyEventArrayExact"]
+                    and result["interpretationOnlyError"] is None
+                )
+            else:
+                passed = (
+                    result["eventArrayExact"]
+                    and result["error"] is None
+                    and result["interpretationOnlyEventArrayExact"]
+                    and result["interpretationOnlyError"] is None
+                )
             progress({
                 "stage": "case_finished",
                 "caseIndex": index + 1,
                 "caseCount": len(manifest["cases"]),
                 "caseId": case["id"],
-                "passed": (
-                    result["normalizedTranscriptMatch"]
-                    and result["eventArrayExact"]
-                    and result["error"] is None
-                ),
+                "passed": passed,
             })
 
-    latencies = [result["latencyMs"] for result in results]
+    latencies = [
+        result["latencyMs"]
+        for result in results
+        if result["latencyMs"] is not None
+    ]
+    interpretation_only_latencies = [
+        result["interpretationOnlyLatencyMs"]
+        for result in results
+        if result["interpretationOnlyLatencyMs"] is not None
+    ]
     return {
         "formatVersion": 1,
+        "mode": mode,
         "transcriptionModel": getattr(transcriber, "model_name", None),
         "commandModel": interpreter.model_name,
         "caseResults": results,
         "summary": {
             "caseCount": len(results),
-            "rawTranscriptMatches": sum(
-                result["rawTranscriptMatch"] for result in results
+            "rawTranscriptMatches": (
+                sum(result["rawTranscriptMatch"] for result in results)
+                if run_end_to_end
+                else None
             ),
-            "normalizedTranscriptMatches": sum(
-                result["normalizedTranscriptMatch"] for result in results
+            "normalizedTranscriptMatches": (
+                sum(
+                    result["normalizedTranscriptMatch"]
+                    for result in results
+                )
+                if run_end_to_end
+                else None
             ),
-            "exactEventArrays": sum(
-                result["eventArrayExact"] for result in results
+            "exactEventArrays": (
+                sum(result["eventArrayExact"] for result in results)
+                if run_end_to_end
+                else None
             ),
-            "errorCount": sum(
-                result["error"] is not None for result in results
+            "interpretationOnlyExactEventArrays": (
+                sum(
+                    result["interpretationOnlyEventArrayExact"]
+                    for result in results
+                )
+                if run_interpretation_only
+                else None
             ),
-            "medianLatencyMs": round(statistics.median(latencies)),
-            "maxLatencyMs": max(latencies),
+            "errorCount": (
+                sum(result["error"] is not None for result in results)
+                if run_end_to_end
+                else None
+            ),
+            "interpretationOnlyErrorCount": (
+                sum(
+                    result["interpretationOnlyError"] is not None
+                    for result in results
+                )
+                if run_interpretation_only
+                else None
+            ),
+            "medianLatencyMs": (
+                round(statistics.median(latencies))
+                if latencies
+                else None
+            ),
+            "maxLatencyMs": max(latencies) if latencies else None,
+            "medianInterpretationOnlyLatencyMs": (
+                round(statistics.median(interpretation_only_latencies))
+                if interpretation_only_latencies
+                else None
+            ),
+            "maxInterpretationOnlyLatencyMs": (
+                max(interpretation_only_latencies)
+                if interpretation_only_latencies
+                else None
+            ),
         },
     }
 
@@ -221,28 +327,41 @@ def main():
     parser.add_argument("--command-model")
     parser.add_argument("--context-size", type=int, default=4096)
     parser.add_argument("--gpu-layers", type=int, default=0)
+    parser.add_argument(
+        "--mode",
+        choices=["end-to-end", "interpretation-only", "both"],
+        default="both",
+    )
     parser.add_argument("--output")
     args = parser.parse_args()
 
     manifest_path = Path(args.manifest).resolve()
     try:
         manifest = load_manifest(manifest_path)
-        profile = resolve_profile(
-            args.profile,
-            model=args.transcription_model,
-            device=args.device,
-            compute_type=args.compute_type,
+        profile = (
+            resolve_profile(
+                args.profile,
+                model=args.transcription_model,
+                device=args.device,
+                compute_type=args.compute_type,
+            )
+            if args.mode != "interpretation-only"
+            else None
         )
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
 
-    transcriber = FasterWhisperTranscriber(
-        profile,
-        model_directory=(
-            Path(args.model_directory)
-            if args.model_directory
-            else default_model_directory()
-        ),
+    transcriber = (
+        FasterWhisperTranscriber(
+            profile,
+            model_directory=(
+                Path(args.model_directory)
+                if args.model_directory
+                else default_model_directory()
+            ),
+        )
+        if profile is not None
+        else None
     )
     interpreter = LlamaCppCommandInterpreter(
         model_path=(
@@ -258,6 +377,7 @@ def main():
         manifest,
         transcriber,
         interpreter,
+        mode=args.mode,
     )
     encoded = json.dumps(report, indent=2)
     print(encoded)
