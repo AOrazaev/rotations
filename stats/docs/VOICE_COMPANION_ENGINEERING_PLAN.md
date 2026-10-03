@@ -781,6 +781,8 @@ against active video playback; processed speech remains available for laptop
 microphones and speakers. The companion also detects audio-interface recordings
 where the microphone occupies only one stereo channel, selects the active
 channel before transcription, and reports the channel mode in diagnostics.
+Microphone, processing, and playback-isolation controls live in an Audio
+settings dialog with a live left/right channel preview.
 
 Deliver:
 

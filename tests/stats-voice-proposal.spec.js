@@ -5,7 +5,9 @@ test.describe.configure({ mode: 'serial' });
 test('real companion client invokes browser fetch with the correct receiver', async ({ page }) => {
   await page.goto('/stats/');
   const result = await page.evaluate(async () => {
-    const { VoiceCompanionClient } = await import(
+    const {
+      VoiceCompanionClient
+    } = await import(
       './js/voice-companion-client.js'
     );
     const calls = [];
@@ -351,8 +353,11 @@ test('prevents overlapping recordings and reports microphone permission failures
 test('optionally pauses and resumes video around recording', async ({ page }) => {
   await openVoiceTracker(page);
   await connectVoiceCompanion(page);
+  await page.locator('#voiceOpenAudioSettings').click();
+  await expect(page.locator('#voiceAudioSettingsDialog')).toHaveAttribute('open', '');
   await page.locator('#voiceAudioProcessing').selectOption('processed');
   await page.locator('#voicePauseVideoDuringRecording').check();
+  await page.locator('#voiceCloseAudioSettings').click();
   await page.evaluate(() => { window.__statsFakePlayer.playing = true; });
 
   await page.locator('#voiceStartRecording').click();
@@ -375,6 +380,25 @@ test('optionally pauses and resumes video around recording', async ({ page }) =>
   expect(await page.evaluate(() => localStorage.getItem(
     'basketball-stats-voice-audio-processing'
   ))).toBe('processed');
+});
+
+test('classifies left, right, both, and silent channel previews', async ({ page }) => {
+  await page.goto('/stats/');
+  const results = await page.evaluate(async () => {
+    const { classifyChannelActivity } = await import('./js/voice-capture.js');
+    return [
+      classifyChannelActivity(0.04, 0.00003),
+      classifyChannelActivity(0.00003, 0.04),
+      classifyChannelActivity(0.04, 0.02),
+      classifyChannelActivity(0.0001, 0.0002)
+    ];
+  });
+  expect(results).toEqual([
+    'Left channel active',
+    'Right channel active',
+    'Both channels active',
+    'No clear input'
+  ]);
 });
 
 test('cancels processing, keeps audio for retry, and disables discard while active', async ({ page }) => {

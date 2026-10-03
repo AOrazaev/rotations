@@ -12,6 +12,16 @@ const MICROPHONE_STORAGE_KEY = 'basketball-stats-voice-microphone';
 const AUDIO_PROCESSING_STORAGE_KEY = 'basketball-stats-voice-audio-processing';
 const PAUSE_VIDEO_STORAGE_KEY = 'basketball-stats-voice-pause-video';
 
+export function classifyChannelActivity(leftRms, rightRms) {
+  const threshold = 0.003;
+  const leftActive = leftRms >= threshold;
+  const rightActive = rightRms >= threshold;
+  if (leftActive && rightActive) return 'Both channels active';
+  if (leftActive) return 'Left channel active';
+  if (rightActive) return 'Right channel active';
+  return 'No clear input';
+}
+
 export function createVoiceCaptureController({
   documentObject = document,
   videoController,
@@ -19,6 +29,7 @@ export function createVoiceCaptureController({
   clientFactory,
   mediaDevices = navigator.mediaDevices,
   MediaRecorderClass = globalThis.MediaRecorder,
+  AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext,
   localStorageObject = localStorage,
   sessionStorageObject = sessionStorage
 }) {
@@ -27,10 +38,18 @@ export function createVoiceCaptureController({
   const connectButton = documentObject.querySelector('#voiceConnect');
   const warmupButton = documentObject.querySelector('#voiceWarmup');
   const connectionStatus = documentObject.querySelector('#voiceConnectionStatus');
+  const audioSummary = documentObject.querySelector('#voiceAudioSummary');
+  const openAudioSettingsButton = documentObject.querySelector('#voiceOpenAudioSettings');
+  const audioSettingsDialog = documentObject.querySelector('#voiceAudioSettingsDialog');
+  const closeAudioSettingsButton = documentObject.querySelector('#voiceCloseAudioSettings');
   const microphoneSelect = documentObject.querySelector('#voiceMicrophone');
   const audioProcessingSelect = documentObject.querySelector('#voiceAudioProcessing');
   const refreshMicrophonesButton = documentObject.querySelector('#voiceRefreshMicrophones');
   const pauseVideoInput = documentObject.querySelector('#voicePauseVideoDuringRecording');
+  const toggleChannelTestButton = documentObject.querySelector('#voiceToggleChannelTest');
+  const leftChannelLevel = documentObject.querySelector('#voiceLeftChannelLevel');
+  const rightChannelLevel = documentObject.querySelector('#voiceRightChannelLevel');
+  const channelStatus = documentObject.querySelector('#voiceChannelStatus');
   const startButton = documentObject.querySelector('#voiceStartRecording');
   const stopButton = documentObject.querySelector('#voiceStopRecording');
   const cancelButton = documentObject.querySelector('#voiceCancelProcessing');
@@ -65,6 +84,9 @@ export function createVoiceCaptureController({
   let destroyed = false;
   let discarding = false;
   let resumePlaybackAfterRecording = false;
+  let channelPreviewStream = null;
+  let channelPreviewContext = null;
+  let channelPreviewFrame = null;
   let operationVersion = 0;
   let observedGameId = getGame()?.id || null;
 
@@ -84,6 +106,16 @@ export function createVoiceCaptureController({
   function setRecordingStatus(message, kind = '') {
     recordingStatus.textContent = message;
     recordingStatus.className = `message voice-status ${kind}`.trim();
+  }
+
+  function updateAudioSummary() {
+    const microphone = microphoneSelect.selectedOptions[0]?.textContent
+      || 'System default microphone';
+    const processing = audioProcessingSelect.value === 'processed'
+      ? 'Processed speech'
+      : 'Raw input';
+    const playback = pauseVideoInput.checked ? 'pause video' : 'keep video playing';
+    audioSummary.textContent = `${microphone} · ${processing} · ${playback}`;
   }
 
   function hasGameAndVideo() {
@@ -122,6 +154,10 @@ export function createVoiceCaptureController({
     warmupButton.disabled = !connected
       || !['idle', 'error', 'proposal'].includes(state);
     connectButton.disabled = state === 'recording'
+      || state === 'processing'
+      || state === 'cancelling'
+      || state === 'warming';
+    openAudioSettingsButton.disabled = state === 'recording'
       || state === 'processing'
       || state === 'cancelling'
       || state === 'warming';
@@ -182,11 +218,105 @@ export function createVoiceCaptureController({
           device.deviceId === selected
         ));
       });
+      updateAudioSummary();
     } catch (error) {
       setRecordingStatus(
         `Could not list microphones: ${error.message || 'device enumeration failed'}`,
         'error'
       );
+    }
+  }
+
+  function audioConstraints({ stereoPreview = false } = {}) {
+      const selectedDeviceId = microphoneSelect.value;
+      const processedAudio = audioProcessingSelect.value === 'processed';
+      return {
+        ...(selectedDeviceId
+          ? { deviceId: { exact: selectedDeviceId } }
+          : {}),
+        channelCount: stereoPreview ? 2 : 1,
+        echoCancellation: processedAudio,
+        noiseSuppression: processedAudio,
+        autoGainControl: processedAudio
+      };
+  }
+
+  function channelLevelPercent(rms) {
+      if (rms <= 0) return 0;
+      const decibels = 20 * Math.log10(rms);
+      return Math.max(0, Math.min(100, ((decibels + 60) / 60) * 100));
+  }
+
+  async function stopChannelPreview() {
+      if (channelPreviewFrame !== null) {
+        documentObject.defaultView.cancelAnimationFrame(channelPreviewFrame);
+        channelPreviewFrame = null;
+      }
+      channelPreviewStream?.getTracks().forEach(track => track.stop());
+      channelPreviewStream = null;
+      if (channelPreviewContext) await channelPreviewContext.close();
+      channelPreviewContext = null;
+      leftChannelLevel.style.width = '0%';
+      rightChannelLevel.style.width = '0%';
+      toggleChannelTestButton.textContent = 'Start preview';
+      channelStatus.textContent = 'Preview is stopped.';
+      channelStatus.className = 'message voice-status';
+  }
+
+  async function toggleChannelPreview() {
+      if (channelPreviewStream) {
+        await stopChannelPreview();
+        return;
+      }
+      if (!AudioContextClass) {
+        channelStatus.textContent = 'Live channel preview is unavailable in this browser.';
+        channelStatus.className = 'message voice-status error';
+        return;
+      }
+      toggleChannelTestButton.disabled = true;
+      channelStatus.textContent = 'Starting microphone preview...';
+      channelStatus.className = 'message voice-status loading';
+      try {
+        channelPreviewStream = await mediaDevices.getUserMedia({
+          audio: audioConstraints({ stereoPreview: true })
+        });
+        await refreshMicrophones();
+        channelPreviewContext = new AudioContextClass();
+        const source = channelPreviewContext.createMediaStreamSource(
+          channelPreviewStream
+        );
+        const splitter = channelPreviewContext.createChannelSplitter(2);
+        const leftAnalyser = channelPreviewContext.createAnalyser();
+        const rightAnalyser = channelPreviewContext.createAnalyser();
+        leftAnalyser.fftSize = 256;
+        rightAnalyser.fftSize = 256;
+        source.connect(splitter);
+        splitter.connect(leftAnalyser, 0);
+        splitter.connect(rightAnalyser, 1);
+        const leftData = new Float32Array(leftAnalyser.fftSize);
+        const rightData = new Float32Array(rightAnalyser.fftSize);
+        const rms = data => Math.sqrt(
+          data.reduce((sum, value) => sum + (value * value), 0) / data.length
+        );
+        const update = () => {
+          leftAnalyser.getFloatTimeDomainData(leftData);
+          rightAnalyser.getFloatTimeDomainData(rightData);
+          const leftRms = rms(leftData);
+          const rightRms = rms(rightData);
+          leftChannelLevel.style.width = `${channelLevelPercent(leftRms)}%`;
+          rightChannelLevel.style.width = `${channelLevelPercent(rightRms)}%`;
+          channelStatus.textContent = classifyChannelActivity(leftRms, rightRms);
+          channelStatus.className = 'message voice-status ready';
+          channelPreviewFrame = documentObject.defaultView.requestAnimationFrame(update);
+        };
+        toggleChannelTestButton.textContent = 'Stop preview';
+        update();
+      } catch (error) {
+        await stopChannelPreview();
+        channelStatus.textContent = `Could not start preview: ${error.message || 'microphone unavailable'}`;
+        channelStatus.className = 'message voice-status error';
+      } finally {
+        toggleChannelTestButton.disabled = false;
     }
   }
 
@@ -529,18 +659,9 @@ export function createVoiceCaptureController({
     audio = null;
     chunks = [];
     try {
-      const selectedDeviceId = microphoneSelect.value;
-      const processedAudio = audioProcessingSelect.value === 'processed';
+      await stopChannelPreview();
       stream = await mediaDevices.getUserMedia({
-        audio: {
-          ...(selectedDeviceId
-            ? { deviceId: { exact: selectedDeviceId } }
-            : {}),
-          channelCount: 1,
-          echoCancellation: processedAudio,
-          noiseSuppression: processedAudio,
-          autoGainControl: processedAudio
-        }
+        audio: audioConstraints()
       });
       await refreshMicrophones();
       capturedSeconds = videoController.getCurrentSeconds();
@@ -771,19 +892,31 @@ export function createVoiceCaptureController({
     } else {
       localStorageObject.removeItem(MICROPHONE_STORAGE_KEY);
     }
+    updateAudioSummary();
   });
   audioProcessingSelect.addEventListener('change', () => {
     localStorageObject.setItem(
       AUDIO_PROCESSING_STORAGE_KEY,
       audioProcessingSelect.value
     );
+    updateAudioSummary();
   });
   pauseVideoInput.addEventListener('change', () => {
     localStorageObject.setItem(
       PAUSE_VIDEO_STORAGE_KEY,
       String(pauseVideoInput.checked)
     );
+    updateAudioSummary();
   });
+  openAudioSettingsButton.addEventListener('click', () => {
+    refreshMicrophones();
+    audioSettingsDialog.showModal();
+  });
+  closeAudioSettingsButton.addEventListener('click', () => {
+    audioSettingsDialog.close();
+  });
+  audioSettingsDialog.addEventListener('close', stopChannelPreview);
+  toggleChannelTestButton.addEventListener('click', toggleChannelPreview);
   expectedTranscript.addEventListener('input', refresh);
   evaluationList.addEventListener('click', event => {
     handleEvaluationAction(event.target);
@@ -797,6 +930,7 @@ export function createVoiceCaptureController({
   const unsubscribeReady = videoController.subscribeReady(refresh);
 
   discard();
+  updateAudioSummary();
   refreshMicrophones();
   if (tokenInput.value) connect();
 
@@ -816,6 +950,7 @@ export function createVoiceCaptureController({
       operationVersion += 1;
       unsubscribeReady();
       stopTracks();
+      stopChannelPreview();
       clearAudioPreview();
       if (recorder?.state === 'recording') recorder.stop();
     }

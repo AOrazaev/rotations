@@ -167,26 +167,10 @@
             </div>
           </details>
           <p id="voiceConnectionStatus" class="message voice-status" aria-live="polite">Companion not connected.</p>
-          <div class="voice-microphone-settings">
-            <label>
-              Microphone
-              <select id="voiceMicrophone">
-                <option value="">System default microphone</option>
-              </select>
-            </label>
-            <button id="voiceRefreshMicrophones" class="secondary small" type="button">Refresh microphones</button>
-            <label>
-              Audio processing
-              <select id="voiceAudioProcessing">
-                <option value="raw">Raw input — audio interface or headphones</option>
-                <option value="processed">Processed speech — laptop mic or speakers</option>
-              </select>
-            </label>
+          <div class="voice-audio-summary">
+            <span id="voiceAudioSummary">System default microphone · Raw input</span>
+            <button id="voiceOpenAudioSettings" class="secondary small" type="button">Audio settings</button>
           </div>
-          <label class="voice-recording-option">
-            <input id="voicePauseVideoDuringRecording" type="checkbox" />
-            Pause video while recording
-          </label>
           <div class="voice-actions">
             <button id="voiceStartRecording" class="primary" type="button" disabled>Start recording</button>
             <button id="voiceStopRecording" class="secondary" type="button" disabled>Stop recording</button>
@@ -224,6 +208,53 @@
               <p class="message">Connect the companion to review saved samples.</p>
             </div>
           </details>
+          <dialog id="voiceAudioSettingsDialog" class="event-dialog voice-audio-dialog">
+            <div class="section-head">
+              <div>
+                <h2>Audio settings</h2>
+                <p>Select the input and verify which channels carry your microphone.</p>
+              </div>
+              <button id="voiceCloseAudioSettings" class="secondary small" type="button">Close</button>
+            </div>
+            <div class="voice-microphone-settings">
+              <label>
+                Microphone
+                <select id="voiceMicrophone">
+                  <option value="">System default microphone</option>
+                </select>
+              </label>
+              <button id="voiceRefreshMicrophones" class="secondary small" type="button">Refresh microphones</button>
+              <label>
+                Audio processing
+                <select id="voiceAudioProcessing">
+                  <option value="raw">Raw input — audio interface or headphones</option>
+                  <option value="processed">Processed speech — laptop mic or speakers</option>
+                </select>
+              </label>
+            </div>
+            <label class="voice-recording-option">
+              <input id="voicePauseVideoDuringRecording" type="checkbox" />
+              Pause video while recording
+            </label>
+            <section class="voice-channel-test" aria-labelledby="voiceChannelTestTitle">
+              <div class="section-head">
+                <div>
+                  <h3 id="voiceChannelTestTitle">Input preview</h3>
+                  <p>Speak normally to identify active input channels.</p>
+                </div>
+                <button id="voiceToggleChannelTest" class="secondary small" type="button">Start preview</button>
+              </div>
+              <div class="voice-channel-meter">
+                <span>Left</span>
+                <div><i id="voiceLeftChannelLevel"></i></div>
+              </div>
+              <div class="voice-channel-meter">
+                <span>Right</span>
+                <div><i id="voiceRightChannelLevel"></i></div>
+              </div>
+              <p id="voiceChannelStatus" class="message voice-status" aria-live="polite">Preview is stopped.</p>
+            </section>
+          </dialog>
         </section>
         <section id="eventEntryPanel" class="card event-entry-card hidden">
             <div class="section-head">
