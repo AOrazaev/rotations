@@ -74,6 +74,12 @@ present in the active lineup, and the number is used as the subject of a
 supported statistic. The response includes a warning whenever this
 roster-aware normalization is applied.
 
+Interpretation also grounds explicit active-lineup subjects independently. For
+example, `number five assist, number thirteen makes three` must attribute the
+assist to #5 and the shot to #13 even if the local command model repeats one
+player across both events. Unspoken shot phases such as transition or half
+court are removed rather than accepted from the model.
+
 ## API
 
 ```text

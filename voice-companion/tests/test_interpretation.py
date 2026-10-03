@@ -134,6 +134,89 @@ class CommandInterpreterTest(unittest.TestCase):
         with self.assertRaisesRegex(InvalidInterpretation, "supplied roster"):
             validate_interpretation(payload, context(), "test-model")
 
+    def test_corrects_explicit_assister_and_scorer_attribution(self):
+        request_context = {
+            **context(),
+            "roster": [
+                {"id": "p5", "jersey": "5", "name": "Vlad"},
+                {"id": "p13", "jersey": "13", "name": "Dmytro"},
+            ],
+            "currentLineupIds": ["p5", "p13"],
+        }
+        payload = {
+            "events": [
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p5",
+                    "shotValue": 3,
+                    "made": True,
+                    "shotDetails": {"phase": "transition"},
+                    "confidence": 0.98,
+                },
+                {
+                    "side": "team",
+                    "type": "assist",
+                    "playerId": "p5",
+                    "confidence": 0.98,
+                },
+            ],
+            "overallConfidence": 0.98,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Number five assist number 13 makes three pointer",
+            request_context,
+        )
+
+        self.assertEqual(result.events[0]["playerId"], "p13")
+        self.assertEqual(result.events[1]["playerId"], "p5")
+        self.assertNotIn("shotDetails", result.events[0])
+        self.assertIn(
+            "Corrected shot attribution to jersey 13 from the explicit transcript.",
+            result.warnings,
+        )
+        self.assertIn(
+            "Removed unspoken shot phase 'transition'.",
+            result.warnings,
+        )
+
+    def test_does_not_ground_opponent_number_to_team_roster(self):
+        payload = {
+            "events": [
+                {
+                    "side": "opponent",
+                    "type": "shot",
+                    "playerId": None,
+                    "shotValue": 3,
+                    "made": True,
+                    "confidence": 0.95,
+                }
+            ],
+            "overallConfidence": 0.95,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Opponent number seven makes three pointer",
+            context(),
+        )
+
+        self.assertEqual(result.events[0]["side"], "opponent")
+        self.assertIsNone(result.events[0]["playerId"])
+        self.assertEqual(result.warnings, [])
+
     def test_rejects_team_player_on_opponent_event(self):
         payload = {
             "events": [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,38 @@ from .profiles import default_model_directory
 MAX_PROPOSED_EVENTS = 20
 MAX_WARNINGS = 20
 DEFAULT_COMMAND_MODEL = "Qwen3-4B-Q4_K_M.gguf"
+NUMBER_WORDS = {
+    0: "zero",
+    1: "one",
+    2: "two",
+    3: "three",
+    4: "four",
+    5: "five",
+    6: "six",
+    7: "seven",
+    8: "eight",
+    9: "nine",
+    10: "ten",
+    11: "eleven",
+    12: "twelve",
+    13: "thirteen",
+    14: "fourteen",
+    15: "fifteen",
+    16: "sixteen",
+    17: "seventeen",
+    18: "eighteen",
+    19: "nineteen",
+}
+TENS_WORDS = {
+    20: "twenty",
+    30: "thirty",
+    40: "forty",
+    50: "fifty",
+    60: "sixty",
+    70: "seventy",
+    80: "eighty",
+    90: "ninety",
+}
 COMMAND_OUTPUT_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -234,6 +267,7 @@ class LlamaCppCommandInterpreter:
                 "Command model returned an invalid structured response."
             ) from error
         result = validate_interpretation(payload, context, self.model_name)
+        result = _ground_explicit_transcript_facts(transcript, result, context)
         _validate_spoken_event_coverage(transcript, result)
         return result
 
@@ -619,6 +653,129 @@ def _normalize_events(events: list[dict]) -> tuple[list[dict], list[str]]:
             f"{'s' if removed_duplicates != 1 else ''}."
         )
     return unique, warnings
+
+
+def _jersey_number_words(value: int) -> str | None:
+    if value in NUMBER_WORDS:
+        return NUMBER_WORDS[value]
+    tens = value // 10 * 10
+    ones = value % 10
+    if tens not in TENS_WORDS:
+        return None
+    return (
+        TENS_WORDS[tens]
+        if not ones
+        else f"{TENS_WORDS[tens]} {NUMBER_WORDS[ones]}"
+    )
+
+
+def _explicit_active_subjects(transcript: str, context: dict) -> dict[str, list[str]]:
+    active_ids = set(context["currentLineupIds"])
+    variants: dict[str, set[str]] = {}
+    for player in context["roster"]:
+        if player["id"] not in active_ids:
+            continue
+        jersey = str(player["jersey"]).strip().lower()
+        if not jersey:
+            continue
+        variants.setdefault(jersey, set()).add(player["id"])
+        if jersey.isdigit():
+            words = _jersey_number_words(int(jersey))
+            if words:
+                variants.setdefault(words, set()).add(player["id"])
+    resolved = {
+        variant: next(iter(player_ids))
+        for variant, player_ids in variants.items()
+        if len(player_ids) == 1
+    }
+    if not resolved:
+        return {}
+    jersey_pattern = "|".join(
+        re.escape(variant)
+        for variant in sorted(resolved, key=len, reverse=True)
+    )
+    pattern = re.compile(
+        rf"\b(?:number\s+|player\s+)?(?P<jersey>{jersey_pattern})\s+"
+        r"(?P<action>assist(?:s|ed)?|make|makes|made|miss|misses|missed|"
+        r"score|scores|scored)\b",
+        re.IGNORECASE,
+    )
+    subjects: dict[str, list[str]] = {}
+    for match in pattern.finditer(transcript):
+        preceding = transcript[max(0, match.start() - 24):match.start()].lower()
+        if re.search(r"\b(?:opponent|opponents|opposing\s+team)\s*$", preceding):
+            continue
+        action = match.group("action").lower()
+        event_type = "assist" if action.startswith("assist") else "shot"
+        subjects.setdefault(event_type, []).append(
+            resolved[match.group("jersey").lower()]
+        )
+    return subjects
+
+
+def _ground_explicit_transcript_facts(
+    transcript: str,
+    result: InterpretationResult,
+    context: dict,
+) -> InterpretationResult:
+    events = [
+        {
+            **event,
+            **(
+                {"shotDetails": dict(event["shotDetails"])}
+                if "shotDetails" in event
+                else {}
+            ),
+        }
+        for event in result.events
+    ]
+    warnings = list(result.warnings)
+    subjects = _explicit_active_subjects(transcript, context)
+    jerseys_by_id = {
+        player["id"]: str(player["jersey"])
+        for player in context["roster"]
+    }
+    for event_type, player_ids in subjects.items():
+        matching_events = [
+            event for event in events if event["type"] == event_type
+        ]
+        if len(matching_events) != len(player_ids):
+            continue
+        for event, player_id in zip(matching_events, player_ids):
+            if event["side"] == "team" and event["playerId"] == player_id:
+                continue
+            event["side"] = "team"
+            event["playerId"] = player_id
+            warnings.append(
+                f"Corrected {event_type} attribution to jersey "
+                f"{jerseys_by_id[player_id]} from the explicit transcript."
+            )
+
+    normalized = re.sub(r"[-_]+", " ", transcript.lower())
+    phase_evidence = {
+        "transition": bool(
+            re.search(r"\btransition\b|\bfast\s+break\b", normalized)
+        ),
+        "half_court": bool(re.search(r"\bhalf\s+court\b", normalized)),
+    }
+    for event in events:
+        details = event.get("shotDetails")
+        phase = details.get("phase") if isinstance(details, dict) else None
+        if not phase or phase_evidence.get(phase, False):
+            continue
+        del details["phase"]
+        if not details:
+            del event["shotDetails"]
+        warnings.append(
+            f"Removed unspoken shot phase '{phase.replace('_', ' ')}'."
+        )
+
+    return InterpretationResult(
+        events=events,
+        overall_confidence=result.overall_confidence,
+        warnings=warnings,
+        model=result.model,
+    )
 
 
 def _is_confidence(value: object) -> bool:
