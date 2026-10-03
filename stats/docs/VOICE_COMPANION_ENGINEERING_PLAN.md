@@ -851,9 +851,11 @@ Queued and processing rows show progress and cancellation. Draft rows expose
 the transcript and a compact read-only summary of recognized events with an
 Accept action. The full event editors, timestamp replacement, retry, discard,
 and evaluation controls remain folded until requested, while validation errors
-reopen the editor for correction. Confirmed rows become normal persisted game
-events with temporary highlighting and full-batch undo. Temporary rows never
-enter game data, IndexedDB, reports, backups, or shared links.
+reopen the editor for correction. Temporary-row timestamps use the same
+three-second video preview behavior as persisted event timestamps. Confirmed
+rows become normal persisted game events with temporary highlighting and
+full-batch undo. Temporary rows never enter game data, IndexedDB, reports,
+backups, or shared links.
 
 Recording remains available while earlier commands are pending. The browser
 queues audio immediately and sends commands to the companion sequentially to

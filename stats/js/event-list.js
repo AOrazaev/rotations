@@ -708,8 +708,11 @@ export function createEventListController({
     item.className = `event-list-item voice-command-item voice-command-${command.state}`;
     item.dataset.voiceCommandId = command.id;
 
-    const time = documentObject.createElement('span');
-    time.className = 'event-time voice-command-time';
+    const time = documentObject.createElement('button');
+    time.type = 'button';
+    time.className = 'event-time link-button voice-command-time';
+    time.dataset.action = 'play-voice-command';
+    time.setAttribute('aria-label', `Play video around ${formatVideoTime(command.capturedSeconds)}`);
     time.textContent = formatVideoTime(command.capturedSeconds);
     const content = documentObject.createElement('div');
     content.className = 'voice-command-content';
@@ -967,8 +970,18 @@ export function createEventListController({
 
   eventList.addEventListener('click', async event => {
     const button = event.target.closest('button[data-action]');
+    if (!button || !game || busy) return;
+    if (button.dataset.action === 'play-voice-command') {
+      const voiceRow = button.closest('[data-voice-command-id]');
+      const command = voiceCommands.find(item => item.id === voiceRow?.dataset.voiceCommandId);
+      if (!command) return;
+      setPlaybackFollowing(true);
+      videoController.seekTo(Math.max(0, command.capturedSeconds - PREVIEW_SECONDS));
+      videoController.play();
+      return;
+    }
     const row = event.target.closest('[data-event-id]');
-    if (!button || !row || !game || busy) return;
+    if (!row) return;
     const selected = game.events.find(item => item.id === row.dataset.eventId);
     if (!selected) return;
     try {

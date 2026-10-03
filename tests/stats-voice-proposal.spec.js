@@ -47,12 +47,17 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
       playing: false,
       playCount: 0,
       pauseCount: 0,
+      calls: [],
       getCurrentSeconds() { return this.current; },
-      seekTo(seconds) { this.current = seconds; },
+      seekTo(seconds) {
+        this.current = seconds;
+        this.calls.push(['seek', seconds]);
+      },
       isPlaying() { return this.playing; },
       play() {
         this.playing = true;
         this.playCount += 1;
+        this.calls.push(['play']);
       },
       pause() {
         this.playing = false;
@@ -310,6 +315,12 @@ test('uses one compact microphone control and keeps drafts out of game storage',
   await expect(draft.locator('[data-voice-action="confirm"]')).toHaveText('Accept');
   await expect(draft.locator('.voice-proposal-event').first()).not.toBeVisible();
   await expect(draft).toContainText('Seven assist and thirteen makes two');
+  await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+  await draft.locator('.voice-command-time').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+    ['seek', 39.4],
+    ['play']
+  ]);
   expect(await page.evaluate(() => window.__voiceRequests[0].capturedSeconds)).toBe(42.4);
   expect(await page.evaluate(
     () => window.__voiceRequests[0].audioChannelPreference
@@ -346,6 +357,16 @@ test('records another command while the first processes and sends requests seque
 
   await recordCommand(page);
   await expect(page.locator('.voice-command-processing')).toHaveCount(1);
+  await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+  await page.locator('.voice-command-processing .voice-command-time').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+    ['seek', 39.4],
+    ['play']
+  ]);
+  await page.evaluate(() => {
+    window.__statsFakePlayer.current = 42.4;
+    window.__statsFakePlayer.playing = false;
+  });
   await recordCommand(page);
   await expect(page.locator('.voice-command-processing')).toHaveCount(1);
   await expect(page.locator('.voice-command-queued')).toHaveCount(1);
