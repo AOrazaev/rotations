@@ -80,9 +80,9 @@ class ContextValidationTest(unittest.TestCase):
 
     def test_rejects_unsupported_event_types(self):
         context = valid_context()
-        context["allowedEventTypes"].append("substitution")
+        context["allowedEventTypes"].append("note")
         with self.assertRaisesRegex(
-            RequestValidationError, "Unsupported event types: substitution"
+            RequestValidationError, "Unsupported event types: note"
         ):
             validate_context(context)
 

@@ -630,6 +630,39 @@ export function createEventListController({
       grid.append(label);
     };
 
+    if (event.type === 'substitution') {
+      const activeIds = new Set(command.currentLineupIds || []);
+      addSelect('Player out', 'playerOutId', [
+        voiceOption('', 'Select player', !event.playerOutId),
+        ...players
+          .filter(player => activeIds.has(player.id))
+          .map(player => voiceOption(
+            player.id,
+            player.number ? `#${player.number} ${player.name}` : player.name,
+            event.playerOutId === player.id
+          ))
+      ]);
+      addSelect('Player in', 'playerInId', [
+        voiceOption('', 'Select player', !event.playerInId),
+        ...players
+          .filter(player => !activeIds.has(player.id))
+          .map(player => voiceOption(
+            player.id,
+            player.number ? `#${player.number} ${player.name}` : player.name,
+            event.playerInId === player.id
+          ))
+      ]);
+      const remove = voiceAction(
+        'Remove event',
+        'remove-event',
+        'danger small voice-remove-event'
+      );
+      remove.dataset.voiceEventIndex = String(index);
+      grid.append(remove);
+      fieldset.append(grid);
+      return fieldset;
+    }
+
     addSelect('Side', 'side', [
       voiceOption('team', 'Our team', event.side === 'team'),
       voiceOption('opponent', 'Opponent', event.side === 'opponent')

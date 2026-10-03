@@ -64,6 +64,9 @@ function buildGameEvent(proposal, {
     }
   } else if (proposal.type === 'rebound') {
     event.reboundKind = proposal.reboundKind;
+  } else if (proposal.type === 'substitution') {
+    event.playerInId = proposal.playerInId;
+    event.playerOutId = proposal.playerOutId;
   }
   return event;
 }
@@ -82,6 +85,13 @@ export function appendVoiceEventBatch(game, {
   if (!Array.isArray(proposalEvents) || !proposalEvents.length) {
     throw mutationError('voice_empty_proposal', 'Add at least one event before confirming.');
   }
+  if (proposalEvents.some(event => event.type === 'substitution')
+    && proposalEvents.length !== 1) {
+    throw mutationError(
+      'voice_mixed_substitution',
+      'A voice substitution must be confirmed as its own command.'
+    );
+  }
 
   const next = structuredClone(game);
   const timestamp = now();
@@ -96,12 +106,27 @@ export function appendVoiceEventBatch(game, {
 
   proposalEvents.forEach((proposal, index) => {
     if (proposal.side === 'team'
-      && proposal.type !== 'timeout'
+      && !['timeout', 'substitution'].includes(proposal.type)
       && !lineupSet.has(proposal.playerId)) {
       throw mutationError(
         'voice_player_not_on_court',
         `Proposal event ${index + 1} references a player who is not on court at this timestamp.`
       );
+    }
+    if (proposal.type === 'substitution') {
+      if (!lineupSet.has(proposal.playerOutId)) {
+        throw mutationError(
+          'voice_substitution_player_out',
+          'The outgoing substitution player is not on court at this timestamp.'
+        );
+      }
+      if (lineupSet.has(proposal.playerInId)
+        || !next.players.some(player => player.id === proposal.playerInId)) {
+        throw mutationError(
+          'voice_substitution_player_in',
+          'The incoming substitution player must be on the bench at this timestamp.'
+        );
+      }
     }
     const id = randomUUID();
     eventIds.push(id);

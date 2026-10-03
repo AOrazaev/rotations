@@ -19,7 +19,7 @@ BASKETBALL_HOTWORDS = (
     "basketball team opponent opponents opposing team player number point points "
     "one two three two pointer three pointer two point three point free throw free throws "
     "makes made misses missed shot rebound offensive defensive assist steal "
-    "block turnover foul transition"
+    "block turnover foul transition timeout substitution substitute subs in for"
 )
 
 BASKETBALL_INITIAL_PROMPT = (
@@ -27,6 +27,7 @@ BASKETBALL_INITIAL_PROMPT = (
     "Opponent misses two pointer. Opponent makes three pointer. "
     "Opponent misses three pointer. Player seven makes two. "
     "Player thirteen makes three. Player seven assist. Player seven steal. "
+    "Player seven subs for player thirteen. "
     "Offensive rebound. Defensive rebound. Turnover. Foul."
 )
 

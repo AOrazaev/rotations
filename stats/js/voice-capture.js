@@ -151,6 +151,7 @@ export function createVoiceCaptureController({
       expectedTranscript: job.expectedTranscript || '',
       events: structuredClone(job.events || []),
       warnings: [...(job.warnings || [])],
+      currentLineupIds: [...(job.context?.currentLineupIds || [])],
       errorMessage: job.errorMessage || '',
       audioUrl: job.audioUrl || '',
       diagnostics: job.response
@@ -846,6 +847,8 @@ export function createVoiceCaptureController({
       delete event.made;
       delete event.reboundKind;
       delete event.shotDetails;
+      delete event.playerInId;
+      delete event.playerOutId;
       if (value === 'shot') {
         event.shotValue = 2;
         event.made = true;
@@ -853,7 +856,19 @@ export function createVoiceCaptureController({
         event.reboundKind = 'defensive';
       } else if (value === 'timeout') {
         event.playerId = null;
+      } else if (value === 'substitution') {
+        const activeIds = new Set(job.context?.currentLineupIds || []);
+        event.side = 'team';
+        event.playerId = null;
+        event.playerOutId = job.gameSnapshot.players.find(
+          player => activeIds.has(player.id)
+        )?.id || null;
+        event.playerInId = job.gameSnapshot.players.find(
+          player => !activeIds.has(player.id)
+        )?.id || null;
       }
+    } else if (field === 'playerInId' || field === 'playerOutId') {
+      event[field] = value || null;
     } else if (field === 'shotValue') {
       event.shotValue = Number(value);
     } else if (field === 'made') {

@@ -80,10 +80,18 @@ assist to #5 and the shot to #13 even if the local command model repeats one
 player across both events. Action-first clauses such as `steal by thirteen` and
 `defensive rebound by opponent` receive the same grounding before strict roster
 validation. Unspoken model events and shot phases such as transition or half
-court are removed rather than accepted.
+court are removed rather than accepted. Explicitly grounded simple events such
+as `opponent foul` can be recovered when the command model omits them entirely;
+relational events such as assists remain strict rather than being guessed.
 
 Voice commands support player statistics plus team-level timeouts. Commands
 such as `opponent timeout` produce a playerless opponent timeline event.
+
+Substitution-only commands are resolved deterministically from the roster and
+active lineup without asking the command model to guess direction. Supported
+phrases include `number 7 subs for 13`, `7 in for 13`, and
+`sub 13 out for 7`; each means #7 enters and #13 exits. The companion rejects
+mixed substitution-and-stat commands and lineup-inconsistent directions.
 
 ## API
 

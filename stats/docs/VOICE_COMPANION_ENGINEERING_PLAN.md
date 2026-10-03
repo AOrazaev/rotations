@@ -869,6 +869,13 @@ The voice proposal boundary supports the seven player-stat event types and
 team-level timeouts. Timeout proposals preserve the spoken team/opponent side
 and never require or accept a player.
 
+Substitution-only commands resolve an incoming bench player and outgoing
+on-court player from explicit jersey numbers. Drafts expose separate Player in
+and Player out controls, confirmation rebuilds lineup snapshots through the
+normal event model, and batch undo restores the preceding lineup. Mixed
+substitution-and-stat recordings are rejected until sequence-aware mixed
+lineup validation is designed.
+
 Connection, token, warmup, microphone, processing, channel, playback-isolation,
 diagnostic, and saved-evaluation controls move into the voice settings dialog.
 Remembered settings auto-connect when possible. An unavailable microphone

@@ -331,6 +331,106 @@ class CommandInterpreterTest(unittest.TestCase):
         )
         self.assertIn("Removed 1 unspoken model event.", result.warnings)
 
+    def test_interprets_substitution_from_lineup_without_loading_model(self):
+        request_context = {
+            **context(),
+            "currentLineupIds": ["p13"],
+            "allowedEventTypes": [
+                *context()["allowedEventTypes"],
+                "substitution",
+            ],
+        }
+        calls = []
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: calls.append(options),
+        )
+
+        result = interpreter.interpret(
+            "Number 7 subs for 13",
+            request_context,
+        )
+
+        self.assertEqual(calls, [])
+        self.assertEqual(
+            result.events,
+            [{
+                "side": "team",
+                "type": "substitution",
+                "playerId": None,
+                "playerInId": "p7",
+                "playerOutId": "p13",
+                "confidence": 0.99,
+            }],
+        )
+
+    def test_rejects_mixed_or_lineup_inconsistent_substitution(self):
+        request_context = {
+            **context(),
+            "currentLineupIds": ["p13"],
+            "allowedEventTypes": [
+                *context()["allowedEventTypes"],
+                "substitution",
+            ],
+        }
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: FakeLlama({}),
+        )
+
+        with self.assertRaisesRegex(InvalidInterpretation, "substitution-only"):
+            interpreter.interpret(
+                "Number 7 subs for 13 and makes two",
+                request_context,
+            )
+        with self.assertRaisesRegex(InvalidInterpretation, "not on court"):
+            interpreter.interpret(
+                "Number 13 subs for 7",
+                request_context,
+            )
+
+    def test_recovers_explicit_opponent_foul_omitted_by_model(self):
+        payload = {
+            "events": [
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p13",
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": False,
+                    "shotDetails": {"phase": "transition"},
+                }
+            ],
+            "overallConfidence": 0.99,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Number 13 misses two pointer in transition. Opponent foul.",
+            context(),
+        )
+
+        self.assertEqual(
+            [
+                (event["type"], event["side"], event["playerId"])
+                for event in result.events
+            ],
+            [
+                ("shot", "team", "p13"),
+                ("foul", "opponent", None),
+            ],
+        )
+        self.assertIn(
+            "Recovered 1 explicitly spoken foul event omitted by the command model.",
+            result.warnings,
+        )
+
     def test_rejects_team_player_on_opponent_event(self):
         payload = {
             "events": [

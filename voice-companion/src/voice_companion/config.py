@@ -36,6 +36,7 @@ ALLOWED_EVENT_TYPES = {
     "turnover",
     "foul",
     "timeout",
+    "substitution",
 }
 
 

@@ -3,7 +3,7 @@ import {
   STAT_EVENT_TYPES
 } from './game-model.js';
 
-const EVENT_TYPES = [...STAT_EVENT_TYPES, 'timeout'];
+const EVENT_TYPES = [...STAT_EVENT_TYPES, 'timeout', 'substitution'];
 const EVENT_TYPE_SET = new Set(EVENT_TYPES);
 
 export function buildVoiceCommandContext(
@@ -69,11 +69,12 @@ export function validateVoiceCommandResponse(payload, {
     if (!EVENT_TYPE_SET.has(event.type)) {
       throw new Error(`${label} has an unsupported event type.`);
     }
-    if (event.type === 'timeout' && event.playerId !== null) {
-      throw new Error(`${label} timeout must be team-level.`);
+    if (['timeout', 'substitution'].includes(event.type)
+      && event.playerId !== null) {
+      throw new Error(`${label} ${event.type} must be playerless.`);
     }
     if (event.side === 'team'
-      && event.type !== 'timeout'
+      && !['timeout', 'substitution'].includes(event.type)
       && !playerIds.has(event.playerId)) {
       throw new Error(`${label} does not reference a current game player.`);
     }
@@ -90,6 +91,14 @@ export function validateVoiceCommandResponse(payload, {
       && !['offensive', 'defensive'].includes(event.reboundKind)) {
       throw new Error(`${label} has an invalid rebound type.`);
     }
+    if (event.type === 'substitution') {
+      if (event.side !== 'team'
+        || !playerIds.has(event.playerInId)
+        || !playerIds.has(event.playerOutId)
+        || event.playerInId === event.playerOutId) {
+        throw new Error(`${label} has invalid substitution players.`);
+      }
+    }
     if (typeof event.confidence !== 'number'
       || event.confidence < 0
       || event.confidence > 1) {
@@ -97,6 +106,9 @@ export function validateVoiceCommandResponse(payload, {
     }
     return structuredClone(event);
   });
+  if (events.some(event => event.type === 'substitution') && events.length !== 1) {
+    throw new Error('A voice substitution must be confirmed as its own command.');
+  }
 
   return {
     ...structuredClone(payload),

@@ -175,6 +175,23 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
               }]
             };
           }
+          if (window.__voiceTestMode === 'substitution') {
+            const activeIds = new Set(context.currentLineupIds);
+            const outgoing = context.roster.find(player => activeIds.has(player.id));
+            const incoming = context.roster.find(player => !activeIds.has(player.id));
+            return {
+              ...successPayload(context),
+              transcript: `Number ${incoming.jersey} subs for ${outgoing.jersey}.`,
+              events: [{
+                side: 'team',
+                type: 'substitution',
+                playerId: null,
+                playerInId: incoming.id,
+                playerOutId: outgoing.id,
+                confidence: 0.99
+              }]
+            };
+          }
           if (window.__voiceTestMode === 'partial-error') {
             throw Object.assign(new Error('Interpretation failed.'), {
               code: 'interpretation_failed',
@@ -437,6 +454,9 @@ test('accepts an opponent timeout as a playerless voice event', async ({ page })
     () => window.__voiceRequests[0].allowedEventTypes.includes('timeout')
   )).toBe(true);
   await draft.locator('[data-voice-action="confirm"]').click();
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(1);
 
   const events = await page.evaluate(
     () => window.__statsApp.eventController.getGame().events
@@ -447,6 +467,67 @@ test('accepts an opponent timeout as a playerless voice event', async ({ page })
     type: 'timeout',
     playerId: null
   });
+});
+
+test('accepts a substitution-only command and rebuilds the lineup', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'substitution' });
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+
+  const request = await page.evaluate(() => window.__voiceRequests[0]);
+  const activeIds = new Set(request.currentLineupIds);
+  const outgoing = request.roster.find(player => activeIds.has(player.id));
+  const incoming = request.roster.find(player => !activeIds.has(player.id));
+  const playerLabel = player => player.jersey
+    ? `#${player.jersey} ${player.name}`
+    : player.name;
+  const draft = page.locator('.voice-command-draft');
+  await expect(draft.locator('.voice-command-event-summary')).toContainText(
+    `${playerLabel(incoming)} in for ${playerLabel(outgoing)}`
+  );
+  expect(request.allowedEventTypes).toContain('substitution');
+
+  await draft.locator('.voice-command-details > summary').click();
+  await expect(draft.locator('[data-voice-field="playerOutId"]')).toHaveValue(
+    outgoing.id
+  );
+  await expect(draft.locator('[data-voice-field="playerInId"]')).toHaveValue(
+    incoming.id
+  );
+  await draft.locator('[data-voice-action="confirm"]').click();
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(1);
+
+  const game = await page.evaluate(
+    () => window.__statsApp.eventController.getGame()
+  );
+  expect(game.events).toHaveLength(1);
+  expect(game.events[0]).toMatchObject({
+    side: 'team',
+    type: 'substitution',
+    playerId: null,
+    playerInId: incoming.id,
+    playerOutId: outgoing.id
+  });
+  expect(game.events[0].lineupIds).toContain(incoming.id);
+  expect(game.events[0].lineupIds).not.toContain(outgoing.id);
+
+  await page.locator('#voiceUndoLatestBatch').click();
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(0);
+  const restoredLineup = await page.evaluate(async seconds => {
+    const { getLineupAtEventPosition } = await import(
+      '/stats/js/game-model.js'
+    );
+    return getLineupAtEventPosition(
+      window.__statsApp.eventController.getGame(),
+      seconds
+    );
+  }, request.capturedSeconds);
+  expect(restoredLineup).toEqual(request.currentLineupIds);
 });
 
 test('confirms completed drafts independently and preserves atomic batch undo', async ({ page }) => {

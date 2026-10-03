@@ -67,6 +67,8 @@ COMMAND_OUTPUT_SCHEMA = {
                         "enum": sorted(ALLOWED_EVENT_TYPES),
                     },
                     "playerId": {"type": ["string", "null"]},
+                    "playerInId": {"type": "string"},
+                    "playerOutId": {"type": "string"},
                     "shotValue": {"type": "integer", "enum": [1, 2, 3]},
                     "made": {"type": "boolean"},
                     "reboundKind": {
@@ -225,6 +227,21 @@ class LlamaCppCommandInterpreter:
             raise InvalidInterpretation("Transcript must be a non-empty string.")
         if cancellation:
             cancellation.raise_if_cancelled()
+        substitution = _interpret_explicit_substitution(
+            transcript.strip(),
+            context,
+            self.model_name,
+        )
+        if substitution:
+            if "substitution" not in context["allowedEventTypes"]:
+                raise InvalidInterpretation(
+                    "Substitution events are not allowed by this request."
+                )
+            return substitution
+        if _mentions_substitution(transcript):
+            raise InvalidInterpretation(
+                "Use a substitution-only phrase such as 'number 7 subs for 13'."
+            )
         model = self._load_model()
         options = dict(
             messages=[
@@ -344,6 +361,9 @@ class LlamaCppCommandInterpreter:
             "For 'A assist and B makes two', emit B's shot and A's assist. "
             "A timeout is team-level: use playerId null and side 'team' or "
             "'opponent' exactly as spoken. "
+            "A substitution is a team event with playerId null, playerInId for "
+            "the entering bench player, and playerOutId for the outgoing "
+            "on-court player. Never combine a substitution with another event. "
             "Opponent statistics are team-level: always use side 'opponent' and "
             "playerId null. Never assign a team roster player to an opponent "
             "event. Team statistics require a resolved supplied roster ID. "
@@ -424,6 +444,38 @@ class LlamaCppCommandInterpreter:
                     },
                 }
             )
+        active_ids = set(context["currentLineupIds"])
+        outgoing = next(
+            (player for player in roster if player["id"] in active_ids),
+            None,
+        )
+        incoming = next(
+            (player for player in roster if player["id"] not in active_ids),
+            None,
+        )
+        if outgoing and incoming:
+            examples.append(
+                {
+                    "transcript": (
+                        f"Number {incoming['jersey']} subs for "
+                        f"{outgoing['jersey']}"
+                    ),
+                    "result": {
+                        "events": [
+                            {
+                                "side": "team",
+                                "type": "substitution",
+                                "playerId": None,
+                                "playerInId": incoming["id"],
+                                "playerOutId": outgoing["id"],
+                                "confidence": 0.99,
+                            }
+                        ],
+                        "overallConfidence": 0.99,
+                        "warnings": [],
+                    },
+                }
+            )
         examples.append(
             {
                 "transcript": "Opponent defensive rebound",
@@ -450,6 +502,23 @@ class LlamaCppCommandInterpreter:
                         {
                             "side": "opponent",
                             "type": "timeout",
+                            "playerId": None,
+                            "confidence": 0.99,
+                        }
+                    ],
+                    "overallConfidence": 0.99,
+                    "warnings": [],
+                },
+            }
+        )
+        examples.append(
+            {
+                "transcript": "Opponent foul",
+                "result": {
+                    "events": [
+                        {
+                            "side": "opponent",
+                            "type": "foul",
                             "playerId": None,
                             "confidence": 0.99,
                         }
@@ -554,7 +623,14 @@ def _validate_event(
     if not isinstance(event, dict):
         raise InvalidInterpretation(f"events[{index}] must be an object.")
     common = {"side", "type", "playerId", "confidence"}
-    optional = {"shotValue", "made", "reboundKind", "shotDetails"}
+    optional = {
+        "shotValue",
+        "made",
+        "reboundKind",
+        "shotDetails",
+        "playerInId",
+        "playerOutId",
+    }
     unexpected = sorted(set(event) - common - optional)
     missing = sorted(common - set(event))
     if unexpected or missing:
@@ -576,13 +652,17 @@ def _validate_event(
         raise InvalidInterpretation(
             f"events[{index}] opponent statistics must use playerId null."
         )
-    if event["side"] == "team" and player_id is None and event_type != "timeout":
+    if (
+        event["side"] == "team"
+        and player_id is None
+        and event_type not in {"timeout", "substitution"}
+    ):
         raise InvalidInterpretation(
             f"events[{index}] team statistics require a supplied roster player."
         )
-    if event_type == "timeout" and player_id is not None:
+    if event_type in {"timeout", "substitution"} and player_id is not None:
         raise InvalidInterpretation(
-            f"events[{index}] timeout must use playerId null."
+            f"events[{index}] {event_type} must use playerId null."
         )
     if not _is_confidence(event["confidence"]):
         raise InvalidInterpretation(
@@ -602,6 +682,7 @@ def _validate_event(
             raise InvalidInterpretation(
                 f"events[{index}].reboundKind is invalid for shots."
             )
+        _reject_fields(event, index, {"playerInId", "playerOutId"})
         shot_details = event.get("shotDetails")
         if shot_details is not None:
             if event["shotValue"] == 1:
@@ -616,12 +697,43 @@ def _validate_event(
             raise InvalidInterpretation(
                 f"events[{index}].reboundKind is required for rebounds."
             )
-        _reject_fields(event, index, {"shotValue", "made", "shotDetails"})
-    else:
+        _reject_fields(
+            event,
+            index,
+            {"shotValue", "made", "shotDetails", "playerInId", "playerOutId"},
+        )
+    elif event_type == "substitution":
+        if event["side"] != "team":
+            raise InvalidInterpretation(
+                f"events[{index}] substitution must use side team."
+            )
+        player_in_id = event.get("playerInId")
+        player_out_id = event.get("playerOutId")
+        if (
+            player_in_id not in roster_ids
+            or player_out_id not in roster_ids
+            or player_in_id == player_out_id
+        ):
+            raise InvalidInterpretation(
+                f"events[{index}] substitution players are invalid."
+            )
         _reject_fields(
             event,
             index,
             {"shotValue", "made", "reboundKind", "shotDetails"},
+        )
+    else:
+        _reject_fields(
+            event,
+            index,
+            {
+                "shotValue",
+                "made",
+                "reboundKind",
+                "shotDetails",
+                "playerInId",
+                "playerOutId",
+            },
         )
     return event
 
@@ -693,11 +805,15 @@ def _jersey_number_words(value: int) -> str | None:
     )
 
 
-def _subject_variants(context: dict) -> dict[str, str]:
+def _subject_variants(
+    context: dict,
+    *,
+    active_only: bool = True,
+) -> dict[str, str]:
     active_ids = set(context["currentLineupIds"])
     variants: dict[str, set[str]] = {}
     for player in context["roster"]:
-        if player["id"] not in active_ids:
+        if active_only and player["id"] not in active_ids:
             continue
         jersey = str(player["jersey"]).strip().lower()
         if not jersey:
@@ -712,6 +828,79 @@ def _subject_variants(context: dict) -> dict[str, str]:
         for variant, player_ids in variants.items()
         if len(player_ids) == 1
     }
+
+
+def _mentions_substitution(transcript: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:sub|subs|substitute|substitutes|substitution|in\s+for)\b",
+            transcript,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _interpret_explicit_substitution(
+    transcript: str,
+    context: dict,
+    model_name: str,
+) -> InterpretationResult | None:
+    resolved = _subject_variants(context, active_only=False)
+    if not resolved:
+        return None
+    player_pattern = "|".join(
+        re.escape(variant)
+        for variant in sorted(resolved, key=len, reverse=True)
+    )
+    subject = rf"(?:(?:number|player)\s+)?(?P<{{name}}>{player_pattern})"
+    normalized = " ".join(
+        re.sub(r"[,.!?]+", " ", transcript.lower()).split()
+    )
+    patterns = [
+        re.compile(
+            rf"^{subject.format(name='incoming')}\s+"
+            r"(?:subs?|substitutes?|checks?\s+in|in)\s+for\s+"
+            rf"{subject.format(name='outgoing')}$"
+        ),
+        re.compile(
+            r"^(?:sub|substitute)\s+"
+            rf"{subject.format(name='outgoing')}\s+out\s+for\s+"
+            rf"{subject.format(name='incoming')}$"
+        ),
+    ]
+    match = next((pattern.fullmatch(normalized) for pattern in patterns), None)
+    if not match:
+        return None
+    incoming_id = resolved[match.group("incoming")]
+    outgoing_id = resolved[match.group("outgoing")]
+    active_ids = set(context["currentLineupIds"])
+    if outgoing_id not in active_ids:
+        raise InvalidInterpretation(
+            "The outgoing substitution player is not on court."
+        )
+    if incoming_id in active_ids:
+        raise InvalidInterpretation(
+            "The incoming substitution player is already on court."
+        )
+    if incoming_id == outgoing_id:
+        raise InvalidInterpretation(
+            "The incoming and outgoing substitution players must differ."
+        )
+    return InterpretationResult(
+        events=[
+            {
+                "side": "team",
+                "type": "substitution",
+                "playerId": None,
+                "playerInId": incoming_id,
+                "playerOutId": outgoing_id,
+                "confidence": 0.99,
+            }
+        ],
+        overall_confidence=0.99,
+        warnings=[],
+        model=model_name,
+    )
 
 
 def _event_type_for_action(action: str) -> str:
@@ -809,6 +998,7 @@ def _spoken_event_types(transcript: str) -> set[str]:
         "turnover": ("turnover", "turned it over"),
         "foul": ("foul",),
         "timeout": ("timeout",),
+        "substitution": (" sub ", " subs ", "substitute", " in for "),
         "shot": (
             " makes ",
             " made ",
@@ -849,6 +1039,39 @@ def _ground_model_payload(transcript: str, payload: object, context: dict):
         )
 
     facts = _explicit_event_facts(transcript, context)
+    recoverable_types = {
+        "steal",
+        "block",
+        "turnover",
+        "foul",
+        "timeout",
+    }
+    recoverable_in_order = dict.fromkeys(
+        fact["type"]
+        for fact in facts
+        if fact["type"] in recoverable_types
+    )
+    for event_type in recoverable_in_order:
+        type_facts = [fact for fact in facts if fact["type"] == event_type]
+        type_events = [
+            event
+            for event in grounded["events"]
+            if isinstance(event, dict) and event.get("type") == event_type
+        ]
+        if not type_facts or type_events:
+            continue
+        for fact in type_facts:
+            grounded["events"].append({
+                "side": fact["side"],
+                "type": event_type,
+                "playerId": fact["playerId"],
+                "confidence": 0.99,
+            })
+        warnings.append(
+            f"Recovered {len(type_facts)} explicitly spoken {event_type} "
+            f"event{'s' if len(type_facts) != 1 else ''} omitted by the "
+            "command model."
+        )
     jerseys_by_id = {
         player["id"]: str(player["jersey"])
         for player in context["roster"]
