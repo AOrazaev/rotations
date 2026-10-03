@@ -41,6 +41,7 @@ ALLOWED_EVENT_TYPES = {
 @dataclass(frozen=True)
 class ServiceSettings:
     token: str
+    authentication_required: bool = True
     allowed_origins: frozenset[str] = field(
         default_factory=lambda: frozenset(DEFAULT_ALLOWED_ORIGINS)
     )
@@ -52,7 +53,7 @@ class ServiceSettings:
     profile: str = "spike"
 
     def __post_init__(self):
-        if not self.token:
+        if self.authentication_required and not self.token:
             raise ValueError("A non-empty pairing token is required.")
         if self.max_audio_bytes <= 0:
             raise ValueError("max_audio_bytes must be positive.")

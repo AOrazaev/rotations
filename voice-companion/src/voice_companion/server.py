@@ -168,7 +168,9 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     "hardware": self.server.hardware,
                     "security": {
                         "loopbackOnly": True,
-                        "tokenRequired": True,
+                        "tokenRequired": (
+                            self.server.settings.authentication_required
+                        ),
                         "originValidation": True,
                     },
                 },
@@ -744,6 +746,8 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         if not self._origin_allowed(origin):
             self._send_error(HTTPStatus.FORBIDDEN, "origin_not_allowed", "Origin is not allowed.")
             return False
+        if not self.server.settings.authentication_required:
+            return True
         supplied = self.headers.get("X-Bask-Voice-Token", "")
         if not secrets.compare_digest(supplied, self.server.settings.token):
             self._send_error(
@@ -973,6 +977,7 @@ def build_server(
     port: int,
     token: str,
     allowed_origins: set[str],
+    authentication_required: bool = True,
     transcriber: Transcriber | None = None,
     interpreter: CommandInterpreter | None = None,
     max_concurrent_requests: int = 1,
@@ -982,6 +987,7 @@ def build_server(
     web_root = Path(__file__).resolve().parents[2] / "web"
     settings = ServiceSettings(
         token=token,
+        authentication_required=authentication_required,
         allowed_origins=frozenset(allowed_origins),
         max_concurrent_requests=max_concurrent_requests,
         max_processing_seconds=max_processing_seconds,
@@ -1005,6 +1011,11 @@ def main():
     parser.add_argument(
         "--token",
         default=os.environ.get("BASK_VOICE_TOKEN") or secrets.token_urlsafe(24),
+    )
+    parser.add_argument(
+        "--disable-authentication",
+        action="store_true",
+        help="Allow requests without a token. Loopback and origin checks remain enabled.",
     )
     parser.add_argument(
         "--allowed-origins",
@@ -1099,6 +1110,7 @@ def main():
         host=args.host,
         port=args.port,
         token=args.token,
+        authentication_required=not args.disable_authentication,
         allowed_origins=parse_origins(args.allowed_origins),
         max_concurrent_requests=args.max_concurrent_requests,
         max_processing_seconds=args.processing_timeout_seconds,
@@ -1107,7 +1119,10 @@ def main():
         interpreter=interpreter,
     )
     print(f"Voice companion workbench: http://127.0.0.1:{args.port}/")
-    print(f"Pairing token: {args.token}")
+    if args.disable_authentication:
+        print("Authentication: disabled (loopback and origin validation remain enabled)")
+    else:
+        print(f"Pairing token: {args.token}")
     print(
         "Transcription: "
         + VoiceCompanionHandler._service_status(

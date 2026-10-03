@@ -146,6 +146,47 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertEqual(json.loads(payload)["error"]["code"], "unauthorized")
 
+    def test_tokenless_mode_keeps_origin_validation(self):
+        server = build_server(
+            host="127.0.0.1",
+            port=0,
+            token="",
+            authentication_required=False,
+            allowed_origins={"https://aorazaev.github.io"},
+            transcriber=FixtureTranscriber(),
+        )
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        port = server.server_address[1]
+        try:
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+            connection.request(
+                "GET",
+                "/v1/capabilities",
+                headers={"Origin": "https://aorazaev.github.io"},
+            )
+            response = connection.getresponse()
+            payload = json.loads(response.read())
+            connection.close()
+            self.assertEqual(response.status, 200)
+            self.assertFalse(payload["security"]["tokenRequired"])
+
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+            connection.request(
+                "GET",
+                "/v1/health",
+                headers={"Origin": "https://attacker.example"},
+            )
+            response = connection.getresponse()
+            payload = json.loads(response.read())
+            connection.close()
+            self.assertEqual(response.status, 403)
+            self.assertEqual(payload["error"]["code"], "origin_not_allowed")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
     def test_health_reports_capabilities(self):
         status, _, payload = self.request(
             "GET",

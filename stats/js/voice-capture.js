@@ -322,9 +322,16 @@ export function createVoiceCaptureController({
       client = nextClient;
       connected = true;
       localStorageObject.setItem(URL_STORAGE_KEY, client.baseUrl || endpointInput.value);
-      sessionStorageObject.setItem(TOKEN_STORAGE_KEY, tokenInput.value);
+      if (tokenInput.value) {
+        sessionStorageObject.setItem(TOKEN_STORAGE_KEY, tokenInput.value);
+      } else {
+        sessionStorageObject.removeItem(TOKEN_STORAGE_KEY);
+      }
+      const securityLabel = capabilities.security?.tokenRequired === false
+        ? 'tokenless local mode'
+        : 'authenticated';
       setConnectionStatus(
-        `Connected · ${capabilities.transcriptionModel || 'transcription'} + ${capabilities.commandModel || 'command model'} · ${health.status}`,
+        `Connected · ${securityLabel} · ${capabilities.transcriptionModel || 'transcription'} + ${capabilities.commandModel || 'command model'} · ${health.status}`,
         'ready'
       );
       setRecordingStatus(

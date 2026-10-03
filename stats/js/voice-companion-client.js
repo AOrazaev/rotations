@@ -49,11 +49,6 @@ export class VoiceCompanionClient {
     this.baseUrl = normalizeLoopbackUrl(baseUrl);
     this.token = String(token || '');
     this.fetch = fetchFn;
-    if (!this.token) {
-      throw new VoiceCompanionClientError('Enter the companion token.', {
-        code: 'missing_token'
-      });
-    }
     if (typeof this.fetch !== 'function') {
       throw new VoiceCompanionClientError('Fetch is unavailable in this browser.', {
         code: 'fetch_unavailable'
@@ -67,7 +62,7 @@ export class VoiceCompanionClient {
       response = await this.fetch(`${this.baseUrl}${path}`, {
         ...options,
         headers: {
-          'X-Bask-Voice-Token': this.token,
+          ...(this.token ? { 'X-Bask-Voice-Token': this.token } : {}),
           ...(options.headers || {})
         }
       });

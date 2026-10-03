@@ -29,6 +29,16 @@ The service binds to loopback only. API requests require the pairing token in
 `X-Bask-Voice-Token`, and browser requests must come from the workbench,
 configured development origins, or the production GitHub Pages origin.
 
+For a simpler local-only setup, explicitly disable token authentication:
+
+```powershell
+.\voice-companion\scripts\run.ps1 -DisableAuthentication
+```
+
+Leave the token field empty when connecting. This mode still binds to loopback
+and validates browser origins, but any allowed page or local process can call
+the companion, so token authentication remains the default.
+
 ## API
 
 ```text
