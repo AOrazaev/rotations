@@ -27,6 +27,12 @@ export function createVoiceCaptureController({
   documentObject = document,
   videoController,
   getGame,
+  commitProposal = async () => {
+    throw new Error('Voice event confirmation is unavailable.');
+  },
+  undoProposal = async () => {
+    throw new Error('Voice batch undo is unavailable.');
+  },
   clientFactory,
   mediaDevices = navigator.mediaDevices,
   MediaRecorderClass = globalThis.MediaRecorder,
@@ -56,6 +62,8 @@ export function createVoiceCaptureController({
   const stopButton = documentObject.querySelector('#voiceStopRecording');
   const cancelButton = documentObject.querySelector('#voiceCancelProcessing');
   const retryButton = documentObject.querySelector('#voiceRetryProcessing');
+  const confirmButton = documentObject.querySelector('#voiceConfirmProposal');
+  const undoBatchButton = documentObject.querySelector('#voiceUndoBatch');
   const discardButton = documentObject.querySelector('#voiceDiscardProposal');
   const replaceTimestampButton = documentObject.querySelector('#voiceReplaceTimestamp');
   const recordingStatus = documentObject.querySelector('#voiceRecordingStatus');
@@ -83,6 +91,8 @@ export function createVoiceCaptureController({
   let response = null;
   let lastContext = null;
   let proposalEvents = [];
+  let proposalGameUpdatedAt = null;
+  let committedBatch = null;
   let destroyed = false;
   let discarding = false;
   let resumePlaybackAfterRecording = false;
@@ -145,6 +155,37 @@ export function createVoiceCaptureController({
           : 'Open a game with a ready video to record.'
       );
     }
+    if (state === 'committed' && committedBatch) {
+      const game = getGame();
+      const batchIds = new Set(committedBatch.eventIds);
+      const presentIds = game?.events
+          .filter(event => batchIds.has(event.id))
+          .map(event => event.id) || [];
+      if (!presentIds.length) {
+          clearCaptureState();
+          setRecordingStatus('Voice batch undone. No events from it remain in the game.', 'ready');
+      } else if (presentIds.length !== committedBatch.eventIds.length) {
+          committedBatch.undoAvailable = false;
+          setRecordingStatus(
+            'Part of the voice batch changed outside the proposal workflow. Review the timeline before continuing.',
+            'error'
+          );
+      } else {
+          const ordered = [...game.events].sort((a, b) => a.sequence - b.sequence);
+          const latestIds = ordered
+            .slice(-committedBatch.eventIds.length)
+            .map(event => event.id);
+          committedBatch.undoAvailable = latestIds.every(
+            (eventId, index) => eventId === committedBatch.eventIds[index]
+          );
+          if (!committedBatch.undoAvailable) {
+            setRecordingStatus(
+              'Another event was added after this voice batch, so batch undo is no longer available.',
+              'error'
+            );
+          }
+      }
+    }
     const ready = connected && hasGameAndVideo();
     startButton.disabled = !ready || !['idle', 'error'].includes(state);
     stopButton.disabled = state !== 'recording';
@@ -153,15 +194,28 @@ export function createVoiceCaptureController({
       || state === 'recording'
       || state === 'processing'
       || state === 'cancelling'
-      || state === 'warming';
+      || state === 'warming'
+      || state === 'committing'
+      || state === 'committed'
+      || state === 'undoing';
+    confirmButton.disabled = state !== 'proposal' || !proposalEvents.length;
+    undoBatchButton.disabled = state !== 'committed'
+      || !committedBatch
+      || committedBatch.undoAvailable === false;
     discardButton.disabled = state === 'processing'
       || state === 'cancelling'
       || state === 'warming'
+      || state === 'committing'
+      || state === 'undoing'
       || (!audio && !response && state === 'idle');
+    discardButton.textContent = state === 'committed' ? 'Done' : 'Discard';
     replaceTimestampButton.disabled = capturedSeconds === null
       || !videoController.isReady()
       || state === 'recording'
-      || state === 'processing';
+      || state === 'processing'
+      || state === 'committing'
+      || state === 'committed'
+      || state === 'undoing';
     warmupButton.disabled = !connected
       || !['idle', 'error', 'proposal'].includes(state);
     connectButton.disabled = state === 'recording'
@@ -335,6 +389,8 @@ export function createVoiceCaptureController({
     response = null;
     lastContext = null;
     proposalEvents = [];
+    proposalGameUpdatedAt = null;
+    committedBatch = null;
     transcript.value = '';
     expectedTranscript.value = '';
     warnings.replaceChildren();
@@ -362,9 +418,12 @@ export function createVoiceCaptureController({
 
   function discard() {
     if (state === 'processing' || state === 'cancelling') return;
+    const saved = state === 'committed';
     clearCaptureState();
     setRecordingStatus(
-      connected
+      saved
+        ? 'Voice events saved. Ready for another recording.'
+        : connected
         ? 'Ready to record when a game and video are available.'
         : 'Connect the companion to enable recording.'
     );
@@ -415,6 +474,7 @@ export function createVoiceCaptureController({
       sideLabel.textContent = 'Side';
       const sideSelect = documentObject.createElement('select');
       sideSelect.dataset.voiceField = 'side';
+      sideSelect.disabled = Boolean(committedBatch);
       sideSelect.append(
         option('team', 'Our team', event.side === 'team'),
         option('opponent', 'Opponent', event.side === 'opponent')
@@ -426,7 +486,7 @@ export function createVoiceCaptureController({
       playerLabel.textContent = 'Player';
       const playerSelect = documentObject.createElement('select');
       playerSelect.dataset.voiceField = 'playerId';
-      playerSelect.disabled = event.side === 'opponent';
+      playerSelect.disabled = event.side === 'opponent' || Boolean(committedBatch);
       playerSelect.append(option('', 'Select player', !event.playerId));
       for (const player of game.players) {
         const label = player.number ? `#${player.number} ${player.name}` : player.name;
@@ -439,6 +499,7 @@ export function createVoiceCaptureController({
       typeLabel.textContent = 'Event';
       const typeSelect = documentObject.createElement('select');
       typeSelect.dataset.voiceField = 'type';
+      typeSelect.disabled = Boolean(committedBatch);
       for (const type of editableEventTypes()) {
         typeSelect.append(option(type, type.replace('_', ' '), event.type === type));
       }
@@ -450,6 +511,7 @@ export function createVoiceCaptureController({
         valueLabel.textContent = 'Shot value';
         const valueSelect = documentObject.createElement('select');
         valueSelect.dataset.voiceField = 'shotValue';
+        valueSelect.disabled = Boolean(committedBatch);
         [1, 2, 3].forEach(value => valueSelect.append(
           option(String(value), `${value} point`, event.shotValue === value)
         ));
@@ -460,6 +522,7 @@ export function createVoiceCaptureController({
         resultLabel.textContent = 'Result';
         const resultSelect = documentObject.createElement('select');
         resultSelect.dataset.voiceField = 'made';
+        resultSelect.disabled = Boolean(committedBatch);
         resultSelect.append(
           option('true', 'Made', event.made === true),
           option('false', 'Missed', event.made === false)
@@ -473,6 +536,7 @@ export function createVoiceCaptureController({
         reboundLabel.textContent = 'Rebound';
         const reboundSelect = documentObject.createElement('select');
         reboundSelect.dataset.voiceField = 'reboundKind';
+        reboundSelect.disabled = Boolean(committedBatch);
         reboundSelect.append(
           option('offensive', 'Offensive', event.reboundKind === 'offensive'),
           option('defensive', 'Defensive', event.reboundKind === 'defensive')
@@ -486,6 +550,7 @@ export function createVoiceCaptureController({
       removeButton.className = 'danger small voice-remove-event';
       removeButton.dataset.voiceAction = 'remove';
       removeButton.textContent = 'Remove event';
+      removeButton.disabled = Boolean(committedBatch);
       grid.append(removeButton);
       card.append(grid);
       proposal.append(card);
@@ -493,6 +558,7 @@ export function createVoiceCaptureController({
   }
 
   function updateProposalEvent(target) {
+    if (committedBatch) return;
     const card = target.closest('[data-proposal-index]');
     if (!card) return;
     const index = Number(card.dataset.proposalIndex);
@@ -604,6 +670,7 @@ export function createVoiceCaptureController({
     }
     const requestId = crypto.randomUUID();
     const requestGameId = game.id;
+    const requestGameUpdatedAt = game.updatedAt;
     const currentOperation = ++operationVersion;
     activeRequestId = requestId;
     state = 'processing';
@@ -620,12 +687,16 @@ export function createVoiceCaptureController({
       lastContext = structuredClone(context);
       const payload = await client.voiceCommand({ audio, context });
       if (currentOperation !== operationVersion || destroyed) return;
-      if (getGame()?.id !== requestGameId) {
-        observedGameId = getGame()?.id || null;
+      const activeGame = getGame();
+      if (activeGame?.id !== requestGameId
+        || activeGame?.updatedAt !== requestGameUpdatedAt) {
+        observedGameId = activeGame?.id || null;
         clearCaptureState();
         setRecordingStatus(
-          observedGameId
-            ? 'Game changed while processing. Record a new proposal for the active game.'
+          observedGameId === requestGameId
+            ? 'Game events changed while processing. Retry the recording for the current game state.'
+            : observedGameId
+              ? 'Game changed while processing. Record a new proposal for the active game.'
             : 'The active game is no longer available.',
           'error'
         );
@@ -633,11 +704,12 @@ export function createVoiceCaptureController({
       }
       response = validateVoiceCommandResponse(payload, { requestId, game });
       proposalEvents = structuredClone(response.events);
+      proposalGameUpdatedAt = requestGameUpdatedAt;
       transcript.value = response.transcript;
       expectedTranscript.value = response.transcript;
       renderWarnings();
-      renderProposal();
       state = 'proposal';
+      renderProposal();
       setRecordingStatus(
         `${proposalEvents.length} proposed event${proposalEvents.length === 1 ? '' : 's'} at ${formatVideoTime(capturedSeconds)}. Review only; nothing has been saved.`,
         'ready'
@@ -762,6 +834,59 @@ export function createVoiceCaptureController({
     setRecordingStatus(
       `Proposal timestamp replaced with ${formatVideoTime(capturedSeconds)}. Nothing has been saved.`
     );
+  }
+
+  async function confirmProposalEvents() {
+    if (state !== 'proposal' || !proposalEvents.length || capturedSeconds === null) return;
+    const game = getGame();
+    if (!game || !proposalGameUpdatedAt) {
+      setRecordingStatus('The active game is no longer available.', 'error');
+      return;
+    }
+    state = 'committing';
+    setRecordingStatus('Adding the voice events as one game update...', 'loading');
+    refresh();
+    try {
+      committedBatch = await commitProposal({
+        expectedGameId: game.id,
+        expectedGameUpdatedAt: proposalGameUpdatedAt,
+        capturedSeconds,
+        events: structuredClone(proposalEvents)
+      });
+      committedBatch.undoAvailable = true;
+      proposalGameUpdatedAt = committedBatch.gameUpdatedAt;
+      state = 'committed';
+      renderProposal();
+      setRecordingStatus(
+        `${committedBatch.eventIds.length} voice event${committedBatch.eventIds.length === 1 ? '' : 's'} added at ${formatVideoTime(capturedSeconds)}. Undo removes the full batch.`,
+        'ready'
+      );
+    } catch (error) {
+      state = error.code === 'voice_game_changed' ? 'error' : 'proposal';
+      setRecordingStatus(error.message || 'Could not add the voice events.', 'error');
+    } finally {
+      refresh();
+    }
+  }
+
+  async function undoCommittedBatch() {
+    if (state !== 'committed' || !committedBatch || committedBatch.undoAvailable === false) return;
+    state = 'undoing';
+    setRecordingStatus('Undoing the complete voice batch...', 'loading');
+    refresh();
+    try {
+      await undoProposal({
+        expectedGameId: committedBatch.gameId,
+        eventIds: [...committedBatch.eventIds]
+      });
+      clearCaptureState();
+      setRecordingStatus('Voice batch undone. No events from it remain in the game.', 'ready');
+    } catch (error) {
+      state = 'committed';
+      setRecordingStatus(error.message || 'Could not undo the voice batch.', 'error');
+    } finally {
+      refresh();
+    }
   }
 
   function evaluationOutcome() {
@@ -897,6 +1022,8 @@ export function createVoiceCaptureController({
   stopButton.addEventListener('click', stopRecording);
   cancelButton.addEventListener('click', cancelProcessing);
   retryButton.addEventListener('click', processAudio);
+  confirmButton.addEventListener('click', confirmProposalEvents);
+  undoBatchButton.addEventListener('click', undoCommittedBatch);
   discardButton.addEventListener('click', discard);
   replaceTimestampButton.addEventListener('click', replaceTimestamp);
   saveEvaluationButton.addEventListener('click', saveEvaluationSample);
@@ -965,7 +1092,8 @@ export function createVoiceCaptureController({
         connected,
         capturedSeconds,
         transcript: transcript.value,
-        events: structuredClone(proposalEvents)
+        events: structuredClone(proposalEvents),
+        committedBatch: committedBatch ? structuredClone(committedBatch) : null
       };
     },
     destroy() {

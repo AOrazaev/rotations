@@ -120,6 +120,7 @@ export function createEventListController({
   let busy = false;
   let earliestFirst = initialEarliestFirst;
   let activeEventId = null;
+  let highlightedEventIds = new Set();
   let lastPlaybackSeconds = 0;
   let playbackFollowing = true;
   let suppressManualScrollUntil = 0;
@@ -628,6 +629,7 @@ export function createEventListController({
     for (const event of events) {
       const item = eventTemplate.content.firstElementChild.cloneNode(true);
       item.dataset.eventId = event.id;
+      item.classList.toggle('voice-added-event', highlightedEventIds.has(event.id));
       item.querySelector('.event-time').textContent = formatVideoTime(event.videoSeconds);
       const description = describeEvent(event, playersById, scoreByEventId.get(event.id));
       item.querySelector('.event-description').textContent = description;
@@ -982,6 +984,18 @@ export function createEventListController({
   return {
     render,
     getFilters: getFilterState,
+    highlightEvents(eventIds) {
+      highlightedEventIds = new Set(eventIds);
+      for (const item of eventList.querySelectorAll('[data-event-id]')) {
+        item.classList.toggle('voice-added-event', highlightedEventIds.has(item.dataset.eventId));
+      }
+    },
+    clearHighlightedEvents() {
+      highlightedEventIds.clear();
+      eventList.querySelectorAll('.voice-added-event').forEach(item => {
+        item.classList.remove('voice-added-event');
+      });
+    },
     destroy() {
       unsubscribeTime();
       shotDetailsEditor?.destroy();

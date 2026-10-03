@@ -806,7 +806,15 @@ Verification:
 
 ### Checkpoint 6: Atomic timeline integration
 
-**Status: in progress.**
+**Status: complete.** Edited proposals can now be confirmed through the normal
+tracker mutation boundary. The browser revalidates the game revision and active
+lineup, converts every proposal item into a normal event with consecutive
+sequence values, rebuilds lineup snapshots, and performs one IndexedDB save
+before updating controller state. Validation and storage failures leave both
+memory and storage unchanged. Newly added events are highlighted in the
+timeline, and both the voice card and normal latest-event control undo the
+complete batch while it remains the latest mutation. A game change during
+processing or before confirmation rejects the stale proposal explicitly.
 
 Deliver:
 

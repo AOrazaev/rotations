@@ -8,6 +8,10 @@ import {
 import { createShotDetailsEditor } from './shot-details-editor.js';
 import { getConfidentExpectedShotValue } from './shot-geometry.js';
 import { formatVideoTime } from './youtube-player.js';
+import {
+  appendVoiceEventBatch,
+  removeLatestVoiceEventBatch
+} from './voice-event-batch.js';
 
 export function createEventEntryController({
   documentObject = document,
@@ -69,6 +73,7 @@ export function createEventEntryController({
   let activeShotEventId = null;
   let shotLocationRevision = 0;
   let undoQueued = false;
+  let latestVoiceBatchEventIds = [];
   let eventEntryQueue = Promise.resolve();
   const reportController = createReportController({ documentObject, videoController });
   const shotDetailsEditor = createShotDetailsEditor({
@@ -199,10 +204,11 @@ export function createEventEntryController({
     setControlsEnabled(videoReady);
   }
 
-  async function persist(nextGame) {
+  async function persist(nextGame, { preserveVoiceBatch = false } = {}) {
     const rebuilt = rebuildLineupSnapshots(nextGame);
     await store.saveGame(rebuilt);
     game = rebuilt;
+    if (!preserveVoiceBatch) latestVoiceBatchEventIds = [];
     render();
     await onGameChanged(game);
   }
@@ -498,8 +504,19 @@ export function createEventEntryController({
     setError();
     try {
       const next = structuredClone(game);
-      const latestSequence = Math.max(...next.events.map(event => event.sequence));
-      next.events = next.events.filter(event => event.sequence !== latestSequence);
+      const orderedBySequence = [...next.events].sort((a, b) => a.sequence - b.sequence);
+      const latestIds = orderedBySequence
+        .slice(-latestVoiceBatchEventIds.length)
+        .map(event => event.id);
+      const undoVoiceBatch = latestVoiceBatchEventIds.length
+        && latestIds.every((eventId, index) => eventId === latestVoiceBatchEventIds[index]);
+      if (undoVoiceBatch) {
+        const batchIds = new Set(latestVoiceBatchEventIds);
+        next.events = next.events.filter(event => !batchIds.has(event.id));
+      } else {
+        const latestSequence = Math.max(...next.events.map(event => event.sequence));
+        next.events = next.events.filter(event => event.sequence !== latestSequence);
+      }
       next.updatedAt = now();
       await persist(next);
       if (activeShotEventId && !next.events.some(event => event.id === activeShotEventId)) hideShotLocation();
@@ -518,6 +535,75 @@ export function createEventEntryController({
       .finally(() => { undoQueued = false; });
   });
 
+  function enqueueExternalMutation(operation) {
+    const queued = eventEntryQueue.then(operation);
+    eventEntryQueue = queued.catch(() => {});
+    return queued;
+  }
+
+  async function commitVoiceProposal({
+    expectedGameId,
+    expectedGameUpdatedAt,
+    capturedSeconds,
+    events
+  }) {
+    return enqueueExternalMutation(async () => {
+      if (!game || busy) throw new Error('The game is busy. Try adding the voice events again.');
+      busy = true;
+      setError();
+      try {
+        const batch = appendVoiceEventBatch(game, {
+          expectedGameId,
+          expectedGameUpdatedAt,
+          capturedSeconds,
+          proposalEvents: events,
+          now
+        });
+        await persist(batch.game, { preserveVoiceBatch: true });
+        latestVoiceBatchEventIds = [...batch.eventIds];
+        hideShotLocation();
+        eventListController.highlightEvents(batch.eventIds);
+        return {
+          eventIds: [...batch.eventIds],
+          gameId: game.id,
+          gameUpdatedAt: game.updatedAt
+        };
+      } catch (error) {
+        setError(error.message || 'Could not add the voice events.');
+        throw error;
+      } finally {
+        busy = false;
+      }
+    });
+  }
+
+  async function undoVoiceBatch({ expectedGameId, eventIds }) {
+    return enqueueExternalMutation(async () => {
+      if (!game || busy) throw new Error('The game is busy. Try undoing the voice batch again.');
+      busy = true;
+      setError();
+      try {
+        const next = removeLatestVoiceEventBatch(game, {
+          expectedGameId,
+          eventIds,
+          now
+        });
+        await persist(next);
+        eventListController.clearHighlightedEvents();
+        hideShotLocation();
+        return {
+          gameId: game.id,
+          gameUpdatedAt: game.updatedAt
+        };
+      } catch (error) {
+        setError(error.message || 'Could not undo the voice batch.');
+        throw error;
+      } finally {
+        busy = false;
+      }
+    });
+  }
+
   render();
   const unsubscribeReady = videoController.subscribeReady(render);
 
@@ -526,11 +612,15 @@ export function createEventEntryController({
       game = structuredClone(nextGame);
       side = 'team';
       selectedPlayerId = null;
+      latestVoiceBatchEventIds = [];
       hideShotLocation();
+      eventListController.clearHighlightedEvents();
       sideButtons[0].click();
       render();
     },
     getGame: () => game ? structuredClone(game) : null,
+    commitVoiceProposal,
+    undoVoiceBatch,
     destroy() {
       unsubscribeReady();
       shotDetailsEditor.destroy();

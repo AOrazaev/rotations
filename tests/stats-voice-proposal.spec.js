@@ -334,6 +334,182 @@ test('records and edits a voice proposal without writing game events', async ({ 
   expect(sample.metadata.outcome).toBe('corrected');
 });
 
+test('confirms a multi-event proposal atomically and undoes the full batch', async ({ page }) => {
+  await openVoiceTracker(page);
+  await connectVoiceCompanion(page);
+
+  await page.locator('#currentLineup .player-select-button').first().click();
+  await page.locator('[data-event-type="assist"]').click();
+  await expect.poll(async () => (
+    await page.evaluate(() => window.__statsApp.eventController.getGame().events.length)
+  )).toBe(1);
+
+  await page.locator('#voiceStartRecording').click();
+  await page.locator('#voiceStopRecording').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await expect(page.locator('#voiceConfirmProposal')).toBeEnabled();
+
+  await page.locator('#voiceConfirmProposal').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    '2 voice events added'
+  );
+  await expect(page.locator('.event-list-item.voice-added-event')).toHaveCount(2);
+  await expect(page.locator('#teamScore')).toHaveText('2');
+  await expect(page.locator('#teamFieldGoals')).toHaveText('1/1');
+  await expect(page.locator('#voiceUndoBatch')).toBeEnabled();
+  await expect(
+    page.locator('.voice-proposal-event select').first()
+  ).toBeDisabled();
+
+  const committed = await page.evaluate(async () => ({
+    game: window.__statsApp.eventController.getGame(),
+    stored: (await window.__statsApp.store.listGames())[0]
+  }));
+  expect(committed.game.events).toHaveLength(3);
+  expect(committed.stored.events).toEqual(committed.game.events);
+  expect(committed.game.events.map(event => event.sequence)).toEqual([1, 2, 3]);
+  expect(committed.game.events.map(event => event.videoSeconds)).toEqual([
+    42.4,
+    42.4,
+    42.4
+  ]);
+  expect(committed.game.events.slice(1).map(event => event.type)).toEqual([
+    'assist',
+    'shot'
+  ]);
+  expect(committed.game.events.slice(1).every(
+    event => event.lineupIds.length === 5
+  )).toBe(true);
+
+  await page.locator('#voiceUndoBatch').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    'Voice batch undone'
+  );
+  await expect(page.locator('.event-list-item.voice-added-event')).toHaveCount(0);
+  await expect(page.locator('#teamScore')).toHaveText('0');
+
+  const undone = await page.evaluate(async () => ({
+    game: window.__statsApp.eventController.getGame(),
+    stored: (await window.__statsApp.store.listGames())[0]
+  }));
+  expect(undone.game.events).toHaveLength(1);
+  expect(undone.game.events[0].type).toBe('assist');
+  expect(undone.stored.events).toEqual(undone.game.events);
+});
+
+test('rejects stale proposals after the game changes', async ({ page }) => {
+  await openVoiceTracker(page);
+  await connectVoiceCompanion(page);
+
+  await page.locator('#voiceStartRecording').click();
+  await page.locator('#voiceStopRecording').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+
+  await page.locator('#currentLineup .player-select-button').first().click();
+  await page.locator('[data-event-type="assist"]').click();
+  await expect.poll(async () => (
+    await page.evaluate(() => window.__statsApp.eventController.getGame().events.length)
+  )).toBe(1);
+
+  await page.locator('#voiceConfirmProposal').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    'game changed after this proposal'
+  );
+  await expect(page.locator('#voiceRetryProcessing')).toBeEnabled();
+
+  const game = await page.evaluate(() => window.__statsApp.eventController.getGame());
+  expect(game.events).toHaveLength(1);
+  expect(game.events[0].type).toBe('assist');
+});
+
+test('the normal undo control also removes the latest voice batch together', async ({ page }) => {
+  await openVoiceTracker(page);
+  await connectVoiceCompanion(page);
+
+  await page.locator('#voiceStartRecording').click();
+  await page.locator('#voiceStopRecording').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await page.locator('#voiceConfirmProposal').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    '2 voice events added'
+  );
+
+  await page.locator('#undoEvent').click();
+  await expect.poll(async () => (
+    await page.evaluate(() => window.__statsApp.eventController.getGame().events.length)
+  )).toBe(0);
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    'Voice batch undone'
+  );
+  await expect(page.locator('#voiceUndoBatch')).toBeDisabled();
+  const stored = await page.evaluate(async () => (
+    await window.__statsApp.store.listGames()
+  )[0]);
+  expect(stored.events).toEqual([]);
+});
+
+test('keeps the full proposal out of memory and storage when saving fails', async ({ page }) => {
+  await openVoiceTracker(page);
+  await connectVoiceCompanion(page);
+
+  await page.locator('#voiceStartRecording').click();
+  await page.locator('#voiceStopRecording').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await page.evaluate(() => {
+    window.__originalVoiceSaveGame = window.__statsApp.store.saveGame;
+    window.__statsApp.store.saveGame = async () => {
+      throw new Error('Simulated voice storage failure.');
+    };
+  });
+
+  await page.locator('#voiceConfirmProposal').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    'Simulated voice storage failure'
+  );
+  await expect(page.locator('#voiceConfirmProposal')).toBeEnabled();
+
+  const failed = await page.evaluate(async () => ({
+    game: window.__statsApp.eventController.getGame(),
+    stored: await window.__statsApp.store.getGame(
+      window.__statsApp.eventController.getGame().id
+    )
+  }));
+  expect(failed.game.events).toEqual([]);
+  expect(failed.stored.events).toEqual([]);
+
+  await page.evaluate(() => {
+    window.__statsApp.store.saveGame = window.__originalVoiceSaveGame;
+  });
+  await page.locator('#voiceConfirmProposal').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    '2 voice events added'
+  );
+});
+
+test('rejects the whole batch when an edited proposal event is invalid', async ({ page }) => {
+  await openVoiceTracker(page);
+  await connectVoiceCompanion(page);
+
+  await page.locator('#voiceStartRecording').click();
+  await page.locator('#voiceStopRecording').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await page.locator('.voice-proposal-event').first()
+    .locator('[data-voice-field="playerId"]')
+    .selectOption('');
+
+  await page.locator('#voiceConfirmProposal').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText(
+    'player who is not on court'
+  );
+
+  const result = await page.evaluate(async () => ({
+    game: window.__statsApp.eventController.getGame(),
+    stored: (await window.__statsApp.store.listGames())[0]
+  }));
+  expect(result.game.events).toEqual([]);
+  expect(result.stored.events).toEqual([]);
+});
+
 test('prevents overlapping recordings and reports microphone permission failures', async ({ page }) => {
   await openVoiceTracker(page);
   await connectVoiceCompanion(page);

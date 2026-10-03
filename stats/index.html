@@ -152,7 +152,7 @@
             <div>
               <p class="eyebrow">Local companion</p>
               <h2>Voice proposal</h2>
-              <p>Record and edit a proposal. Checkpoint 5 never writes it to the game.</p>
+              <p>Record, review, and confirm one or more events as a single game update.</p>
             </div>
           </div>
           <details id="voiceConnectionSettings" class="voice-connection-settings">
@@ -194,6 +194,8 @@
           <ul id="voiceWarnings" class="voice-warnings hidden"></ul>
           <div id="voiceProposalEvents" class="voice-proposal-events"></div>
           <div class="voice-actions voice-proposal-actions">
+            <button id="voiceConfirmProposal" class="primary small" type="button" disabled>Add events</button>
+            <button id="voiceUndoBatch" class="secondary small" type="button" disabled>Undo voice batch</button>
             <button id="voiceRetryProcessing" class="secondary small" type="button" disabled>Retry processing</button>
             <button id="voiceSaveEvaluation" class="secondary small" type="button" disabled>Save evaluation sample</button>
             <button id="voiceDiscardProposal" class="danger small" type="button" disabled>Discard</button>

@@ -459,6 +459,7 @@ if (reviewMode) {
         setupController.syncGame(game);
         await setupController.refreshGames();
       }
+      voiceController?.refresh();
     }
   });
   const voiceClientFactory = window.__STATS_VOICE_CLIENT_FACTORY__
@@ -466,6 +467,8 @@ if (reviewMode) {
   voiceController = createVoiceCaptureController({
     videoController,
     getGame: () => eventController.getGame(),
+    commitProposal: proposal => eventController.commitVoiceProposal(proposal),
+    undoProposal: batch => eventController.undoVoiceBatch(batch),
     clientFactory: voiceClientFactory,
     mediaDevices: window.__STATS_MEDIA_DEVICES__ || navigator.mediaDevices,
     MediaRecorderClass: window.__STATS_MEDIA_RECORDER__ || window.MediaRecorder
