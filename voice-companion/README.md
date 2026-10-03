@@ -56,6 +56,12 @@ and outcome under:
 Use **Saved evaluation samples** in the tracker to review, export, or delete
 samples. Export produces one ZIP containing the audio and JSON metadata.
 
+Audio interfaces that expose a mono microphone as one side of a stereo stream
+are normalized automatically before transcription. The companion selects the
+dominant left or right channel when the other side is effectively silent;
+otherwise it performs a normal stereo-to-mono mix. The selected mode is reported
+as `processor.audioChannelMode`.
+
 ## API
 
 ```text

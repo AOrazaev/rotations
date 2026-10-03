@@ -778,7 +778,9 @@ after capture only when it was previously playing; the default keeps playback
 running for faster stat entry. Raw microphone capture is the default for audio
 interfaces and headphones so browser echo cancellation does not muffle speech
 against active video playback; processed speech remains available for laptop
-microphones and speakers.
+microphones and speakers. The companion also detects audio-interface recordings
+where the microphone occupies only one stereo channel, selects the active
+channel before transcription, and reports the channel mode in diagnostics.
 
 Deliver:
 

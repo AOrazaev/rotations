@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -24,11 +26,11 @@ class FakeSegment:
 
 class FakeModel:
     def __init__(self):
-        self.audio_path = None
+        self.audio = None
         self.options = None
 
-    def transcribe(self, audio_path, **options):
-        self.audio_path = Path(audio_path)
+    def transcribe(self, audio, **options):
+        self.audio = audio
         self.options = options
         return (
             iter([FakeSegment(" Seven assist"), FakeSegment(" thirteen makes two ")]),
@@ -45,11 +47,21 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
             calls.append((args, kwargs))
             return model
 
+        decoded_paths = []
+
+        def decoder(audio_path, **options):
+            decoded_paths.append(Path(audio_path))
+            return (
+                np.array([0.2, -0.2], dtype=np.float32),
+                np.array([0.001, -0.001], dtype=np.float32),
+            )
+
         with tempfile.TemporaryDirectory() as directory:
             transcriber = FasterWhisperTranscriber(
                 resolve_profile("lightweight"),
                 model_directory=Path(directory) / "models",
                 model_factory=factory,
+                audio_decoder=decoder,
             )
             self.assertEqual(transcriber.state, "not_loaded")
 
@@ -62,7 +74,12 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
             self.assertEqual(second.model, "tiny.en")
             self.assertEqual(first.audio_duration_seconds, 2.4)
             self.assertEqual(first.language_probability, 0.99)
-            self.assertFalse(model.audio_path.exists())
+            self.assertEqual(first.audio_channel_mode, "left")
+            self.assertTrue(np.array_equal(
+                model.audio,
+                np.array([0.2, -0.2], dtype=np.float32),
+            ))
+            self.assertTrue(all(not path.exists() for path in decoded_paths))
             self.assertEqual(model.options["language"], "en")
             self.assertTrue(model.options["vad_filter"])
             self.assertEqual(model.options["hotwords"], BASKETBALL_HOTWORDS)
@@ -76,6 +93,21 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
                 "Opponent misses two pointer",
                 model.options["initial_prompt"],
             )
+
+    def test_selects_right_channel_or_mixes_balanced_stereo(self):
+        selected, mode = FasterWhisperTranscriber._select_audio_channel(
+            np.array([0.001, -0.001]),
+            np.array([0.2, -0.2]),
+        )
+        self.assertEqual(mode, "right")
+        self.assertTrue(np.allclose(selected, np.array([0.2, -0.2])))
+
+        selected, mode = FasterWhisperTranscriber._select_audio_channel(
+            np.array([0.2, -0.2]),
+            np.array([0.1, -0.1]),
+        )
+        self.assertEqual(mode, "mixed")
+        self.assertTrue(np.allclose(selected, np.array([0.15, -0.15])))
 
     def test_reports_model_load_failure(self):
         def factory(*args, **kwargs):

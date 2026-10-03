@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
 
+import numpy as np
+
 from .profiles import TranscriptionProfile, default_model_directory
 
 
@@ -38,6 +40,7 @@ class TranscriptionResult:
     model: str
     audio_duration_seconds: float | None = None
     language_probability: float | None = None
+    audio_channel_mode: str | None = None
 
 
 class Transcriber(Protocol):
@@ -144,10 +147,12 @@ class FasterWhisperTranscriber:
         *,
         model_directory: Path | None = None,
         model_factory: Callable | None = None,
+        audio_decoder: Callable | None = None,
     ):
         self.profile = profile
         self.model_directory = model_directory or default_model_directory()
         self.model_factory = model_factory
+        self.audio_decoder = audio_decoder
         self._model = None
         self._state = "not_loaded"
         self._last_error: str | None = None
@@ -186,8 +191,15 @@ class FasterWhisperTranscriber:
                 temporary.write(audio)
                 temporary_path = Path(temporary.name)
 
-            segments, info = model.transcribe(
+            decoder = self.audio_decoder or self._import_audio_decoder()
+            left, right = decoder(
                 str(temporary_path),
+                sampling_rate=16000,
+                split_stereo=True,
+            )
+            audio_input, channel_mode = self._select_audio_channel(left, right)
+            segments, info = model.transcribe(
+                audio_input,
                 language="en",
                 beam_size=1,
                 best_of=1,
@@ -206,6 +218,7 @@ class FasterWhisperTranscriber:
                 model=self.profile.model,
                 audio_duration_seconds=getattr(info, "duration", None),
                 language_probability=getattr(info, "language_probability", None),
+                audio_channel_mode=channel_mode,
             )
         finally:
             if temporary_path is not None:
@@ -256,6 +269,24 @@ class FasterWhisperTranscriber:
         from faster_whisper import WhisperModel
 
         return WhisperModel
+
+    @staticmethod
+    def _import_audio_decoder():
+        from faster_whisper.audio import decode_audio
+
+        return decode_audio
+
+    @staticmethod
+    def _select_audio_channel(left, right):
+        left = np.asarray(left, dtype=np.float32)
+        right = np.asarray(right, dtype=np.float32)
+        left_rms = float(np.sqrt(np.mean(left ** 2))) if left.size else 0.0
+        right_rms = float(np.sqrt(np.mean(right ** 2))) if right.size else 0.0
+        dominant = max(left_rms, right_rms)
+        quieter = min(left_rms, right_rms)
+        if dominant >= 0.001 and quieter <= dominant * 0.1:
+            return (left, "left") if left_rms > right_rms else (right, "right")
+        return ((left + right) / 2, "mixed")
 
 
 def create_transcriber(
