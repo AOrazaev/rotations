@@ -2,6 +2,44 @@ const { test, expect } = require('@playwright/test');
 
 test.describe.configure({ mode: 'serial' });
 
+test('real companion client invokes browser fetch with the correct receiver', async ({ page }) => {
+  await page.goto('/stats/');
+  const result = await page.evaluate(async () => {
+    const { VoiceCompanionClient } = await import(
+      './js/voice-companion-client.js'
+    );
+    const calls = [];
+    const fetchFn = function (url) {
+      if (this !== window) throw new TypeError('Illegal invocation');
+      calls.push(url);
+      const body = url.endsWith('/v1/health')
+        ? { protocolVersion: 1, status: 'ready' }
+        : {
+            protocolVersion: 1,
+            eventInterpretation: true,
+            security: { tokenRequired: false }
+          };
+      return Promise.resolve(new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }));
+    };
+    const client = new VoiceCompanionClient({
+      baseUrl: 'http://127.0.0.1:8766',
+      token: '',
+      fetchFn
+    });
+    const response = await client.check();
+    return { calls, response };
+  });
+
+  expect(result.calls).toEqual([
+    'http://127.0.0.1:8766/v1/health',
+    'http://127.0.0.1:8766/v1/capabilities'
+  ]);
+  expect(result.response.capabilities.security.tokenRequired).toBe(false);
+});
+
 async function openVoiceTracker(page) {
   const databaseName = `basketball-stats-voice-${Date.now()}-${Math.random()}`;
   await page.addInitScript(name => {

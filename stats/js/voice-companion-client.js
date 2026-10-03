@@ -48,12 +48,12 @@ export class VoiceCompanionClient {
   }) {
     this.baseUrl = normalizeLoopbackUrl(baseUrl);
     this.token = String(token || '');
-    this.fetch = fetchFn;
-    if (typeof this.fetch !== 'function') {
+    if (typeof fetchFn !== 'function') {
       throw new VoiceCompanionClientError('Fetch is unavailable in this browser.', {
         code: 'fetch_unavailable'
       });
     }
+    this.fetch = fetchFn.bind(globalThis);
   }
 
   async request(path, options = {}) {
