@@ -9,6 +9,7 @@ const DEFAULT_URL = 'http://127.0.0.1:8766';
 const URL_STORAGE_KEY = 'basketball-stats-voice-url';
 const TOKEN_STORAGE_KEY = 'basketball-stats-voice-token';
 const MICROPHONE_STORAGE_KEY = 'basketball-stats-voice-microphone';
+const AUDIO_PROCESSING_STORAGE_KEY = 'basketball-stats-voice-audio-processing';
 const PAUSE_VIDEO_STORAGE_KEY = 'basketball-stats-voice-pause-video';
 
 export function createVoiceCaptureController({
@@ -27,6 +28,7 @@ export function createVoiceCaptureController({
   const warmupButton = documentObject.querySelector('#voiceWarmup');
   const connectionStatus = documentObject.querySelector('#voiceConnectionStatus');
   const microphoneSelect = documentObject.querySelector('#voiceMicrophone');
+  const audioProcessingSelect = documentObject.querySelector('#voiceAudioProcessing');
   const refreshMicrophonesButton = documentObject.querySelector('#voiceRefreshMicrophones');
   const pauseVideoInput = documentObject.querySelector('#voicePauseVideoDuringRecording');
   const startButton = documentObject.querySelector('#voiceStartRecording');
@@ -69,6 +71,9 @@ export function createVoiceCaptureController({
   endpointInput.value = localStorageObject.getItem(URL_STORAGE_KEY) || DEFAULT_URL;
   tokenInput.value = sessionStorageObject.getItem(TOKEN_STORAGE_KEY) || '';
   microphoneSelect.value = localStorageObject.getItem(MICROPHONE_STORAGE_KEY) || '';
+  audioProcessingSelect.value = localStorageObject.getItem(
+    AUDIO_PROCESSING_STORAGE_KEY
+  ) || 'raw';
   pauseVideoInput.checked = localStorageObject.getItem(PAUSE_VIDEO_STORAGE_KEY) === 'true';
 
   function setConnectionStatus(message, kind = '') {
@@ -525,15 +530,16 @@ export function createVoiceCaptureController({
     chunks = [];
     try {
       const selectedDeviceId = microphoneSelect.value;
+      const processedAudio = audioProcessingSelect.value === 'processed';
       stream = await mediaDevices.getUserMedia({
         audio: {
           ...(selectedDeviceId
             ? { deviceId: { exact: selectedDeviceId } }
             : {}),
           channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+          echoCancellation: processedAudio,
+          noiseSuppression: processedAudio,
+          autoGainControl: processedAudio
         }
       });
       await refreshMicrophones();
@@ -765,6 +771,12 @@ export function createVoiceCaptureController({
     } else {
       localStorageObject.removeItem(MICROPHONE_STORAGE_KEY);
     }
+  });
+  audioProcessingSelect.addEventListener('change', () => {
+    localStorageObject.setItem(
+      AUDIO_PROCESSING_STORAGE_KEY,
+      audioProcessingSelect.value
+    );
   });
   pauseVideoInput.addEventListener('change', () => {
     localStorageObject.setItem(

@@ -292,9 +292,9 @@ test('records and edits a voice proposal without writing game events', async ({ 
   expect((await page.evaluate(() => window.__voiceRequests[0].capturedSeconds))).toBe(42.4);
   expect(await page.evaluate(() => window.__lastAudioConstraints.audio)).toEqual({
     channelCount: 1,
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false
   });
   expect(await page.evaluate(() => window.__recorderOptions.audioBitsPerSecond)).toBe(
     128000
@@ -351,12 +351,19 @@ test('prevents overlapping recordings and reports microphone permission failures
 test('optionally pauses and resumes video around recording', async ({ page }) => {
   await openVoiceTracker(page);
   await connectVoiceCompanion(page);
+  await page.locator('#voiceAudioProcessing').selectOption('processed');
   await page.locator('#voicePauseVideoDuringRecording').check();
   await page.evaluate(() => { window.__statsFakePlayer.playing = true; });
 
   await page.locator('#voiceStartRecording').click();
   expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(false);
   expect(await page.evaluate(() => window.__statsFakePlayer.pauseCount)).toBe(1);
+  expect(await page.evaluate(() => window.__lastAudioConstraints.audio)).toEqual({
+    channelCount: 1,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true
+  });
 
   await page.locator('#voiceStopRecording').click();
   await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
@@ -365,6 +372,9 @@ test('optionally pauses and resumes video around recording', async ({ page }) =>
   expect(await page.evaluate(() => localStorage.getItem(
     'basketball-stats-voice-pause-video'
   ))).toBe('true');
+  expect(await page.evaluate(() => localStorage.getItem(
+    'basketball-stats-voice-audio-processing'
+  ))).toBe('processed');
 });
 
 test('cancels processing, keeps audio for retry, and disables discard while active', async ({ page }) => {

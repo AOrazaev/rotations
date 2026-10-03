@@ -775,7 +775,10 @@ higher-bitrate recording, and immediate playback so poor input can be rejected
 before it enters the evaluation corpus. An optional persisted recording mode
 pauses active video playback to prevent game-audio contamination and resumes it
 after capture only when it was previously playing; the default keeps playback
-running for faster stat entry.
+running for faster stat entry. Raw microphone capture is the default for audio
+interfaces and headphones so browser echo cancellation does not muffle speech
+against active video playback; processed speech remains available for laptop
+microphones and speakers.
 
 Deliver:
 
