@@ -57,7 +57,13 @@ class Transcriber(Protocol):
 
     def warmup(self) -> None: ...
 
-    def transcribe(self, audio: bytes, suffix: str) -> TranscriptionResult: ...
+    def transcribe(
+        self,
+        audio: bytes,
+        suffix: str,
+        *,
+        channel_preference: str = "auto",
+    ) -> TranscriptionResult: ...
 
 
 class ExternalCommandTranscriber:
@@ -96,7 +102,13 @@ class ExternalCommandTranscriber:
                 "External transcription is not configured."
             )
 
-    def transcribe(self, audio: bytes, suffix: str) -> TranscriptionResult:
+    def transcribe(
+        self,
+        audio: bytes,
+        suffix: str,
+        *,
+        channel_preference: str = "auto",
+    ) -> TranscriptionResult:
         if self.fixture_transcript:
             return TranscriptionResult(
                 text=self.fixture_transcript,
@@ -183,7 +195,13 @@ class FasterWhisperTranscriber:
     def warmup(self) -> None:
         self._load_model()
 
-    def transcribe(self, audio: bytes, suffix: str) -> TranscriptionResult:
+    def transcribe(
+        self,
+        audio: bytes,
+        suffix: str,
+        *,
+        channel_preference: str = "auto",
+    ) -> TranscriptionResult:
         model = self._load_model()
         temporary_path: Path | None = None
         try:
@@ -197,7 +215,11 @@ class FasterWhisperTranscriber:
                 sampling_rate=16000,
                 split_stereo=True,
             )
-            audio_input, channel_mode = self._select_audio_channel(left, right)
+            audio_input, channel_mode = self._select_audio_channel(
+                left,
+                right,
+                channel_preference,
+            )
             segments, info = model.transcribe(
                 audio_input,
                 language="en",
@@ -277,11 +299,19 @@ class FasterWhisperTranscriber:
         return decode_audio
 
     @staticmethod
-    def _select_audio_channel(left, right):
+    def _select_audio_channel(left, right, preference="auto"):
         left = np.asarray(left, dtype=np.float32)
         right = np.asarray(right, dtype=np.float32)
         left_rms = float(np.sqrt(np.mean(left ** 2))) if left.size else 0.0
         right_rms = float(np.sqrt(np.mean(right ** 2))) if right.size else 0.0
+        if preference == "left":
+            return left, "left"
+        if preference == "right":
+            return right, "right"
+        if preference == "mix":
+            return (left + right) / 2, "mixed"
+        if preference != "auto":
+            raise ValueError(f"Unsupported audio channel preference: {preference}")
         dominant = max(left_rms, right_rms)
         quieter = min(left_rms, right_rms)
         if dominant >= 0.001 and quieter <= dominant * 0.1:

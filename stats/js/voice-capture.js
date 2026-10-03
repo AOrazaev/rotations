@@ -10,6 +10,7 @@ const URL_STORAGE_KEY = 'basketball-stats-voice-url';
 const TOKEN_STORAGE_KEY = 'basketball-stats-voice-token';
 const MICROPHONE_STORAGE_KEY = 'basketball-stats-voice-microphone';
 const AUDIO_PROCESSING_STORAGE_KEY = 'basketball-stats-voice-audio-processing';
+const CHANNEL_PREFERENCE_STORAGE_KEY = 'basketball-stats-voice-channel-preference';
 const PAUSE_VIDEO_STORAGE_KEY = 'basketball-stats-voice-pause-video';
 
 export function classifyChannelActivity(leftRms, rightRms) {
@@ -44,6 +45,7 @@ export function createVoiceCaptureController({
   const closeAudioSettingsButton = documentObject.querySelector('#voiceCloseAudioSettings');
   const microphoneSelect = documentObject.querySelector('#voiceMicrophone');
   const audioProcessingSelect = documentObject.querySelector('#voiceAudioProcessing');
+  const channelPreferenceSelect = documentObject.querySelector('#voiceChannelPreference');
   const refreshMicrophonesButton = documentObject.querySelector('#voiceRefreshMicrophones');
   const pauseVideoInput = documentObject.querySelector('#voicePauseVideoDuringRecording');
   const toggleChannelTestButton = documentObject.querySelector('#voiceToggleChannelTest');
@@ -96,6 +98,9 @@ export function createVoiceCaptureController({
   audioProcessingSelect.value = localStorageObject.getItem(
     AUDIO_PROCESSING_STORAGE_KEY
   ) || 'raw';
+  channelPreferenceSelect.value = localStorageObject.getItem(
+    CHANNEL_PREFERENCE_STORAGE_KEY
+  ) || 'auto';
   pauseVideoInput.checked = localStorageObject.getItem(PAUSE_VIDEO_STORAGE_KEY) === 'true';
 
   function setConnectionStatus(message, kind = '') {
@@ -114,8 +119,14 @@ export function createVoiceCaptureController({
     const processing = audioProcessingSelect.value === 'processed'
       ? 'Processed speech'
       : 'Raw input';
+    const channel = {
+      auto: 'Automatic channels',
+      left: 'Left only',
+      right: 'Right only',
+      mix: 'Mix both'
+    }[channelPreferenceSelect.value];
     const playback = pauseVideoInput.checked ? 'pause video' : 'keep video playing';
-    audioSummary.textContent = `${microphone} · ${processing} · ${playback}`;
+    audioSummary.textContent = `${microphone} · ${processing} · ${channel} · ${playback}`;
   }
 
   function hasGameAndVideo() {
@@ -600,7 +611,12 @@ export function createVoiceCaptureController({
     setRecordingStatus('Transcribing and interpreting the recording...', 'loading');
     refresh();
     try {
-      const context = buildVoiceCommandContext(game, capturedSeconds, requestId);
+      const context = buildVoiceCommandContext(
+        game,
+        capturedSeconds,
+        requestId,
+        channelPreferenceSelect.value
+      );
       lastContext = structuredClone(context);
       const payload = await client.voiceCommand({ audio, context });
       if (currentOperation !== operationVersion || destroyed) return;
@@ -898,6 +914,13 @@ export function createVoiceCaptureController({
     localStorageObject.setItem(
       AUDIO_PROCESSING_STORAGE_KEY,
       audioProcessingSelect.value
+    );
+    updateAudioSummary();
+  });
+  channelPreferenceSelect.addEventListener('change', () => {
+    localStorageObject.setItem(
+      CHANNEL_PREFERENCE_STORAGE_KEY,
+      channelPreferenceSelect.value
     );
     updateAudioSummary();
   });

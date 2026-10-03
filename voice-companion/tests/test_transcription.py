@@ -109,6 +109,22 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         self.assertEqual(mode, "mixed")
         self.assertTrue(np.allclose(selected, np.array([0.15, -0.15])))
 
+        selected, mode = FasterWhisperTranscriber._select_audio_channel(
+            np.array([0.2, -0.2]),
+            np.array([0.1, -0.1]),
+            "right",
+        )
+        self.assertEqual(mode, "right")
+        self.assertTrue(np.allclose(selected, np.array([0.1, -0.1])))
+
+        selected, mode = FasterWhisperTranscriber._select_audio_channel(
+            np.array([0.2, -0.2]),
+            np.array([0.1, -0.1]),
+            "mix",
+        )
+        self.assertEqual(mode, "mixed")
+        self.assertTrue(np.allclose(selected, np.array([0.15, -0.15])))
+
     def test_reports_model_load_failure(self):
         def factory(*args, **kwargs):
             raise RuntimeError("unsupported compute type")

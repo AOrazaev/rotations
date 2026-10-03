@@ -28,7 +28,13 @@ class FixtureTranscriber:
     ready = True
     model_name = "fixture"
 
-    def transcribe(self, audio: bytes, suffix: str):
+    def transcribe(
+        self,
+        audio: bytes,
+        suffix: str,
+        *,
+        channel_preference: str = "auto",
+    ):
         if not audio:
             raise RuntimeError("missing audio")
         return TranscriptionResult(

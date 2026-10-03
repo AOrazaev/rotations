@@ -31,6 +31,23 @@ class ContextValidationTest(unittest.TestCase):
         context = valid_context()
         self.assertIs(validate_context(context), context)
 
+    def test_accepts_supported_audio_channel_preference(self):
+        context = valid_context()
+        context["audioChannelPreference"] = "left"
+        self.assertEqual(
+            validate_context(context)["audioChannelPreference"],
+            "left",
+        )
+
+    def test_rejects_unknown_audio_channel_preference(self):
+        context = valid_context()
+        context["audioChannelPreference"] = "center"
+        with self.assertRaisesRegex(
+            RequestValidationError,
+            "audioChannelPreference",
+        ):
+            validate_context(context)
+
     def test_rejects_unknown_context_fields(self):
         context = valid_context()
         context["game"] = {"events": []}

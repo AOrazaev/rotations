@@ -593,7 +593,9 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             timeout_timer = self._start_timeout(cancellation)
             transcription_started = time.perf_counter()
             transcription = self.server.transcriber.transcribe(
-                audio, ALLOWED_AUDIO_TYPES[audio_type]
+                audio,
+                ALLOWED_AUDIO_TYPES[audio_type],
+                channel_preference=context.get("audioChannelPreference", "auto"),
             )
             cancellation.raise_if_cancelled()
             transcription_ms = round(

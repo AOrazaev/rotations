@@ -782,7 +782,9 @@ microphones and speakers. The companion also detects audio-interface recordings
 where the microphone occupies only one stereo channel, selects the active
 channel before transcription, and reports the channel mode in diagnostics.
 Microphone, processing, and playback-isolation controls live in an Audio
-settings dialog with a live left/right channel preview.
+settings dialog with a live left/right channel preview. Channel handling
+defaults to automatic detection and supports explicit left-only, right-only,
+and mixed overrides for unusual audio-interface routing.
 
 Deliver:
 

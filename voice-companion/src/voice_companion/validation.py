@@ -16,11 +16,15 @@ CONTEXT_FIELDS = {
     "capturedSeconds",
     "language",
     "sideHint",
+    "audioChannelPreference",
     "roster",
     "currentLineupIds",
     "allowedEventTypes",
 }
-REQUIRED_CONTEXT_FIELDS = CONTEXT_FIELDS - {"sideHint"}
+REQUIRED_CONTEXT_FIELDS = CONTEXT_FIELDS - {
+    "sideHint",
+    "audioChannelPreference",
+}
 PLAYER_FIELDS = {"id", "jersey", "name"}
 
 
@@ -68,6 +72,15 @@ def validate_context(context):
     if context.get("sideHint") not in {None, "team", "opponent"}:
         raise RequestValidationError(
             "sideHint must be 'team', 'opponent', or null."
+        )
+    if context.get("audioChannelPreference", "auto") not in {
+        "auto",
+        "left",
+        "right",
+        "mix",
+    }:
+        raise RequestValidationError(
+            "audioChannelPreference must be 'auto', 'left', 'right', or 'mix'."
         )
 
     roster = context["roster"]

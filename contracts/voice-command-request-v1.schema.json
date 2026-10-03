@@ -34,6 +34,11 @@
       "type": ["string", "null"],
       "enum": ["team", "opponent", null]
     },
+    "audioChannelPreference": {
+      "type": "string",
+      "enum": ["auto", "left", "right", "mix"],
+      "default": "auto"
+    },
     "roster": {
       "type": "array",
       "maxItems": 30,

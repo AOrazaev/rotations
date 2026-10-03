@@ -6,7 +6,12 @@ import {
 const EVENT_TYPES = [...STAT_EVENT_TYPES];
 const EVENT_TYPE_SET = new Set(EVENT_TYPES);
 
-export function buildVoiceCommandContext(game, capturedSeconds, requestId) {
+export function buildVoiceCommandContext(
+  game,
+  capturedSeconds,
+  requestId,
+  audioChannelPreference = 'auto'
+) {
   if (!game) throw new Error('Open a game before recording a voice command.');
   if (!Number.isFinite(capturedSeconds) || capturedSeconds < 0) {
     throw new Error('The recording timestamp is invalid.');
@@ -17,6 +22,7 @@ export function buildVoiceCommandContext(game, capturedSeconds, requestId) {
     capturedSeconds,
     language: 'en',
     sideHint: null,
+    audioChannelPreference,
     roster: game.players.map(player => ({
       id: player.id,
       jersey: player.number,

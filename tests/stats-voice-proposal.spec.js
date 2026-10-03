@@ -292,6 +292,9 @@ test('records and edits a voice proposal without writing game events', async ({ 
   await expect(page.locator('.voice-proposal-event')).toHaveCount(2);
   await expect(page.locator('#voiceCapturedTimestamp')).toHaveText('0:42.4');
   expect((await page.evaluate(() => window.__voiceRequests[0].capturedSeconds))).toBe(42.4);
+  expect(await page.evaluate(
+    () => window.__voiceRequests[0].audioChannelPreference
+  )).toBe('auto');
   expect(await page.evaluate(() => window.__lastAudioConstraints.audio)).toEqual({
     channelCount: 1,
     echoCancellation: false,
@@ -356,6 +359,7 @@ test('optionally pauses and resumes video around recording', async ({ page }) =>
   await page.locator('#voiceOpenAudioSettings').click();
   await expect(page.locator('#voiceAudioSettingsDialog')).toHaveAttribute('open', '');
   await page.locator('#voiceAudioProcessing').selectOption('processed');
+  await page.locator('#voiceChannelPreference').selectOption('right');
   await page.locator('#voicePauseVideoDuringRecording').check();
   await page.locator('#voiceCloseAudioSettings').click();
   await page.evaluate(() => { window.__statsFakePlayer.playing = true; });
@@ -380,6 +384,12 @@ test('optionally pauses and resumes video around recording', async ({ page }) =>
   expect(await page.evaluate(() => localStorage.getItem(
     'basketball-stats-voice-audio-processing'
   ))).toBe('processed');
+  expect(await page.evaluate(
+    () => window.__voiceRequests[0].audioChannelPreference
+  )).toBe('right');
+  expect(await page.evaluate(() => localStorage.getItem(
+    'basketball-stats-voice-channel-preference'
+  ))).toBe('right');
 });
 
 test('classifies left, right, both, and silent channel previews', async ({ page }) => {
