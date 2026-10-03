@@ -277,14 +277,14 @@ test('records and edits a voice proposal without writing game events', async ({ 
   await page.locator('#voiceStartRecording').click();
   await expect(page.locator('#voiceRecordingStatus')).toContainText('Recording at 0:42.4');
   await expect(page.locator('#voiceStartRecording')).toBeDisabled();
-  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(false);
-  expect(await page.evaluate(() => window.__statsFakePlayer.pauseCount)).toBe(1);
+  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(true);
+  expect(await page.evaluate(() => window.__statsFakePlayer.pauseCount)).toBe(0);
   await page.evaluate(() => { window.__statsFakePlayer.current = 99; });
   await page.locator('#voiceStopRecording').click();
 
   await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
   expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(true);
-  expect(await page.evaluate(() => window.__statsFakePlayer.playCount)).toBe(1);
+  expect(await page.evaluate(() => window.__statsFakePlayer.playCount)).toBe(0);
   await expect(page.locator('#voiceRecordingPreview')).toBeVisible();
   await expect(page.locator('#voiceTranscript')).toHaveValue('Seven assist and thirteen makes two');
   await expect(page.locator('.voice-proposal-event')).toHaveCount(2);
@@ -346,6 +346,25 @@ test('prevents overlapping recordings and reports microphone permission failures
     'Could not start recording: Permission denied'
   );
   await expect(page.locator('#voiceStartRecording')).toBeEnabled();
+});
+
+test('optionally pauses and resumes video around recording', async ({ page }) => {
+  await openVoiceTracker(page);
+  await connectVoiceCompanion(page);
+  await page.locator('#voicePauseVideoDuringRecording').check();
+  await page.evaluate(() => { window.__statsFakePlayer.playing = true; });
+
+  await page.locator('#voiceStartRecording').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(false);
+  expect(await page.evaluate(() => window.__statsFakePlayer.pauseCount)).toBe(1);
+
+  await page.locator('#voiceStopRecording').click();
+  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(true);
+  expect(await page.evaluate(() => window.__statsFakePlayer.playCount)).toBe(1);
+  expect(await page.evaluate(() => localStorage.getItem(
+    'basketball-stats-voice-pause-video'
+  ))).toBe('true');
 });
 
 test('cancels processing, keeps audio for retry, and disables discard while active', async ({ page }) => {

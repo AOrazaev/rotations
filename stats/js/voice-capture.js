@@ -9,6 +9,7 @@ const DEFAULT_URL = 'http://127.0.0.1:8766';
 const URL_STORAGE_KEY = 'basketball-stats-voice-url';
 const TOKEN_STORAGE_KEY = 'basketball-stats-voice-token';
 const MICROPHONE_STORAGE_KEY = 'basketball-stats-voice-microphone';
+const PAUSE_VIDEO_STORAGE_KEY = 'basketball-stats-voice-pause-video';
 
 export function createVoiceCaptureController({
   documentObject = document,
@@ -27,6 +28,7 @@ export function createVoiceCaptureController({
   const connectionStatus = documentObject.querySelector('#voiceConnectionStatus');
   const microphoneSelect = documentObject.querySelector('#voiceMicrophone');
   const refreshMicrophonesButton = documentObject.querySelector('#voiceRefreshMicrophones');
+  const pauseVideoInput = documentObject.querySelector('#voicePauseVideoDuringRecording');
   const startButton = documentObject.querySelector('#voiceStartRecording');
   const stopButton = documentObject.querySelector('#voiceStopRecording');
   const cancelButton = documentObject.querySelector('#voiceCancelProcessing');
@@ -67,6 +69,7 @@ export function createVoiceCaptureController({
   endpointInput.value = localStorageObject.getItem(URL_STORAGE_KEY) || DEFAULT_URL;
   tokenInput.value = sessionStorageObject.getItem(TOKEN_STORAGE_KEY) || '';
   microphoneSelect.value = localStorageObject.getItem(MICROPHONE_STORAGE_KEY) || '';
+  pauseVideoInput.checked = localStorageObject.getItem(PAUSE_VIDEO_STORAGE_KEY) === 'true';
 
   function setConnectionStatus(message, kind = '') {
     connectionStatus.textContent = message;
@@ -536,7 +539,8 @@ export function createVoiceCaptureController({
       await refreshMicrophones();
       capturedSeconds = videoController.getCurrentSeconds();
       timestampOutput.textContent = formatVideoTime(capturedSeconds);
-      resumePlaybackAfterRecording = videoController.isPlaying();
+      resumePlaybackAfterRecording = pauseVideoInput.checked
+        && videoController.isPlaying();
       if (resumePlaybackAfterRecording) videoController.pause();
       const preferredType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg']
         .find(type => !MediaRecorderClass.isTypeSupported
@@ -761,6 +765,12 @@ export function createVoiceCaptureController({
     } else {
       localStorageObject.removeItem(MICROPHONE_STORAGE_KEY);
     }
+  });
+  pauseVideoInput.addEventListener('change', () => {
+    localStorageObject.setItem(
+      PAUSE_VIDEO_STORAGE_KEY,
+      String(pauseVideoInput.checked)
+    );
   });
   expectedTranscript.addEventListener('input', refresh);
   evaluationList.addEventListener('click', event => {

@@ -231,6 +231,8 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .voice-microphone-settings { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .voice-microphone-settings label { display: grid; gap: 5px; color: var(--muted); font-size: .82rem; }
 .voice-microphone-settings select { width: 100%; min-width: 0; padding: 8px 9px; color: var(--text); background: #0a1220; border: 1px solid var(--line); border-radius: 9px; }
+.voice-recording-option { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: .82rem; }
+.voice-recording-option input { width: auto; }
 .voice-recording-preview { width: 100%; height: 36px; }
 .voice-status { margin-top: 0; }
 .voice-status.loading { color: #b8c1ff; }
