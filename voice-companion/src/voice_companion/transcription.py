@@ -19,6 +19,14 @@ BASKETBALL_HOTWORDS = (
     "block turnover foul transition"
 )
 
+BASKETBALL_INITIAL_PROMPT = (
+    "Basketball statistics commands. Opponent makes two pointer. "
+    "Opponent misses two pointer. Opponent makes three pointer. "
+    "Opponent misses three pointer. Player seven makes two. "
+    "Player thirteen makes three. Player seven assist. Player seven steal. "
+    "Offensive rebound. Defensive rebound. Turnover. Foul."
+)
+
 
 class TranscriptionUnavailable(RuntimeError):
     pass
@@ -186,6 +194,7 @@ class FasterWhisperTranscriber:
                 condition_on_previous_text=False,
                 vad_filter=True,
                 hotwords=BASKETBALL_HOTWORDS,
+                initial_prompt=BASKETBALL_INITIAL_PROMPT,
             )
             transcript = " ".join(
                 segment.text.strip() for segment in segments if segment.text.strip()

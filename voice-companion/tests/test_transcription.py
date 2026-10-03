@@ -12,6 +12,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from voice_companion.profiles import resolve_profile
 from voice_companion.transcription import (
     BASKETBALL_HOTWORDS,
+    BASKETBALL_INITIAL_PROMPT,
     FasterWhisperTranscriber,
 )
 
@@ -65,8 +66,16 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
             self.assertEqual(model.options["language"], "en")
             self.assertTrue(model.options["vad_filter"])
             self.assertEqual(model.options["hotwords"], BASKETBALL_HOTWORDS)
+            self.assertEqual(
+                model.options["initial_prompt"],
+                BASKETBALL_INITIAL_PROMPT,
+            )
             self.assertIn("three pointer", model.options["hotwords"])
             self.assertIn("opponent", model.options["hotwords"])
+            self.assertIn(
+                "Opponent misses two pointer",
+                model.options["initial_prompt"],
+            )
 
     def test_reports_model_load_failure(self):
         def factory(*args, **kwargs):
