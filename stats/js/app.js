@@ -338,7 +338,7 @@ function removeReviewMutationSurfaces() {
     '#gamePanel',
     '#showGamePanel',
     '#eventEntryPanel',
-    '#voiceCapturePanel',
+    '#voiceSettingsDialog',
     '#eventEditDialog',
     '#coachCommentDialog',
     '#substitutionDialog',
@@ -469,6 +469,7 @@ if (reviewMode) {
     getGame: () => eventController.getGame(),
     commitProposal: proposal => eventController.commitVoiceProposal(proposal),
     undoProposal: batch => eventController.undoVoiceBatch(batch),
+    onCommandsChanged: commands => eventController.setVoiceCommands(commands),
     clientFactory: voiceClientFactory,
     mediaDevices: window.__STATS_MEDIA_DEVICES__ || navigator.mediaDevices,
     MediaRecorderClass: window.__STATS_MEDIA_RECORDER__ || window.MediaRecorder

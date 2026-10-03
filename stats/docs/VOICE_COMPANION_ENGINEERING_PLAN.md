@@ -807,14 +807,14 @@ Verification:
 ### Checkpoint 6: Atomic timeline integration
 
 **Status: complete.** Edited proposals can now be confirmed through the normal
-tracker mutation boundary. The browser revalidates the game revision and active
-lineup, converts every proposal item into a normal event with consecutive
+tracker mutation boundary. The browser revalidates the active game, timestamp,
+roster references, and lineup, converts every proposal item into a normal event with consecutive
 sequence values, rebuilds lineup snapshots, and performs one IndexedDB save
 before updating controller state. Validation and storage failures leave both
 memory and storage unchanged. Newly added events are highlighted in the
-timeline, and both the voice card and normal latest-event control undo the
-complete batch while it remains the latest mutation. A game change during
-processing or before confirmation rejects the stale proposal explicitly.
+timeline, and both the compact voice status and normal latest-event control undo
+the complete batch while it remains the latest mutation. Switching games clears
+pending commands, while unrelated writes in the same game remain valid.
 
 Deliver:
 
@@ -833,6 +833,40 @@ Verification:
 - Undo removes every event from the voice mutation and restores reports.
 - Related events remain separate facts.
 - The service still has no persistence access.
+
+#### Compact queued tracker workflow
+
+**Status: complete.** The initial integration proved the complete workflow but
+dedicated too much permanent tracker space to connection, recording, proposal,
+and evaluation controls. The production tracker workflow now uses one
+microphone button in the event-entry header with a small adjacent settings
+button.
+
+The microphone is a start/stop toggle. After recording stops, the browser adds a
+UI-only command row to the event timeline at the captured video timestamp. A
+row moves through queued, processing, draft, error, and committing states.
+Queued and processing rows show progress and cancellation. Draft rows expose
+the transcript, editable proposed events, and explicit Add events, Retry, and
+Discard actions. Confirmed rows become normal persisted game events with
+temporary highlighting and full-batch undo. Temporary rows never enter game
+data, IndexedDB, reports, backups, or shared links.
+
+Recording remains available while earlier commands are pending. The browser
+queues audio immediately and sends commands to the companion sequentially to
+avoid competing local-model inference. Completed drafts may be confirmed,
+edited, retried, or discarded independently.
+
+Connection, token, warmup, microphone, processing, channel, playback-isolation,
+diagnostic, and saved-evaluation controls move into the voice settings dialog.
+Remembered settings auto-connect when possible. An unavailable microphone
+control opens actionable settings instead of becoming an unexplained disabled
+control.
+
+Confirmation uses contextual revalidation instead of rejecting a command after
+every unrelated game write. The active game must still match, referenced
+players must still exist, the timestamp must remain valid, and team players
+must belong to the derived lineup at that timestamp. Later unrelated manual or
+voice events do not invalidate a queued command.
 
 ### Checkpoint 7: Integrated resilience and regression
 

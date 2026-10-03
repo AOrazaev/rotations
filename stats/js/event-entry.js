@@ -543,7 +543,7 @@ export function createEventEntryController({
 
   async function commitVoiceProposal({
     expectedGameId,
-    expectedGameUpdatedAt,
+    expectedLineupIds,
     capturedSeconds,
     events
   }) {
@@ -554,7 +554,7 @@ export function createEventEntryController({
       try {
         const batch = appendVoiceEventBatch(game, {
           expectedGameId,
-          expectedGameUpdatedAt,
+          expectedLineupIds,
           capturedSeconds,
           proposalEvents: events,
           now
@@ -619,6 +619,9 @@ export function createEventEntryController({
       render();
     },
     getGame: () => game ? structuredClone(game) : null,
+    setVoiceCommands(commands) {
+      eventListController.setVoiceCommands(commands);
+    },
     commitVoiceProposal,
     undoVoiceBatch,
     destroy() {

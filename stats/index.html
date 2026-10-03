@@ -147,13 +147,14 @@
       </div>
 
       <aside class="panel-stack side-panel capture-panel">
-        <section id="voiceCapturePanel" class="card voice-capture-card">
+        <dialog id="voiceSettingsDialog" class="event-dialog voice-settings-dialog">
           <div class="section-head">
             <div>
               <p class="eyebrow">Local companion</p>
-              <h2>Voice proposal</h2>
-              <p>Record, review, and confirm one or more events as a single game update.</p>
+              <h2>Voice settings</h2>
+              <p>Configure the local service, microphone, and diagnostic tools.</p>
             </div>
+            <button id="voiceCloseSettings" class="secondary small" type="button">Close</button>
           </div>
           <details id="voiceConnectionSettings" class="voice-connection-settings">
             <summary>Companion connection</summary>
@@ -167,39 +168,7 @@
             </div>
           </details>
           <p id="voiceConnectionStatus" class="message voice-status" aria-live="polite">Companion not connected.</p>
-          <div class="voice-audio-summary">
-            <span id="voiceAudioSummary">System default microphone · Raw input</span>
-            <button id="voiceOpenAudioSettings" class="secondary small" type="button">Audio settings</button>
-          </div>
-          <div class="voice-actions">
-            <button id="voiceStartRecording" class="primary" type="button" disabled>Start recording</button>
-            <button id="voiceStopRecording" class="secondary" type="button" disabled>Stop recording</button>
-            <button id="voiceCancelProcessing" class="secondary" type="button" disabled>Cancel processing</button>
-          </div>
-          <p id="voiceRecordingStatus" class="message voice-status" aria-live="polite">Connect the companion to enable recording.</p>
-          <audio id="voiceRecordingPreview" class="voice-recording-preview hidden" controls preload="metadata"></audio>
-          <div class="voice-timestamp">
-            <span>Proposal timestamp</span>
-            <strong id="voiceCapturedTimestamp">Not captured</strong>
-            <button id="voiceReplaceTimestamp" class="secondary small" type="button" disabled>Use current video time</button>
-          </div>
-          <label class="voice-transcript-label">
-            Latest transcript
-            <textarea id="voiceTranscript" rows="2" readonly placeholder="Transcript appears after processing."></textarea>
-          </label>
-          <label class="voice-transcript-label">
-            Expected transcript for evaluation
-            <textarea id="voiceExpectedTranscript" rows="2" placeholder="Correct the transcript before saving an evaluation sample."></textarea>
-          </label>
-          <ul id="voiceWarnings" class="voice-warnings hidden"></ul>
-          <div id="voiceProposalEvents" class="voice-proposal-events"></div>
-          <div class="voice-actions voice-proposal-actions">
-            <button id="voiceConfirmProposal" class="primary small" type="button" disabled>Add events</button>
-            <button id="voiceUndoBatch" class="secondary small" type="button" disabled>Undo voice batch</button>
-            <button id="voiceRetryProcessing" class="secondary small" type="button" disabled>Retry processing</button>
-            <button id="voiceSaveEvaluation" class="secondary small" type="button" disabled>Save evaluation sample</button>
-            <button id="voiceDiscardProposal" class="danger small" type="button" disabled>Discard</button>
-          </div>
+          <p id="voiceDiagnostics" class="message">Service diagnostics appear after connection.</p>
           <p id="voiceEvaluationStatus" class="message voice-status" aria-live="polite"></p>
           <details id="voiceEvaluationSamples" class="voice-connection-settings">
             <summary>Saved evaluation samples</summary>
@@ -210,14 +179,14 @@
               <p class="message">Connect the companion to review saved samples.</p>
             </div>
           </details>
-          <dialog id="voiceAudioSettingsDialog" class="event-dialog voice-audio-dialog">
+          <section class="voice-settings-section" aria-labelledby="voiceAudioSettingsTitle">
             <div class="section-head">
               <div>
-                <h2>Audio settings</h2>
+                <h3 id="voiceAudioSettingsTitle">Audio settings</h3>
                 <p>Select the input and verify which channels carry your microphone.</p>
               </div>
-              <button id="voiceCloseAudioSettings" class="secondary small" type="button">Close</button>
             </div>
+            <p id="voiceAudioSummary" class="message">System default microphone · Raw input</p>
             <div class="voice-microphone-settings">
               <label>
                 Microphone
@@ -265,14 +234,32 @@
               </div>
               <p id="voiceChannelStatus" class="message voice-status" aria-live="polite">Preview is stopped.</p>
             </section>
-          </dialog>
-        </section>
+          </section>
+        </dialog>
         <section id="eventEntryPanel" class="card event-entry-card hidden">
             <div class="section-head">
               <div>
                 <h2>Event entry</h2>
                 <p id="eventGameStatus">Save or open a game to record events.</p>
               </div>
+              <div id="voiceCompactControls" class="voice-compact-controls">
+                <span id="voiceReadiness" class="voice-readiness" aria-hidden="true"></span>
+                <button id="voiceRecordToggle" class="primary voice-record-toggle" type="button" aria-label="Start voice recording" title="Start voice recording">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm-6-3a6 6 0 0 0 12 0M12 17v4m-4 0h8" />
+                  </svg>
+                  <span id="voiceRecordLabel">Voice</span>
+                </button>
+                <button id="voiceOpenSettings" class="secondary icon-button" type="button" aria-label="Voice settings" title="Voice settings">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4 2-1-2-4-2 1a8 8 0 0 0-2-1l-1-3h-6L8 7a8 8 0 0 0-2 1L4 7l-2 4 2 1v2l-2 1 2 4 2-1a8 8 0 0 0 2 1l1 3h6l1-3a8 8 0 0 0 2-1l2 1 2-4-2-1v-2Z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="voice-command-status-row">
+              <p id="voiceCommandStatus" class="message voice-command-status" aria-live="polite">Voice companion is not connected.</p>
+              <button id="voiceUndoLatestBatch" class="secondary small hidden" type="button">Undo voice batch</button>
             </div>
             <div id="eventLockMessage" class="locked-message">Save or open a game to load its recording.</div>
             <div class="scoreboard">

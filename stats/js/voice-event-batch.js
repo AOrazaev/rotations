@@ -10,13 +10,31 @@ function mutationError(code, message) {
   return error;
 }
 
-function assertExpectedGame(game, expectedGameId, expectedGameUpdatedAt) {
-  if (!game || game.id !== expectedGameId || game.updatedAt !== expectedGameUpdatedAt) {
+function sameLineup(actual, expected) {
+  return Array.isArray(expected)
+    && actual.length === expected.length
+    && actual.every((playerId, index) => playerId === expected[index]);
+}
+
+function assertExpectedContext(game, {
+  expectedGameId,
+  expectedLineupIds,
+  capturedSeconds
+}) {
+  if (!game || game.id !== expectedGameId) {
     throw mutationError(
       'voice_game_changed',
-      'The game changed after this proposal was created. Retry processing before adding it.'
+      'This voice command belongs to a different game.'
     );
   }
+  const currentLineupIds = getLineupAtEventPosition(game, capturedSeconds);
+  if (!sameLineup(currentLineupIds, expectedLineupIds)) {
+    throw mutationError(
+      'voice_context_changed',
+      'The lineup at this command timestamp changed. Review the timestamp or retry the command.'
+    );
+  }
+  return currentLineupIds;
 }
 
 function buildGameEvent(proposal, {
@@ -52,13 +70,12 @@ function buildGameEvent(proposal, {
 
 export function appendVoiceEventBatch(game, {
   expectedGameId,
-  expectedGameUpdatedAt,
+  expectedLineupIds,
   capturedSeconds,
   proposalEvents,
   now = () => new Date().toISOString(),
   randomUUID = () => crypto.randomUUID()
 }) {
-  assertExpectedGame(game, expectedGameId, expectedGameUpdatedAt);
   if (!Number.isFinite(capturedSeconds) || capturedSeconds < 0) {
     throw mutationError('voice_invalid_timestamp', 'The proposal timestamp is invalid.');
   }
@@ -68,7 +85,11 @@ export function appendVoiceEventBatch(game, {
 
   const next = structuredClone(game);
   const timestamp = now();
-  const lineupIds = getLineupAtEventPosition(next, capturedSeconds);
+  const lineupIds = assertExpectedContext(next, {
+    expectedGameId,
+    expectedLineupIds,
+    capturedSeconds
+  });
   const lineupSet = new Set(lineupIds);
   const firstSequence = Math.max(0, ...next.events.map(event => event.sequence)) + 1;
   const eventIds = [];

@@ -5,11 +5,7 @@ test.describe.configure({ mode: 'serial' });
 test('real companion client invokes browser fetch with the correct receiver', async ({ page }) => {
   await page.goto('/stats/');
   const result = await page.evaluate(async () => {
-    const {
-      VoiceCompanionClient
-    } = await import(
-      './js/voice-companion-client.js'
-    );
+    const { VoiceCompanionClient } = await import('./js/voice-companion-client.js');
     const calls = [];
     const fetchFn = function (url) {
       if (this !== window) throw new TypeError('Illegal invocation');
@@ -42,9 +38,9 @@ test('real companion client invokes browser fetch with the correct receiver', as
   expect(result.response.capabilities.security.tokenRequired).toBe(false);
 });
 
-async function openVoiceTracker(page) {
+async function openVoiceTracker(page, { mode = 'success' } = {}) {
   const databaseName = `basketball-stats-voice-${Date.now()}-${Math.random()}`;
-  await page.addInitScript(name => {
+  await page.addInitScript(({ name, initialMode }) => {
     window.__STATS_DATABASE_NAME__ = name;
     window.__statsFakePlayer = {
       current: 42.4,
@@ -69,10 +65,43 @@ async function openVoiceTracker(page) {
     window.__voiceCommandCount = 0;
     window.__microphoneRequestCount = 0;
     window.__evaluationSamples = [];
-    window.__voiceTestMode = 'success';
+    window.__voiceTestMode = initialMode;
+
+    function successPayload(context) {
+      return {
+        protocolVersion: 1,
+        requestId: context.requestId,
+        transcript: 'Seven assist and thirteen makes two',
+        events: [
+          {
+            side: 'team',
+            type: 'assist',
+            playerId: context.currentLineupIds[0],
+            confidence: 0.95
+          },
+          {
+            side: 'team',
+            type: 'shot',
+            playerId: context.currentLineupIds[1],
+            shotValue: 2,
+            made: true,
+            confidence: 0.98
+          }
+        ],
+        overallConfidence: 0.95,
+        warnings: [],
+        processor: {
+          transcriptionModel: 'base.en',
+          commandModel: 'Qwen3-4B-Q4_K_M.gguf',
+          profile: 'balanced'
+        },
+        timingMs: { transcription: 10, interpretation: 15, total: 25 }
+      };
+    }
+
     window.__STATS_VOICE_CLIENT_FACTORY__ = options => {
       window.__voiceClientOptions = structuredClone(options);
-      return ({
+      return {
         baseUrl: options.baseUrl,
         async check() {
           if (window.__voiceTestMode === 'unavailable') {
@@ -102,6 +131,13 @@ async function openVoiceTracker(page) {
         async voiceCommand({ context }) {
           window.__voiceCommandCount += 1;
           window.__voiceRequests.push(structuredClone(context));
+          if (window.__voiceTestMode === 'hold-first'
+            && window.__voiceCommandCount === 1) {
+            return new Promise((resolve, reject) => {
+              window.__resolveHeldVoice = () => resolve(successPayload(context));
+              window.__rejectVoiceRequest = reject;
+            });
+          }
           if (window.__voiceTestMode === 'cancel-once'
             && window.__voiceCommandCount === 1) {
             return new Promise((resolve, reject) => {
@@ -110,8 +146,7 @@ async function openVoiceTracker(page) {
           }
           if (window.__voiceTestMode === 'invalid') {
             return {
-              protocolVersion: 1,
-              requestId: context.requestId,
+              ...successPayload(context),
               transcript: 'Unknown player scores',
               events: [{
                 side: 'team',
@@ -120,8 +155,7 @@ async function openVoiceTracker(page) {
                 shotValue: 2,
                 made: true,
                 confidence: 0.9
-              }],
-              warnings: []
+              }]
             };
           }
           if (window.__voiceTestMode === 'partial-error') {
@@ -130,35 +164,7 @@ async function openVoiceTracker(page) {
               partialResult: { transcript: 'Seven assist' }
             });
           }
-          return {
-            protocolVersion: 1,
-            requestId: context.requestId,
-            transcript: 'Seven assist and thirteen makes two',
-            events: [
-              {
-                side: 'team',
-                type: 'assist',
-                playerId: context.currentLineupIds[0],
-                confidence: 0.95
-              },
-              {
-                side: 'team',
-                type: 'shot',
-                playerId: context.currentLineupIds[1],
-                shotValue: 2,
-                made: true,
-                confidence: 0.98
-              }
-            ],
-            overallConfidence: 0.95,
-            warnings: [],
-            processor: {
-              transcriptionModel: 'base.en',
-              commandModel: 'Qwen3-4B-Q4_K_M.gguf',
-              profile: 'balanced'
-            },
-            timingMs: { transcription: 10, interpretation: 15, total: 25 }
-          };
+          return successPayload(context);
         },
         async cancel() {
           window.__rejectVoiceRequest?.(Object.assign(
@@ -201,17 +207,15 @@ async function openVoiceTracker(page) {
         async exportEvaluationSample() {
           return new Blob(['evaluation-zip'], { type: 'application/zip' });
         }
-      });
+      };
     };
     window.__STATS_MEDIA_DEVICES__ = {
       async enumerateDevices() {
-        return [
-          {
-            kind: 'audioinput',
-            deviceId: 'test-microphone',
-            label: 'Test microphone'
-          }
-        ];
+        return [{
+          kind: 'audioinput',
+          deviceId: 'test-microphone',
+          label: 'Test microphone'
+        }];
       },
       async getUserMedia(constraints) {
         window.__lastAudioConstraints = structuredClone(constraints);
@@ -249,7 +253,7 @@ async function openVoiceTracker(page) {
         this.listeners.stop?.();
       }
     };
-  }, databaseName);
+  }, { name: databaseName, initialMode: mode });
 
   await page.goto('/stats/');
   await page.waitForFunction(() => window.__statsApp?.setupController);
@@ -257,6 +261,9 @@ async function openVoiceTracker(page) {
   await page.locator('#gameTitle').fill('Voice proposal test');
   await page.locator('#opponentName').fill('Falcons');
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
+  await page.locator('#addSetupPlayer').click();
+  await page.locator('.setup-name').last().fill('Bench player');
+  await page.locator('.setup-number').last().fill('99');
   await page.locator('#saveGame').click();
   await expect(page.locator('#eventLockMessage')).toBeHidden();
   await page.waitForFunction(() => Boolean(
@@ -264,197 +271,163 @@ async function openVoiceTracker(page) {
   ));
 }
 
-async function connectVoiceCompanion(page) {
-  await page.locator('#voiceConnectionSettings > summary').click();
-  await page.locator('#voiceCompanionToken').fill('test-token');
-  await page.locator('#voiceConnect').click();
-  await expect(page.locator('#voiceConnectionStatus')).toContainText('Connected');
+async function waitForConnection(page) {
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.voiceController.getState().connected
+  )).toBe(true);
 }
 
-test('records and edits a voice proposal without writing game events', async ({ page }) => {
+async function recordCommand(page) {
+  const before = await page.evaluate(
+    () => window.__statsApp.voiceController.getState().jobs.length
+  );
+  await page.locator('#voiceRecordToggle').click();
+  await expect(page.locator('#voiceRecordLabel')).toContainText('Stop');
+  await page.locator('#voiceRecordToggle').click();
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.voiceController.getState().jobs.length
+  )).toBe(before + 1);
+}
+
+async function waitForDrafts(page, count) {
+  await expect(page.locator('.voice-command-draft')).toHaveCount(count);
+}
+
+test('uses one compact microphone control and keeps drafts out of game storage', async ({ page }) => {
   await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
-  await page.evaluate(() => { window.__statsFakePlayer.playing = true; });
+  await waitForConnection(page);
+  await expect(page.locator('#voiceSettingsDialog')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#voiceRecordToggle')).toBeVisible();
 
-  await page.locator('#voiceStartRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('Recording at 0:42.4');
-  await expect(page.locator('#voiceStartRecording')).toBeDisabled();
-  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(true);
-  expect(await page.evaluate(() => window.__statsFakePlayer.pauseCount)).toBe(0);
-  await page.evaluate(() => { window.__statsFakePlayer.current = 99; });
-  await page.locator('#voiceStopRecording').click();
-
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
-  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(true);
-  expect(await page.evaluate(() => window.__statsFakePlayer.playCount)).toBe(0);
-  await expect(page.locator('#voiceRecordingPreview')).toBeVisible();
-  await expect(page.locator('#voiceTranscript')).toHaveValue('Seven assist and thirteen makes two');
-  await expect(page.locator('.voice-proposal-event')).toHaveCount(2);
-  await expect(page.locator('#voiceCapturedTimestamp')).toHaveText('0:42.4');
-  expect((await page.evaluate(() => window.__voiceRequests[0].capturedSeconds))).toBe(42.4);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+  const draft = page.locator('.voice-command-draft');
+  await expect(draft.locator('.voice-proposal-event')).toHaveCount(2);
+  await expect(draft).toContainText('Seven assist and thirteen makes two');
+  expect(await page.evaluate(() => window.__voiceRequests[0].capturedSeconds)).toBe(42.4);
   expect(await page.evaluate(
     () => window.__voiceRequests[0].audioChannelPreference
   )).toBe('auto');
-  expect(await page.evaluate(() => window.__lastAudioConstraints.audio)).toEqual({
-    channelCount: 1,
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false
-  });
-  expect(await page.evaluate(() => window.__recorderOptions.audioBitsPerSecond)).toBe(
-    128000
-  );
 
-  await page.locator('.voice-proposal-event').first().locator('[data-voice-field="type"]').selectOption('steal');
-  await expect(page.locator('.voice-proposal-event').first().locator('[data-voice-field="type"]')).toHaveValue('steal');
-  await page.locator('#voiceReplaceTimestamp').click();
-  await expect(page.locator('#voiceCapturedTimestamp')).toHaveText('1:39.0');
-  await page.locator('#voiceExpectedTranscript').fill(
+  await draft.locator('[data-voice-field="type"]').first().selectOption('steal');
+  await page.evaluate(() => { window.__statsFakePlayer.current = 99; });
+  await draft.locator('[data-voice-action="replace-timestamp"]').click();
+  await expect(draft.locator('.voice-command-time')).toHaveText('1:39.0');
+  await draft.locator('[data-voice-field="expectedTranscript"]').fill(
     'Seven steal and thirteen makes two'
   );
-  await page.locator('#voiceSaveEvaluation').click();
-  await expect(page.locator('#voiceEvaluationStatus')).toContainText(
-    'Saved evaluation sample'
-  );
-  await expect(page.locator('.voice-evaluation-item')).toHaveCount(1);
+  await draft.locator('[data-voice-action="save-evaluation"]').click();
+  await expect(draft).toContainText('Saved evaluation sample');
 
-  const game = await page.evaluate(() => window.__statsApp.eventController.getGame());
-  const stored = await page.evaluate(async () => (await window.__statsApp.store.listGames())[0]);
-  const sample = await page.evaluate(() => window.__evaluationSamples[0]);
-  expect(game.events).toEqual([]);
-  expect(stored.events).toEqual([]);
-  expect(sample.audioSize).toBeGreaterThan(0);
-  expect(sample.metadata.originalTranscript).toBe(
-    'Seven assist and thirteen makes two'
-  );
-  expect(sample.metadata.correctedTranscript).toBe(
+  const result = await page.evaluate(async () => ({
+    game: window.__statsApp.eventController.getGame(),
+    stored: (await window.__statsApp.store.listGames())[0],
+    sample: window.__evaluationSamples[0]
+  }));
+  expect(result.game.events).toEqual([]);
+  expect(result.stored.events).toEqual([]);
+  expect(result.sample.metadata.correctedEvents[0].type).toBe('steal');
+  expect(result.sample.metadata.correctedTranscript).toBe(
     'Seven steal and thirteen makes two'
   );
-  expect(sample.metadata.correctedEvents[0].type).toBe('steal');
-  expect(sample.metadata.outcome).toBe('corrected');
 });
 
-test('confirms a multi-event proposal atomically and undoes the full batch', async ({ page }) => {
-  await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
+test('records another command while the first processes and sends requests sequentially', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'hold-first' });
+  await waitForConnection(page);
 
-  await page.locator('#currentLineup .player-select-button').first().click();
-  await page.locator('[data-event-type="assist"]').click();
-  await expect.poll(async () => (
-    await page.evaluate(() => window.__statsApp.eventController.getGame().events.length)
-  )).toBe(1);
+  await recordCommand(page);
+  await expect(page.locator('.voice-command-processing')).toHaveCount(1);
+  await recordCommand(page);
+  await expect(page.locator('.voice-command-processing')).toHaveCount(1);
+  await expect(page.locator('.voice-command-queued')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__voiceCommandCount)).toBe(1);
+  await expect(page.locator('#voiceRecordToggle')).toBeEnabled();
 
-  await page.locator('#voiceStartRecording').click();
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
-  await expect(page.locator('#voiceConfirmProposal')).toBeEnabled();
+  await page.evaluate(() => window.__resolveHeldVoice());
+  await waitForDrafts(page, 2);
+  expect(await page.evaluate(() => window.__voiceCommandCount)).toBe(2);
+});
 
-  await page.locator('#voiceConfirmProposal').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    '2 voice events added'
+test('confirms completed drafts independently and preserves atomic batch undo', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'hold-first' });
+  await waitForConnection(page);
+  await recordCommand(page);
+  await recordCommand(page);
+  await page.evaluate(() => window.__resolveHeldVoice());
+  await waitForDrafts(page, 2);
+
+  const jobIds = await page.evaluate(
+    () => window.__statsApp.voiceController.getState().jobs.map(job => job.id)
   );
+  const secondDraft = page.locator(`[data-voice-command-id="${jobIds[1]}"]`);
+  await secondDraft.locator('[data-voice-action="confirm"]').click();
+  await expect(secondDraft).toHaveCount(0);
+  await expect(page.locator('.voice-command-draft')).toHaveCount(1);
   await expect(page.locator('.event-list-item.voice-added-event')).toHaveCount(2);
   await expect(page.locator('#teamScore')).toHaveText('2');
-  await expect(page.locator('#teamFieldGoals')).toHaveText('1/1');
-  await expect(page.locator('#voiceUndoBatch')).toBeEnabled();
-  await expect(
-    page.locator('.voice-proposal-event select').first()
-  ).toBeDisabled();
 
   const committed = await page.evaluate(async () => ({
     game: window.__statsApp.eventController.getGame(),
     stored: (await window.__statsApp.store.listGames())[0]
   }));
-  expect(committed.game.events).toHaveLength(3);
+  expect(committed.game.events).toHaveLength(2);
   expect(committed.stored.events).toEqual(committed.game.events);
-  expect(committed.game.events.map(event => event.sequence)).toEqual([1, 2, 3]);
-  expect(committed.game.events.map(event => event.videoSeconds)).toEqual([
-    42.4,
-    42.4,
-    42.4
-  ]);
-  expect(committed.game.events.slice(1).map(event => event.type)).toEqual([
-    'assist',
-    'shot'
-  ]);
-  expect(committed.game.events.slice(1).every(
-    event => event.lineupIds.length === 5
-  )).toBe(true);
 
-  await page.locator('#voiceUndoBatch').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    'Voice batch undone'
-  );
-  await expect(page.locator('.event-list-item.voice-added-event')).toHaveCount(0);
+  await page.locator('#voiceUndoLatestBatch').click();
   await expect(page.locator('#teamScore')).toHaveText('0');
-
-  const undone = await page.evaluate(async () => ({
-    game: window.__statsApp.eventController.getGame(),
-    stored: (await window.__statsApp.store.listGames())[0]
-  }));
-  expect(undone.game.events).toHaveLength(1);
-  expect(undone.game.events[0].type).toBe('assist');
-  expect(undone.stored.events).toEqual(undone.game.events);
+  expect(await page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(0);
+  await expect(page.locator('.voice-command-draft')).toHaveCount(1);
 });
 
-test('rejects stale proposals after the game changes', async ({ page }) => {
+test('allows unrelated manual events before confirming a queued draft', async ({ page }) => {
   await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
-
-  await page.locator('#voiceStartRecording').click();
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
 
   await page.locator('#currentLineup .player-select-button').first().click();
   await page.locator('[data-event-type="assist"]').click();
-  await expect.poll(async () => (
-    await page.evaluate(() => window.__statsApp.eventController.getGame().events.length)
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
   )).toBe(1);
 
-  await page.locator('#voiceConfirmProposal').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    'game changed after this proposal'
-  );
-  await expect(page.locator('#voiceRetryProcessing')).toBeEnabled();
-
+  await page.locator('.voice-command-draft [data-voice-action="confirm"]').click();
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(3);
   const game = await page.evaluate(() => window.__statsApp.eventController.getGame());
-  expect(game.events).toHaveLength(1);
-  expect(game.events[0].type).toBe('assist');
+  expect(game.events).toHaveLength(3);
+  expect(game.events.map(event => event.sequence)).toEqual([1, 2, 3]);
 });
 
-test('the normal undo control also removes the latest voice batch together', async ({ page }) => {
+test('rejects confirmation when the lineup at the captured timestamp changes', async ({ page }) => {
   await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
 
-  await page.locator('#voiceStartRecording').click();
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
-  await page.locator('#voiceConfirmProposal').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    '2 voice events added'
-  );
+  await page.locator('#openSubstitution').click();
+  await page.locator('#substitutionForm button[type="submit"]').click();
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(1);
 
-  await page.locator('#undoEvent').click();
-  await expect.poll(async () => (
-    await page.evaluate(() => window.__statsApp.eventController.getGame().events.length)
-  )).toBe(0);
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    'Voice batch undone'
-  );
-  await expect(page.locator('#voiceUndoBatch')).toBeDisabled();
-  const stored = await page.evaluate(async () => (
-    await window.__statsApp.store.listGames()
-  )[0]);
-  expect(stored.events).toEqual([]);
+  const draft = page.locator('.voice-command-draft');
+  await draft.locator('[data-voice-action="confirm"]').click();
+  await expect(draft).toContainText('lineup at this command timestamp changed');
+  expect(await page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(1);
 });
 
-test('keeps the full proposal out of memory and storage when saving fails', async ({ page }) => {
+test('keeps every proposed event out of memory and storage when saving fails', async ({ page }) => {
   await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
-
-  await page.locator('#voiceStartRecording').click();
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
   await page.evaluate(() => {
     window.__originalVoiceSaveGame = window.__statsApp.store.saveGame;
     window.__statsApp.store.saveGame = async () => {
@@ -462,12 +435,9 @@ test('keeps the full proposal out of memory and storage when saving fails', asyn
     };
   });
 
-  await page.locator('#voiceConfirmProposal').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    'Simulated voice storage failure'
-  );
-  await expect(page.locator('#voiceConfirmProposal')).toBeEnabled();
-
+  const draft = page.locator('.voice-command-draft');
+  await draft.locator('[data-voice-action="confirm"]').click();
+  await expect(draft).toContainText('Simulated voice storage failure');
   const failed = await page.evaluate(async () => ({
     game: window.__statsApp.eventController.getGame(),
     stored: await window.__statsApp.store.getGame(
@@ -480,92 +450,108 @@ test('keeps the full proposal out of memory and storage when saving fails', asyn
   await page.evaluate(() => {
     window.__statsApp.store.saveGame = window.__originalVoiceSaveGame;
   });
-  await page.locator('#voiceConfirmProposal').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    '2 voice events added'
-  );
+  await draft.locator('[data-voice-action="confirm"]').click();
+  await expect(draft).toHaveCount(0);
 });
 
-test('rejects the whole batch when an edited proposal event is invalid', async ({ page }) => {
+test('rejects the full batch when an edited draft event is invalid', async ({ page }) => {
   await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
 
-  await page.locator('#voiceStartRecording').click();
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
-  await page.locator('.voice-proposal-event').first()
-    .locator('[data-voice-field="playerId"]')
-    .selectOption('');
-
-  await page.locator('#voiceConfirmProposal').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    'player who is not on court'
-  );
-
-  const result = await page.evaluate(async () => ({
-    game: window.__statsApp.eventController.getGame(),
-    stored: (await window.__statsApp.store.listGames())[0]
-  }));
-  expect(result.game.events).toEqual([]);
-  expect(result.stored.events).toEqual([]);
+  const draft = page.locator('.voice-command-draft');
+  await draft.locator('[data-voice-field="playerId"]').first().selectOption('');
+  await draft.locator('[data-voice-action="confirm"]').click();
+  await expect(draft).toContainText('player who is not on court');
+  expect(await page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(0);
 });
 
-test('prevents overlapping recordings and reports microphone permission failures', async ({ page }) => {
+test('moves connection and audio controls into the adjacent settings dialog', async ({ page }) => {
   await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
+  await waitForConnection(page);
+  await page.locator('#voiceOpenSettings').click();
+  await expect(page.locator('#voiceSettingsDialog')).toHaveAttribute('open', '');
+  await expect(page.locator('#voiceConnectionSettings')).toBeVisible();
 
-  await page.locator('#voiceStartRecording').click();
-  await expect(page.locator('#voiceStartRecording')).toBeDisabled();
-  expect(await page.evaluate(() => window.__microphoneRequestCount)).toBe(1);
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
-
-  await page.locator('#voiceDiscardProposal').click();
-  await page.evaluate(() => { window.__voiceTestMode = 'microphone-denied'; });
-  await page.locator('#voiceStartRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    'Could not start recording: Permission denied'
-  );
-  await expect(page.locator('#voiceStartRecording')).toBeEnabled();
-});
-
-test('optionally pauses and resumes video around recording', async ({ page }) => {
-  await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
-  await page.locator('#voiceOpenAudioSettings').click();
-  await expect(page.locator('#voiceAudioSettingsDialog')).toHaveAttribute('open', '');
   await page.locator('#voiceAudioProcessing').selectOption('processed');
   await page.locator('#voiceChannelPreference').selectOption('right');
   await page.locator('#voicePauseVideoDuringRecording').check();
-  await page.locator('#voiceCloseAudioSettings').click();
+  await page.locator('#voiceCloseSettings').click();
   await page.evaluate(() => { window.__statsFakePlayer.playing = true; });
 
-  await page.locator('#voiceStartRecording').click();
+  await page.locator('#voiceRecordToggle').click();
   expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(false);
-  expect(await page.evaluate(() => window.__statsFakePlayer.pauseCount)).toBe(1);
   expect(await page.evaluate(() => window.__lastAudioConstraints.audio)).toEqual({
     channelCount: 1,
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true
   });
-
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await page.locator('#voiceRecordToggle').click();
+  await waitForDrafts(page, 1);
   expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(true);
-  expect(await page.evaluate(() => window.__statsFakePlayer.playCount)).toBe(1);
-  expect(await page.evaluate(() => localStorage.getItem(
-    'basketball-stats-voice-pause-video'
-  ))).toBe('true');
-  expect(await page.evaluate(() => localStorage.getItem(
-    'basketball-stats-voice-audio-processing'
-  ))).toBe('processed');
   expect(await page.evaluate(
     () => window.__voiceRequests[0].audioChannelPreference
   )).toBe('right');
-  expect(await page.evaluate(() => localStorage.getItem(
-    'basketball-stats-voice-channel-preference'
-  ))).toBe('right');
+});
+
+test('cancels an active command and retries its retained recording', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'cancel-once' });
+  await waitForConnection(page);
+  await recordCommand(page);
+  await expect(page.locator('.voice-command-processing')).toHaveCount(1);
+  await page.locator('.voice-command-processing [data-voice-action="cancel"]').click();
+  await expect(page.locator('.voice-command-error')).toContainText('Processing cancelled');
+
+  await page.evaluate(() => { window.__voiceTestMode = 'success'; });
+  await page.locator('.voice-command-error [data-voice-action="retry"]').click();
+  await waitForDrafts(page, 1);
+  expect(await page.evaluate(() => window.__voiceCommandCount)).toBe(2);
+});
+
+test('keeps partial transcripts and rejects invalid companion proposals', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'partial-error' });
+  await waitForConnection(page);
+  await recordCommand(page);
+  await expect(page.locator('.voice-command-error')).toContainText('Interpretation failed');
+  await expect(page.locator('.voice-command-error textarea').first()).toHaveValue('Seven assist');
+
+  await page.evaluate(() => { window.__voiceTestMode = 'invalid'; });
+  await page.locator('.voice-command-error [data-voice-action="retry"]').click();
+  await expect(page.locator('.voice-command-error')).toContainText(
+    'does not reference a current game player'
+  );
+  expect(await page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(0);
+});
+
+test('opens actionable settings when the companion is unavailable', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'unavailable' });
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.voiceController.getState().connected
+  )).toBe(false);
+  await expect(page.locator('#eventEntryPanel')).toBeVisible();
+  await expect(page.locator('#voiceRecordToggle')).toBeEnabled();
+
+  await page.locator('#voiceRecordToggle').click();
+  await expect(page.locator('#voiceSettingsDialog')).toHaveAttribute('open', '');
+  await expect(page.locator('#voiceConnectionStatus')).toContainText(
+    'Could not reach the local voice companion'
+  );
+});
+
+test('auto-connects without a token when tokenless mode is advertised', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'tokenless' });
+  await waitForConnection(page);
+  await page.locator('#voiceOpenSettings').click();
+  await expect(page.locator('#voiceConnectionStatus')).toContainText(
+    'tokenless local mode'
+  );
+  expect(await page.evaluate(() => window.__voiceClientOptions.token)).toBe('');
 });
 
 test('classifies left, right, both, and silent channel previews', async ({ page }) => {
@@ -587,82 +573,12 @@ test('classifies left, right, both, and silent channel previews', async ({ page 
   ]);
 });
 
-test('cancels processing, keeps audio for retry, and disables discard while active', async ({ page }) => {
+test('review mode removes every voice mutation and settings surface', async ({ page }) => {
   await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
-  await page.evaluate(() => { window.__voiceTestMode = 'cancel-once'; });
-
-  await page.locator('#voiceStartRecording').click();
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('Transcribing');
-  await expect(page.locator('#voiceDiscardProposal')).toBeDisabled();
-  await page.locator('#voiceCancelProcessing').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('Processing cancelled');
-  await expect(page.locator('#voiceRetryProcessing')).toBeEnabled();
-
-  await page.locator('#voiceRetryProcessing').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
-  expect(await page.evaluate(() => window.__voiceCommandCount)).toBe(2);
-});
-
-test('shows partial transcripts and rejects invalid companion proposals', async ({ page }) => {
-  await openVoiceTracker(page);
-  await connectVoiceCompanion(page);
-  await page.evaluate(() => { window.__voiceTestMode = 'partial-error'; });
-
-  await page.locator('#voiceStartRecording').click();
-  await page.locator('#voiceStopRecording').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText('Interpretation failed');
-  await expect(page.locator('#voiceTranscript')).toHaveValue('Seven assist');
-
-  await page.evaluate(() => { window.__voiceTestMode = 'invalid'; });
-  await page.locator('#voiceRetryProcessing').click();
-  await expect(page.locator('#voiceRecordingStatus')).toContainText(
-    'does not reference a current game player'
+  const gameId = await page.evaluate(
+    () => window.__statsApp.eventController.getGame().id
   );
-  await expect(page.locator('.voice-proposal-event')).toHaveCount(0);
-
-  const game = await page.evaluate(() => window.__statsApp.eventController.getGame());
-  expect(game.events).toEqual([]);
-});
-
-test('reports unavailable and incompatible companions without breaking tracking', async ({ page }) => {
-  await openVoiceTracker(page);
-  await page.locator('#voiceConnectionSettings > summary').click();
-  await page.locator('#voiceCompanionToken').fill('test-token');
-
-  await page.evaluate(() => { window.__voiceTestMode = 'unavailable'; });
-  await page.locator('#voiceConnect').click();
-  await expect(page.locator('#voiceConnectionStatus')).toContainText(
-    'Could not reach the local voice companion'
-  );
-  await expect(page.locator('#voiceStartRecording')).toBeDisabled();
-
-  await page.evaluate(() => { window.__voiceTestMode = 'incompatible'; });
-  await page.locator('#voiceConnect').click();
-  await expect(page.locator('#voiceConnectionStatus')).toContainText(
-    'protocol is incompatible'
-  );
-  await expect(page.locator('#eventEntryPanel')).toBeVisible();
-  await expect(page.locator('[data-event-type="assist"]')).toBeEnabled();
-});
-
-test('connects without a token when the companion advertises tokenless mode', async ({ page }) => {
-  await openVoiceTracker(page);
-  await page.evaluate(() => { window.__voiceTestMode = 'tokenless'; });
-  await page.locator('#voiceConnectionSettings > summary').click();
-  await page.locator('#voiceConnect').click();
-
-  await expect(page.locator('#voiceConnectionStatus')).toContainText(
-    'tokenless local mode'
-  );
-  expect(await page.evaluate(() => window.__voiceClientOptions.token)).toBe('');
-  await expect(page.locator('#voiceStartRecording')).toBeEnabled();
-});
-
-test('review mode removes the voice mutation surface', async ({ page }) => {
-  await openVoiceTracker(page);
-  const gameId = await page.evaluate(() => window.__statsApp.eventController.getGame().id);
   await page.goto(`/stats/?mode=review&game=${encodeURIComponent(gameId)}`);
-  await expect(page.locator('#voiceCapturePanel')).toHaveCount(0);
+  await expect(page.locator('#voiceCompactControls')).toHaveCount(0);
+  await expect(page.locator('#voiceSettingsDialog')).toHaveCount(0);
 });

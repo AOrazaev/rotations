@@ -62,7 +62,7 @@ dominant left or right channel when the other side is effectively silent;
 otherwise it performs a normal stereo-to-mono mix. The selected mode is reported
 as `processor.audioChannelMode`.
 
-The tracker's **Audio settings** dialog provides a **Channel handling** override:
+The tracker's **Voice settings** dialog provides a **Channel handling** override:
 **Automatic** (recommended), **Left only**, **Right only**, or **Mix both**.
 Automatic keeps the dominant-channel behavior while explicit selections are
 useful for unusual interface routing.

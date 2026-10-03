@@ -2,6 +2,7 @@ import {
   getLineupAtEventPosition,
   orderGameEvents
 } from './game-model.js';
+import { editableEventTypes } from './voice-proposal.js';
 import { createShotDetailsEditor } from './shot-details-editor.js';
 import { getConfidentExpectedShotValue } from './shot-geometry.js';
 import {
@@ -121,6 +122,7 @@ export function createEventListController({
   let earliestFirst = initialEarliestFirst;
   let activeEventId = null;
   let highlightedEventIds = new Set();
+  let voiceCommands = [];
   let lastPlaybackSeconds = 0;
   let playbackFollowing = true;
   let suppressManualScrollUntil = 0;
@@ -589,6 +591,231 @@ export function createEventListController({
     dialog.showModal();
   }
 
+  function voiceOption(value, label, selected) {
+    const option = documentObject.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    option.selected = selected;
+    return option;
+  }
+
+  function voiceAction(label, action, className = 'secondary small') {
+    const button = documentObject.createElement('button');
+    button.type = 'button';
+    button.className = className;
+    button.dataset.voiceAction = action;
+    button.textContent = label;
+    return button;
+  }
+
+  function renderVoiceDraftEvent(command, event, index, players) {
+    const fieldset = documentObject.createElement('fieldset');
+    fieldset.className = 'voice-proposal-event';
+    fieldset.dataset.voiceEventIndex = String(index);
+    const legend = documentObject.createElement('legend');
+    legend.textContent = `Event ${index + 1} · ${Math.round(event.confidence * 100)}% confidence`;
+    fieldset.append(legend);
+
+    const grid = documentObject.createElement('div');
+    grid.className = 'voice-proposal-grid';
+    const addSelect = (labelText, field, options, disabled = false) => {
+      const label = documentObject.createElement('label');
+      label.textContent = labelText;
+      const select = documentObject.createElement('select');
+      select.dataset.voiceField = field;
+      select.disabled = disabled;
+      select.append(...options);
+      label.append(select);
+      grid.append(label);
+    };
+
+    addSelect('Side', 'side', [
+      voiceOption('team', 'Our team', event.side === 'team'),
+      voiceOption('opponent', 'Opponent', event.side === 'opponent')
+    ]);
+    addSelect('Player', 'playerId', [
+      voiceOption('', 'Select player', !event.playerId),
+      ...players.map(player => voiceOption(
+        player.id,
+        player.number ? `#${player.number} ${player.name}` : player.name,
+        event.playerId === player.id
+      ))
+    ], event.side === 'opponent');
+    addSelect('Event', 'type', editableEventTypes().map(type => voiceOption(
+      type,
+      type.replace('_', ' '),
+      event.type === type
+    )));
+
+    if (event.type === 'shot') {
+      addSelect('Shot value', 'shotValue', [1, 2, 3].map(value => voiceOption(
+        String(value),
+        `${value} point`,
+        event.shotValue === value
+      )));
+      addSelect('Result', 'made', [
+        voiceOption('true', 'Made', event.made === true),
+        voiceOption('false', 'Missed', event.made === false)
+      ]);
+    } else if (event.type === 'rebound') {
+      addSelect('Rebound', 'reboundKind', [
+        voiceOption('offensive', 'Offensive', event.reboundKind === 'offensive'),
+        voiceOption('defensive', 'Defensive', event.reboundKind === 'defensive')
+      ]);
+    }
+
+    const remove = voiceAction('Remove event', 'remove-event', 'danger small voice-remove-event');
+    remove.dataset.voiceEventIndex = String(index);
+    grid.append(remove);
+    fieldset.append(grid);
+    return fieldset;
+  }
+
+  function renderVoiceCommand(command, players) {
+    const item = documentObject.createElement('li');
+    item.className = `event-list-item voice-command-item voice-command-${command.state}`;
+    item.dataset.voiceCommandId = command.id;
+
+    const time = documentObject.createElement('span');
+    time.className = 'event-time voice-command-time';
+    time.textContent = formatVideoTime(command.capturedSeconds);
+    const content = documentObject.createElement('div');
+    content.className = 'voice-command-content';
+    const heading = documentObject.createElement('div');
+    heading.className = 'voice-command-heading';
+    const title = documentObject.createElement('strong');
+    const stateLabels = {
+      queued: 'Voice command queued',
+      processing: 'Voice command is processing',
+      cancelling: 'Cancelling voice command',
+      draft: `${command.events.length} voice event${command.events.length === 1 ? '' : 's'} ready`,
+      committing: 'Adding voice events',
+      error: 'Voice command needs attention'
+    };
+    title.textContent = stateLabels[command.state] || 'Voice command';
+    if (['queued', 'processing', 'cancelling', 'committing'].includes(command.state)) {
+      const spinner = documentObject.createElement('span');
+      spinner.className = 'voice-command-spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      heading.append(spinner);
+    }
+    heading.append(title);
+    content.append(heading);
+
+    if (command.errorMessage) {
+      const error = documentObject.createElement('p');
+      error.className = 'message error';
+      error.textContent = command.errorMessage;
+      content.append(error);
+    } else if (command.transcript) {
+      const transcript = documentObject.createElement('p');
+      transcript.className = 'voice-command-transcript';
+      transcript.textContent = command.transcript;
+      content.append(transcript);
+    }
+
+    if (command.state === 'draft' || (command.state === 'error' && command.audioUrl)) {
+      const details = documentObject.createElement('details');
+      details.className = 'voice-command-details';
+      details.open = command.state === 'draft';
+      const summary = documentObject.createElement('summary');
+      summary.textContent = command.state === 'draft' ? 'Review voice proposal' : 'Recording details';
+      details.append(summary);
+      if (command.audioUrl) {
+        const audio = documentObject.createElement('audio');
+        audio.controls = true;
+        audio.preload = 'metadata';
+        audio.src = command.audioUrl;
+        audio.className = 'voice-recording-preview';
+        details.append(audio);
+      }
+      if (command.transcript) {
+        const original = documentObject.createElement('label');
+        original.className = 'voice-transcript-label';
+        original.textContent = 'Transcript';
+        const textarea = documentObject.createElement('textarea');
+        textarea.rows = 2;
+        textarea.readOnly = true;
+        textarea.value = command.transcript;
+        original.append(textarea);
+        details.append(original);
+      }
+      if (command.canSaveEvaluation) {
+        const expected = documentObject.createElement('label');
+        expected.className = 'voice-transcript-label';
+        expected.textContent = 'Expected transcript for evaluation';
+        const textarea = documentObject.createElement('textarea');
+        textarea.rows = 2;
+        textarea.value = command.expectedTranscript || '';
+        textarea.dataset.voiceField = 'expectedTranscript';
+        expected.append(textarea);
+        details.append(expected);
+      }
+      if (command.warnings?.length) {
+        const warnings = documentObject.createElement('ul');
+        warnings.className = 'voice-warnings';
+        for (const warning of command.warnings) {
+          const warningItem = documentObject.createElement('li');
+          warningItem.textContent = warning;
+          warnings.append(warningItem);
+        }
+        details.append(warnings);
+      }
+      if (command.diagnostics) {
+        const diagnostics = documentObject.createElement('p');
+        diagnostics.className = 'message';
+        diagnostics.textContent = command.diagnostics;
+        details.append(diagnostics);
+      }
+      if (command.state === 'draft') {
+        const proposals = documentObject.createElement('div');
+        proposals.className = 'voice-proposal-events';
+        command.events.forEach((event, index) => {
+          proposals.append(renderVoiceDraftEvent(command, event, index, players));
+        });
+        details.append(proposals);
+      }
+      if (command.evaluationStatus) {
+        const status = documentObject.createElement('p');
+        status.className = `message voice-status ${command.evaluationStatusKind || ''}`.trim();
+        status.textContent = command.evaluationStatus;
+        details.append(status);
+      }
+      content.append(details);
+    }
+
+    const actions = documentObject.createElement('div');
+    actions.className = 'voice-command-actions';
+    if (command.state === 'queued') {
+      actions.append(voiceAction('Discard', 'discard', 'danger small'));
+    } else if (command.state === 'processing') {
+      actions.append(voiceAction('Cancel', 'cancel'));
+    } else if (command.state === 'draft') {
+      const confirm = voiceAction('Add events', 'confirm', 'primary small');
+      confirm.disabled = !command.events.length;
+      actions.append(
+        confirm,
+        voiceAction('Use current time', 'replace-timestamp'),
+        voiceAction('Retry', 'retry'),
+        voiceAction('Discard', 'discard', 'danger small')
+      );
+      if (command.canSaveEvaluation) {
+        actions.append(voiceAction('Save sample', 'save-evaluation'));
+      }
+    } else if (command.state === 'error') {
+      actions.append(
+        voiceAction('Retry', 'retry', 'primary small'),
+        voiceAction('Discard', 'discard', 'danger small')
+      );
+      if (command.canSaveEvaluation) {
+        actions.append(voiceAction('Save sample', 'save-evaluation'));
+      }
+    }
+    content.append(actions);
+    item.append(time, content);
+    return item;
+  }
+
   function render(nextGame) {
     game = nextGame;
     eventList.innerHTML = '';
@@ -621,12 +848,32 @@ export function createEventListController({
       );
     }
     updateMobileTimelinePreview();
-    const events = (earliestFirst ? orderedEvents : orderedEvents.reverse()).filter(eventMatchesFilters);
-    emptyEvents.textContent = game.events.length && !events.length
+    const visibleEvents = orderedEvents.filter(eventMatchesFilters);
+    const timelineItems = [
+      ...visibleEvents.map(event => ({
+        kind: 'event',
+        videoSeconds: event.videoSeconds,
+        order: event.sequence,
+        value: event
+      })),
+      ...voiceCommands.map(command => ({
+        kind: 'voice',
+        videoSeconds: command.capturedSeconds,
+        order: Number.MAX_SAFE_INTEGER - 1000 + command.order,
+        value: command
+      }))
+    ].sort((a, b) => a.videoSeconds - b.videoSeconds || a.order - b.order);
+    if (!earliestFirst) timelineItems.reverse();
+    emptyEvents.textContent = (game.events.length || voiceCommands.length) && !timelineItems.length
       ? 'No events match the current filters.'
       : 'No events recorded.';
-    emptyEvents.classList.toggle('hidden', events.length > 0);
-    for (const event of events) {
+    emptyEvents.classList.toggle('hidden', timelineItems.length > 0);
+    for (const timelineItem of timelineItems) {
+      if (timelineItem.kind === 'voice') {
+        eventList.append(renderVoiceCommand(timelineItem.value, game.players));
+        continue;
+      }
+      const event = timelineItem.value;
       const item = eventTemplate.content.firstElementChild.cloneNode(true);
       item.dataset.eventId = event.id;
       item.classList.toggle('voice-added-event', highlightedEventIds.has(event.id));
@@ -984,6 +1231,10 @@ export function createEventListController({
   return {
     render,
     getFilters: getFilterState,
+    setVoiceCommands(commands) {
+      voiceCommands = structuredClone(commands);
+      render(game);
+    },
     highlightEvents(eventIds) {
       highlightedEventIds = new Set(eventIds);
       for (const item of eventList.querySelectorAll('[data-event-id]')) {
