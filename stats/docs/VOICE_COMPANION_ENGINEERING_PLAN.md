@@ -760,7 +760,7 @@ Exit gate:
 
 ### Checkpoint 5: Stats recording and proposal preview
 
-**Status: in progress.** The tracker now has an optional loopback-only companion
+**Status: complete.** The tracker now has an optional loopback-only companion
 client, connection and warmup status, microphone recording with recording-start
 timestamps, cancellation and retry, strict browser-side proposal validation,
 partial transcript recovery, and an editable non-persistent proposal preview.
@@ -768,11 +768,11 @@ Tracker tests cover companion and microphone failures, overlapping-recording
 prevention, cancellation, invalid proposals, zero game writes, and removal of
 the voice surface from Review mode. Explicit opt-in evaluation collection now
 stores audio, original and corrected results, and diagnostics in the local
-companion folder with tracker review, ZIP export, and deletion controls. Real
-browser-to-companion microphone validation remains open. The tracker also
-supports explicit microphone selection, speech-oriented capture constraints,
-higher-bitrate recording, and immediate playback so poor input can be rejected
-before it enters the evaluation corpus. An optional persisted recording mode
+companion folder with tracker review, ZIP export, and deletion controls. The
+tracker also supports explicit microphone selection, speech-oriented capture
+constraints, higher-bitrate recording, and immediate playback so poor input can
+be rejected before it enters the evaluation corpus. An optional persisted
+recording mode
 pauses active video playback to prevent game-audio contamination and resumes it
 after capture only when it was previously playing; the default keeps playback
 running for faster stat entry. Raw microphone capture is the default for audio
@@ -805,6 +805,8 @@ Verification:
 - Tracker, Review, and shared modes initialize the correct surfaces.
 
 ### Checkpoint 6: Atomic timeline integration
+
+**Status: in progress.**
 
 Deliver:
 
