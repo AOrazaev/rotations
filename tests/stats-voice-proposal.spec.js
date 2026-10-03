@@ -378,6 +378,39 @@ test('records another command while the first processes and sends requests seque
   expect(await page.evaluate(() => window.__voiceCommandCount)).toBe(2);
 });
 
+test('rerecords a draft in place while preserving its original timestamp', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+
+  const draft = page.locator('.voice-command-draft');
+  const original = await page.evaluate(
+    () => window.__statsApp.voiceController.getState().jobs[0]
+  );
+  await draft.locator('.voice-command-details > summary').click();
+  await page.evaluate(() => { window.__statsFakePlayer.current = 88; });
+  await draft.locator('[data-voice-action="rerecord"]').click();
+  await expect(page.locator('.voice-command-rerecording')).toHaveCount(1);
+  await expect(page.locator('#voiceRecordLabel')).toContainText('Stop');
+  expect(await page.evaluate(
+    () => window.__statsApp.voiceController.getState().jobs.length
+  )).toBe(1);
+
+  await page.locator(
+    '.voice-command-rerecording [data-voice-action="stop-rerecord"]'
+  ).click();
+  await waitForDrafts(page, 1);
+  const rerecorded = await page.evaluate(
+    () => window.__statsApp.voiceController.getState().jobs[0]
+  );
+  expect(rerecorded.id).toBe(original.id);
+  expect(rerecorded.capturedSeconds).toBe(42.4);
+  expect(rerecorded.audioUrl).not.toBe(original.audioUrl);
+  expect(await page.evaluate(() => window.__voiceRequests[1].capturedSeconds)).toBe(42.4);
+  await expect(page.locator('.voice-command-draft .voice-command-time')).toHaveText('0:42.4');
+});
+
 test('confirms completed drafts independently and preserves atomic batch undo', async ({ page }) => {
   await openVoiceTracker(page, { mode: 'hold-first' });
   await waitForConnection(page);
@@ -549,8 +582,17 @@ test('keeps partial transcripts and rejects invalid companion proposals', async 
   await expect(page.locator('.voice-command-error')).toContainText('Interpretation failed');
   await expect(page.locator('.voice-command-error textarea').first()).toHaveValue('Seven assist');
 
+  await page.evaluate(() => { window.__voiceTestMode = 'success'; });
+  await page.locator('.voice-command-error .voice-command-details > summary').click();
+  await page.locator('.voice-command-error [data-voice-action="rerecord"]').click();
+  await expect(page.locator('.voice-command-rerecording')).toHaveCount(1);
+  await page.locator(
+    '.voice-command-rerecording [data-voice-action="stop-rerecord"]'
+  ).click();
+  await waitForDrafts(page, 1);
+
   await page.evaluate(() => { window.__voiceTestMode = 'invalid'; });
-  await page.locator('.voice-command-error [data-voice-action="retry"]').click();
+  await page.locator('.voice-command-draft [data-voice-action="retry"]').click();
   await expect(page.locator('.voice-command-error')).toContainText(
     'does not reference a current game player'
   );

@@ -240,19 +240,24 @@ export function createVoiceCaptureController({
     const available = hasGameAndVideo()
       && mediaDevices?.getUserMedia
       && MediaRecorderClass;
+    const rerecording = Boolean(recording?.replacementJobId);
     recordButton.disabled = !available;
     recordButton.classList.toggle('recording', Boolean(recording));
     recordButton.setAttribute(
       'aria-label',
-      recording ? 'Stop voice recording' : 'Start voice recording'
+      recording
+        ? (rerecording ? 'Stop rerecording voice command' : 'Stop voice recording')
+        : 'Start voice recording'
     );
-    recordButton.title = recording ? 'Stop voice recording' : 'Start voice recording';
+    recordButton.title = recording
+      ? (rerecording ? 'Stop rerecording voice command' : 'Stop voice recording')
+      : 'Start voice recording';
 
     if (recording) {
       readiness.className = 'voice-readiness recording';
       recordLabel.textContent = `Stop ${recordingDurationLabel()}`;
       setCommandStatus(
-        `Recording at ${formatVideoTime(recording.capturedSeconds)}. Click again to stop.`,
+        `${rerecording ? 'Rerecording command' : 'Recording'} at ${formatVideoTime(recording.capturedSeconds)}. Click again to stop.`,
         'recording'
       );
     } else {
@@ -481,6 +486,13 @@ export function createVoiceCaptureController({
   }
 
   function discardActiveRecording() {
+    const replacementJob = recording?.replacementJobId
+      ? jobs.find(job => job.id === recording.replacementJobId)
+      : null;
+    if (replacementJob?.state === 'rerecording') {
+      replacementJob.state = recording.previousState;
+      publishJobs();
+    }
     if (recorder?.state === 'recording') {
       discardingRecording = true;
       recorder.stop();
@@ -495,11 +507,43 @@ export function createVoiceCaptureController({
   }
 
   function enqueueRecording(audio, mimeType) {
+    const audioUrl = URL.createObjectURL(audio);
+    if (recording.replacementJobId) {
+      const job = jobs.find(item => item.id === recording.replacementJobId);
+      if (!job) {
+        URL.revokeObjectURL(audioUrl);
+        recording = null;
+        refreshCompactControls();
+        return;
+      }
+      revokeJobAudio(job);
+      Object.assign(job, {
+        state: 'queued',
+        audio,
+        audioUrl,
+        mimeType,
+        requestId: null,
+        context: null,
+        response: null,
+        transcript: '',
+        expectedTranscript: '',
+        events: [],
+        warnings: [],
+        errorMessage: '',
+        evaluationStatus: '',
+        evaluationStatusKind: ''
+      });
+      recording = null;
+      publishJobs();
+      refreshCompactControls();
+      pumpQueue();
+      return;
+    }
     const job = {
       ...recording,
       state: 'queued',
       audio,
-      audioUrl: URL.createObjectURL(audio),
+      audioUrl,
       mimeType,
       requestId: null,
       context: null,
@@ -524,6 +568,26 @@ export function createVoiceCaptureController({
       stopRecording();
       return;
     }
+    await beginRecording();
+  }
+
+  async function rerecordJob(job) {
+    if (!['draft', 'error'].includes(job.state)) return;
+    const game = getGame();
+    if (!game || game.id !== job.gameId) {
+      job.state = 'error';
+      job.errorMessage = 'This voice command belongs to a different game.';
+      publishJobs();
+      return;
+    }
+    if (recording) {
+      setStatusNotice('Finish the current voice recording before rerecording.', 'error');
+      return;
+    }
+    await beginRecording(job);
+  }
+
+  async function beginRecording(replacementJob = null) {
     if (!connected) {
       await connect({ openOnFailure: true });
       if (!connected) return;
@@ -551,13 +615,23 @@ export function createVoiceCaptureController({
         ...(preferredType ? { mimeType: preferredType } : {}),
         audioBitsPerSecond: 128000
       });
-      recording = {
-        id: crypto.randomUUID(),
-        order: nextJobOrder++,
-        gameId: game.id,
-        gameSnapshot: structuredClone(game),
-        capturedSeconds
-      };
+      recording = replacementJob
+        ? {
+            id: replacementJob.id,
+            order: replacementJob.order,
+            gameId: replacementJob.gameId,
+            gameSnapshot: structuredClone(replacementJob.gameSnapshot),
+            capturedSeconds: replacementJob.capturedSeconds,
+            replacementJobId: replacementJob.id,
+            previousState: replacementJob.state
+          }
+        : {
+            id: crypto.randomUUID(),
+            order: nextJobOrder++,
+            gameId: game.id,
+            gameSnapshot: structuredClone(game),
+            capturedSeconds
+          };
       recorder.addEventListener('dataavailable', event => {
         if (event.data?.size) chunks.push(event.data);
       });
@@ -581,6 +655,11 @@ export function createVoiceCaptureController({
         enqueueRecording(audio, mimeType);
       });
       recorder.start();
+      if (replacementJob) {
+        replacementJob.state = 'rerecording';
+        replacementJob.errorMessage = '';
+        publishJobs();
+      }
       recordingStartedAt = Date.now();
       recordingTimer = documentObject.defaultView.setInterval(refreshCompactControls, 250);
       refreshCompactControls();
@@ -603,6 +682,11 @@ export function createVoiceCaptureController({
     recordLabel.textContent = 'Finishing...';
     stopRecordingTimer();
     recorder.stop();
+  }
+
+  function stopRerecording(job) {
+    if (recording?.replacementJobId !== job.id) return;
+    stopRecording();
   }
 
   function pumpQueue() {
@@ -960,6 +1044,8 @@ export function createVoiceCaptureController({
     if (action === 'discard') removeJob(job);
     else if (action === 'cancel') cancelJob(job);
     else if (action === 'retry') retryJob(job);
+    else if (action === 'rerecord') rerecordJob(job);
+    else if (action === 'stop-rerecord') stopRerecording(job);
     else if (action === 'confirm') confirmJob(job);
     else if (action === 'replace-timestamp') replaceJobTimestamp(job);
     else if (action === 'save-evaluation') saveEvaluationSample(job);

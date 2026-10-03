@@ -723,12 +723,13 @@ export function createEventListController({
       queued: 'Voice command queued',
       processing: 'Voice command is processing',
       cancelling: 'Cancelling voice command',
+      rerecording: 'Rerecording voice command',
       draft: `${command.events.length} voice event${command.events.length === 1 ? '' : 's'} ready`,
       committing: 'Adding voice events',
       error: 'Voice command needs attention'
     };
     title.textContent = stateLabels[command.state] || 'Voice command';
-    if (['queued', 'processing', 'cancelling', 'committing'].includes(command.state)) {
+    if (['queued', 'processing', 'cancelling', 'rerecording', 'committing'].includes(command.state)) {
       const spinner = documentObject.createElement('span');
       spinner.className = 'voice-command-spinner';
       spinner.setAttribute('aria-hidden', 'true');
@@ -826,6 +827,7 @@ export function createEventListController({
         const editActions = documentObject.createElement('div');
         editActions.className = 'voice-command-actions voice-command-edit-actions';
         editActions.append(
+          voiceAction('Rerecord', 'rerecord'),
           voiceAction('Use current time', 'replace-timestamp'),
           voiceAction('Retry', 'retry'),
           voiceAction('Discard', 'discard', 'danger small')
@@ -834,6 +836,12 @@ export function createEventListController({
           editActions.append(voiceAction('Save sample', 'save-evaluation'));
         }
         details.append(editActions);
+      }
+      if (command.state === 'error') {
+        const recordingActions = documentObject.createElement('div');
+        recordingActions.className = 'voice-command-actions voice-command-edit-actions';
+        recordingActions.append(voiceAction('Rerecord', 'rerecord'));
+        details.append(recordingActions);
       }
       if (command.evaluationStatus) {
         const status = documentObject.createElement('p');
@@ -850,6 +858,8 @@ export function createEventListController({
       actions.append(voiceAction('Discard', 'discard', 'danger small'));
     } else if (command.state === 'processing') {
       actions.append(voiceAction('Cancel', 'cancel'));
+    } else if (command.state === 'rerecording') {
+      actions.append(voiceAction('Stop rerecording', 'stop-rerecord', 'primary small'));
     } else if (command.state === 'error') {
       actions.append(
         voiceAction('Retry', 'retry', 'primary small'),
