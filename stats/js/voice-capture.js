@@ -60,6 +60,7 @@ export function createVoiceCaptureController({
   let proposalEvents = [];
   let destroyed = false;
   let discarding = false;
+  let resumePlaybackAfterRecording = false;
   let operationVersion = 0;
   let observedGameId = getGame()?.id || null;
 
@@ -130,6 +131,12 @@ export function createVoiceCaptureController({
     stream = null;
   }
 
+  function resumeVideoPlayback() {
+    if (!resumePlaybackAfterRecording) return;
+    resumePlaybackAfterRecording = false;
+    if (videoController.isReady()) videoController.play();
+  }
+
   function clearAudioPreview() {
     if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
     audioPreviewUrl = null;
@@ -192,6 +199,7 @@ export function createVoiceCaptureController({
       recorder.stop();
     }
     stopTracks();
+    resumeVideoPlayback();
     recorder = null;
     chunks = [];
     audio = null;
@@ -528,6 +536,8 @@ export function createVoiceCaptureController({
       await refreshMicrophones();
       capturedSeconds = videoController.getCurrentSeconds();
       timestampOutput.textContent = formatVideoTime(capturedSeconds);
+      resumePlaybackAfterRecording = videoController.isPlaying();
+      if (resumePlaybackAfterRecording) videoController.pause();
       const preferredType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg']
         .find(type => !MediaRecorderClass.isTypeSupported
           || MediaRecorderClass.isTypeSupported(type));
@@ -547,12 +557,14 @@ export function createVoiceCaptureController({
           discarding = false;
           stopTracks();
           recorder = null;
+          resumeVideoPlayback();
           return;
         }
         audio = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
         showAudioPreview();
         stopTracks();
         recorder = null;
+        resumeVideoPlayback();
         processAudio();
       });
       recorder.start();
@@ -564,6 +576,7 @@ export function createVoiceCaptureController({
     } catch (error) {
       stopTracks();
       recorder = null;
+      resumeVideoPlayback();
       state = 'error';
       setRecordingStatus(
         `Could not start recording: ${error.message || 'microphone unavailable'}`,

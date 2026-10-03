@@ -46,10 +46,20 @@ async function openVoiceTracker(page) {
     window.__STATS_DATABASE_NAME__ = name;
     window.__statsFakePlayer = {
       current: 42.4,
+      playing: false,
+      playCount: 0,
+      pauseCount: 0,
       getCurrentSeconds() { return this.current; },
       seekTo(seconds) { this.current = seconds; },
-      play() {},
-      pause() {},
+      isPlaying() { return this.playing; },
+      play() {
+        this.playing = true;
+        this.playCount += 1;
+      },
+      pause() {
+        this.playing = false;
+        this.pauseCount += 1;
+      },
       destroy() {}
     };
     window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
@@ -262,14 +272,19 @@ async function connectVoiceCompanion(page) {
 test('records and edits a voice proposal without writing game events', async ({ page }) => {
   await openVoiceTracker(page);
   await connectVoiceCompanion(page);
+  await page.evaluate(() => { window.__statsFakePlayer.playing = true; });
 
   await page.locator('#voiceStartRecording').click();
   await expect(page.locator('#voiceRecordingStatus')).toContainText('Recording at 0:42.4');
   await expect(page.locator('#voiceStartRecording')).toBeDisabled();
+  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(false);
+  expect(await page.evaluate(() => window.__statsFakePlayer.pauseCount)).toBe(1);
   await page.evaluate(() => { window.__statsFakePlayer.current = 99; });
   await page.locator('#voiceStopRecording').click();
 
   await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  expect(await page.evaluate(() => window.__statsFakePlayer.playing)).toBe(true);
+  expect(await page.evaluate(() => window.__statsFakePlayer.playCount)).toBe(1);
   await expect(page.locator('#voiceRecordingPreview')).toBeVisible();
   await expect(page.locator('#voiceTranscript')).toHaveValue('Seven assist and thirteen makes two');
   await expect(page.locator('.voice-proposal-event')).toHaveCount(2);

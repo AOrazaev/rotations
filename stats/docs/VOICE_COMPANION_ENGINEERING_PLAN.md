@@ -772,7 +772,9 @@ companion folder with tracker review, ZIP export, and deletion controls. Real
 browser-to-companion microphone validation remains open. The tracker also
 supports explicit microphone selection, speech-oriented capture constraints,
 higher-bitrate recording, and immediate playback so poor input can be rejected
-before it enters the evaluation corpus.
+before it enters the evaluation corpus. Starting a voice recording pauses active
+video playback to prevent game audio contamination and resumes it after capture
+only when it was previously playing.
 
 Deliver:
 

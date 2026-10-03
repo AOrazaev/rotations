@@ -202,6 +202,11 @@ export function createStatsSpikeApp({
       player.play();
       playbackActive = true;
     },
+    pause() {
+      if (!player) throw new Error('The game recording is unavailable for playback.');
+      player.pause();
+      playbackActive = false;
+    },
     destroy() {
       loadSequence += 1;
       if (timer) clearIntervalFn(timer);
