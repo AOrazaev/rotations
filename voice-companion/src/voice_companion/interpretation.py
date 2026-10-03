@@ -309,7 +309,10 @@ class LlamaCppCommandInterpreter:
             "For 'A assist and B makes two', emit B's shot and A's assist. "
             "Opponent statistics are team-level: always use side 'opponent' and "
             "playerId null. Never assign a team roster player to an opponent "
-            "event. Team statistics require a resolved supplied roster ID."
+            "event. Team statistics require a resolved supplied roster ID. "
+            "Resolve each clause independently when the side changes. After an "
+            "opponent event, an explicit roster jersey number starts a team "
+            "event unless that clause also says opponent."
         )
 
     @staticmethod
@@ -349,6 +352,37 @@ class LlamaCppCommandInterpreter:
                             },
                         ],
                         "overallConfidence": 0.96,
+                        "warnings": [],
+                    },
+                }
+            )
+        if roster:
+            rebounder = roster[0]
+            examples.append(
+                {
+                    "transcript": (
+                        "Opponent misses two pointer. Number "
+                        f"{rebounder['jersey']} defensive rebound."
+                    ),
+                    "result": {
+                        "events": [
+                            {
+                                "side": "opponent",
+                                "type": "shot",
+                                "playerId": None,
+                                "shotValue": 2,
+                                "made": False,
+                                "confidence": 0.99,
+                            },
+                            {
+                                "side": "team",
+                                "type": "rebound",
+                                "playerId": rebounder["id"],
+                                "reboundKind": "defensive",
+                                "confidence": 0.99,
+                            },
+                        ],
+                        "overallConfidence": 0.99,
                         "warnings": [],
                     },
                 }

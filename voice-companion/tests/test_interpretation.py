@@ -107,7 +107,15 @@ class CommandInterpreterTest(unittest.TestCase):
             False,
         )
         self.assertIn('"jersey":"13"', request["messages"][1]["content"])
+        self.assertIn(
+            "Opponent misses two pointer. Number 7 defensive rebound.",
+            request["messages"][1]["content"],
+        )
         self.assertIn("/no_think", request["messages"][0]["content"])
+        self.assertIn(
+            "Resolve each clause independently",
+            request["messages"][0]["content"],
+        )
 
     def test_rejects_player_id_absent_from_roster(self):
         payload = {
