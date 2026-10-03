@@ -67,6 +67,13 @@ The tracker's **Voice settings** dialog provides a **Channel handling** override
 Automatic keeps the dominant-channel behavior while explicit selections are
 useful for unusual interface routing.
 
+After transcription, the companion conservatively resolves common spoken
+teen/tens jersey confusions such as **fifteen** versus **fifty**. It only changes
+the transcript when the spoken number is absent, its counterpart is uniquely
+present in the active lineup, and the number is used as the subject of a
+supported statistic. The response includes a warning whenever this
+roster-aware normalization is applied.
+
 ## API
 
 ```text

@@ -16,6 +16,7 @@ from voice_companion.transcription import (
     BASKETBALL_HOTWORDS,
     BASKETBALL_INITIAL_PROMPT,
     FasterWhisperTranscriber,
+    normalize_active_jersey_confusions,
 )
 
 
@@ -39,6 +40,55 @@ class FakeModel:
 
 
 class FasterWhisperTranscriberTest(unittest.TestCase):
+    def test_normalizes_unique_active_teen_tens_jersey_confusion(self):
+        context = {
+            "roster": [
+                {"id": "p13", "jersey": "13", "name": "Dmytro"},
+                {"id": "p50", "jersey": "50", "name": "Denis"},
+            ],
+            "currentLineupIds": ["p13", "p50"],
+        }
+
+        transcript, warnings = normalize_active_jersey_confusions(
+            "Fifteen misses two pointer.",
+            context,
+        )
+
+        self.assertEqual(transcript, "Fifty misses two pointer.")
+        self.assertEqual(
+            warnings,
+            ["Normalized jersey Fifteen to Fifty using the active lineup."],
+        )
+
+    def test_keeps_ambiguous_or_non_stat_number_phrases(self):
+        both_active = {
+            "roster": [
+                {"id": "p15", "jersey": "15", "name": "Alex"},
+                {"id": "p50", "jersey": "50", "name": "Denis"},
+            ],
+            "currentLineupIds": ["p15", "p50"],
+        }
+        only_fifty = {
+            "roster": [
+                {"id": "p50", "jersey": "50", "name": "Denis"},
+            ],
+            "currentLineupIds": ["p50"],
+        }
+
+        ambiguous, ambiguous_warnings = normalize_active_jersey_confusions(
+            "Fifteen misses two pointer.",
+            both_active,
+        )
+        non_stat, non_stat_warnings = normalize_active_jersey_confusions(
+            "Fifteen seconds remaining.",
+            only_fifty,
+        )
+
+        self.assertEqual(ambiguous, "Fifteen misses two pointer.")
+        self.assertEqual(ambiguous_warnings, [])
+        self.assertEqual(non_stat, "Fifteen seconds remaining.")
+        self.assertEqual(non_stat_warnings, [])
+
     def test_loads_model_once_and_deletes_temporary_audio(self):
         calls = []
         model = FakeModel()

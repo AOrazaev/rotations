@@ -12,6 +12,7 @@ import threading
 import time
 import uuid
 import zipfile
+from dataclasses import replace
 from datetime import datetime, timezone
 from email.parser import BytesParser
 from email.policy import default
@@ -41,6 +42,7 @@ from .transcription import (
     Transcriber,
     TranscriptionUnavailable,
     create_transcriber,
+    normalize_active_jersey_confusions,
 )
 from .validation import RequestValidationError, validate_context
 from .profiles import default_model_directory, resolve_profile
@@ -597,6 +599,13 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 ALLOWED_AUDIO_TYPES[audio_type],
                 channel_preference=context.get("audioChannelPreference", "auto"),
             )
+            normalized_text, transcription_warnings = (
+                normalize_active_jersey_confusions(
+                    transcription.text,
+                    context,
+                )
+            )
+            transcription = replace(transcription, text=normalized_text)
             cancellation.raise_if_cancelled()
             transcription_ms = round(
                 (time.perf_counter() - transcription_started) * 1000
@@ -716,6 +725,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 audio_channel_mode=transcription.audio_channel_mode,
                 transcription_ms=transcription_ms,
                 interpretation=interpretation,
+                transcription_warnings=transcription_warnings,
                 interpretation_ms=interpretation_ms,
                 total_ms=total_ms,
             ),
@@ -820,6 +830,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 audio_channel_mode=None,
                 transcription_ms=0,
                 interpretation=interpretation,
+                transcription_warnings=[],
                 interpretation_ms=interpretation_ms,
                 total_ms=total_ms,
             ),
@@ -866,6 +877,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         audio_channel_mode: str | None,
         transcription_ms: int,
         interpretation: InterpretationResult,
+        transcription_warnings: list[str],
         interpretation_ms: int,
         total_ms: int,
     ) -> dict:
@@ -875,7 +887,10 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             "transcript": transcript,
             "events": interpretation.events,
             "overallConfidence": interpretation.overall_confidence,
-            "warnings": interpretation.warnings,
+            "warnings": [
+                *transcription_warnings,
+                *interpretation.warnings,
+            ],
             "processor": {
                 "transcriptionModel": transcription_model,
                 "audioChannelMode": audio_channel_mode,

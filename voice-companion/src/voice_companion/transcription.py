@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 import tempfile
@@ -28,6 +29,104 @@ BASKETBALL_INITIAL_PROMPT = (
     "Player thirteen makes three. Player seven assist. Player seven steal. "
     "Offensive rebound. Defensive rebound. Turnover. Foul."
 )
+
+JERSEY_NUMBER_WORDS = {
+    13: "thirteen",
+    14: "fourteen",
+    15: "fifteen",
+    16: "sixteen",
+    17: "seventeen",
+    18: "eighteen",
+    19: "nineteen",
+    30: "thirty",
+    40: "forty",
+    50: "fifty",
+    60: "sixty",
+    70: "seventy",
+    80: "eighty",
+    90: "ninety",
+}
+JERSEY_WORD_NUMBERS = {
+    word: number for number, word in JERSEY_NUMBER_WORDS.items()
+}
+JERSEY_CONFUSIONS = {
+    13: 30,
+    14: 40,
+    15: 50,
+    16: 60,
+    17: 70,
+    18: 80,
+    19: 90,
+    30: 13,
+    40: 14,
+    50: 15,
+    60: 16,
+    70: 17,
+    80: 18,
+    90: 19,
+}
+STAT_SUBJECT_PATTERN = re.compile(
+    r"\b("
+    + "|".join(
+        [re.escape(word) for word in JERSEY_WORD_NUMBERS]
+        + [str(number) for number in JERSEY_CONFUSIONS]
+    )
+    + r")\b(?=\s+(?:make|makes|made|miss|misses|missed|assist|assists|"
+      r"steal|steals|block|blocks|rebound|rebounds|offensive|defensive|"
+      r"turnover|turnovers|foul|fouls)\b)",
+    re.IGNORECASE,
+)
+
+
+def normalize_active_jersey_confusions(
+    transcript: str,
+    context: dict,
+) -> tuple[str, list[str]]:
+    roster_by_id = {
+        player["id"]: player
+        for player in context.get("roster", [])
+        if isinstance(player, dict)
+    }
+    active_jerseys = {
+        str(roster_by_id[player_id]["jersey"]).strip()
+        for player_id in context.get("currentLineupIds", [])
+        if player_id in roster_by_id
+    }
+    active_numbers = {
+        int(jersey)
+        for jersey in active_jerseys
+        if jersey.isdigit()
+    }
+    warnings: list[str] = []
+
+    def replace(match: re.Match) -> str:
+        token = match.group(0)
+        lowered = token.lower()
+        spoken_number = (
+            int(token)
+            if token.isdigit()
+            else JERSEY_WORD_NUMBERS.get(lowered)
+        )
+        candidate = JERSEY_CONFUSIONS.get(spoken_number)
+        if (
+            candidate is None
+            or spoken_number in active_numbers
+            or candidate not in active_numbers
+        ):
+            return token
+        replacement = (
+            str(candidate)
+            if token.isdigit()
+            else JERSEY_NUMBER_WORDS[candidate]
+        )
+        if token[0].isupper():
+            replacement = replacement.capitalize()
+        warnings.append(
+            f"Normalized jersey {token} to {replacement} using the active lineup."
+        )
+        return replacement
+
+    return STAT_SUBJECT_PATTERN.sub(replace, transcript), warnings
 
 
 class TranscriptionUnavailable(RuntimeError):

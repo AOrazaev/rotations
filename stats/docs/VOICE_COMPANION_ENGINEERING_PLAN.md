@@ -781,6 +781,8 @@ against active video playback; processed speech remains available for laptop
 microphones and speakers. The companion also detects audio-interface recordings
 where the microphone occupies only one stereo channel, selects the active
 channel before transcription, and reports the channel mode in diagnostics.
+Common teen/tens jersey confusions are normalized only when the spoken number
+is absent and its counterpart is uniquely present in the active lineup.
 Microphone, processing, and playback-isolation controls live in an Audio
 settings dialog with a live left/right channel preview. Channel handling
 defaults to automatic detection and supports explicit left-only, right-only,

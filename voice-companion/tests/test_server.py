@@ -43,6 +43,20 @@ class FixtureTranscriber:
         )
 
 
+class ConfusedJerseyTranscriber(FixtureTranscriber):
+    def transcribe(
+        self,
+        audio: bytes,
+        suffix: str,
+        *,
+        channel_preference: str = "auto",
+    ):
+        return TranscriptionResult(
+            text="Fifteen misses two pointer.",
+            model="fixture",
+        )
+
+
 class FixtureInterpreter:
     ready = True
     state = "ready"
@@ -74,6 +88,15 @@ class FixtureInterpreter:
             warnings=[],
             model=self.model_name,
         )
+
+
+class CapturingInterpreter(FixtureInterpreter):
+    def __init__(self):
+        self.transcript = None
+
+    def interpret(self, transcript, context, cancellation=None):
+        self.transcript = transcript
+        return super().interpret(transcript, context, cancellation)
 
 
 class FailingInterpreter(FixtureInterpreter):
@@ -378,6 +401,50 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(result["requestId"], "request-1")
         self.assertEqual(result["events"], [])
         self.assertIn("Seven assist", result["transcript"])
+
+    def test_voice_command_normalizes_unique_active_jersey_confusion(self):
+        context = {
+            "protocolVersion": 1,
+            "requestId": "request-jersey-confusion",
+            "capturedSeconds": 12.3,
+            "language": "en",
+            "sideHint": None,
+            "roster": [
+                {"id": "p13", "jersey": "13", "name": "Dmytro"},
+                {"id": "p50", "jersey": "50", "name": "Denis"},
+            ],
+            "currentLineupIds": ["p13", "p50"],
+            "allowedEventTypes": ["shot"],
+        }
+        boundary, body = self.voice_body(context)
+        original_transcriber = self.server.transcriber
+        original_interpreter = self.server.interpreter
+        interpreter = CapturingInterpreter()
+        self.server.transcriber = ConfusedJerseyTranscriber()
+        self.server.interpreter = interpreter
+        try:
+            status, _, payload = self.request(
+                "POST",
+                "/v1/voice-command",
+                headers={
+                    "Content-Type": f"multipart/form-data; boundary={boundary}",
+                    "Content-Length": str(len(body)),
+                    "X-Bask-Voice-Token": "test-token",
+                },
+                body=body,
+            )
+        finally:
+            self.server.transcriber = original_transcriber
+            self.server.interpreter = original_interpreter
+
+        self.assertEqual(status, 200)
+        result = json.loads(payload)
+        self.assertEqual(result["transcript"], "Fifty misses two pointer.")
+        self.assertEqual(interpreter.transcript, "Fifty misses two pointer.")
+        self.assertIn(
+            "Normalized jersey Fifteen to Fifty using the active lineup.",
+            result["warnings"],
+        )
 
     def test_voice_command_rejects_unknown_context_fields(self):
         context = {
