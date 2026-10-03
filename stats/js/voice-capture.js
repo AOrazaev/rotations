@@ -11,6 +11,7 @@ const MICROPHONE_STORAGE_KEY = 'basketball-stats-voice-microphone';
 const AUDIO_PROCESSING_STORAGE_KEY = 'basketball-stats-voice-audio-processing';
 const CHANNEL_PREFERENCE_STORAGE_KEY = 'basketball-stats-voice-channel-preference';
 const PAUSE_VIDEO_STORAGE_KEY = 'basketball-stats-voice-pause-video';
+const DATA_COLLECTION_STORAGE_KEY = 'basketball-stats-voice-data-collection';
 
 export function classifyChannelActivity(leftRms, rightRms) {
   const threshold = 0.003;
@@ -67,6 +68,7 @@ export function createVoiceCaptureController({
   const evaluationStatus = documentObject.querySelector('#voiceEvaluationStatus');
   const refreshEvaluationsButton = documentObject.querySelector('#voiceRefreshEvaluations');
   const evaluationList = documentObject.querySelector('#voiceEvaluationList');
+  const dataCollectionInput = documentObject.querySelector('#voiceDataCollection');
   const eventList = documentObject.querySelector('#eventList');
 
   let client = null;
@@ -101,6 +103,9 @@ export function createVoiceCaptureController({
     CHANNEL_PREFERENCE_STORAGE_KEY
   ) || 'auto';
   pauseVideoInput.checked = localStorageObject.getItem(PAUSE_VIDEO_STORAGE_KEY) === 'true';
+  dataCollectionInput.checked = localStorageObject.getItem(
+    DATA_COLLECTION_STORAGE_KEY
+  ) === 'true';
 
   function setConnectionStatus(message, kind = '') {
     connectionStatus.textContent = message;
@@ -798,13 +803,36 @@ export function createVoiceCaptureController({
         gameId: batch.gameId,
         eventIds: [...batch.eventIds]
       };
+      let collectionError = null;
+      if (dataCollectionInput.checked) {
+        try {
+          await persistEvaluationSample(job, 'automatic_on_accept');
+          await loadEvaluationSamples();
+        } catch (error) {
+          collectionError = error;
+        }
+      }
       removeJob(job);
       undoLatestBatchButton.disabled = false;
       undoLatestBatchButton.classList.remove('hidden');
-      setStatusNotice(
-        `${batch.eventIds.length} voice event${batch.eventIds.length === 1 ? '' : 's'} added.`,
-        'ready'
-      );
+      const eventCount = `${batch.eventIds.length} voice event${
+        batch.eventIds.length === 1 ? '' : 's'
+      } added.`;
+      if (collectionError) {
+        setStatusNotice(
+          `${eventCount} Evaluation sample was not saved: ${
+            collectionError.message || 'unknown local storage error'
+          }`,
+          'error'
+        );
+      } else {
+        setStatusNotice(
+          dataCollectionInput.checked
+            ? `${eventCount} Recording saved locally as an evaluation candidate.`
+            : eventCount,
+          'ready'
+        );
+      }
     } catch (error) {
       job.state = 'draft';
       job.errorMessage = error.message || 'Could not add the voice events.';
@@ -900,27 +928,39 @@ export function createVoiceCaptureController({
     return transcriptChanged || eventsChanged ? 'corrected' : 'accepted';
   }
 
+  function evaluationMetadata(job, collectionSource) {
+    return {
+      capturedSeconds: job.capturedSeconds,
+      context: job.context,
+      originalTranscript: job.transcript,
+      originalEvents: structuredClone(job.response?.events || []),
+      correctedTranscript: job.expectedTranscript.trim(),
+      correctedEvents: structuredClone(job.events),
+      warnings: structuredClone(job.response?.warnings || []),
+      processor: structuredClone(job.response?.processor || {}),
+      timingMs: structuredClone(job.response?.timingMs || {}),
+      outcome: evaluationOutcome(job),
+      collectionSource
+    };
+  }
+
+  async function persistEvaluationSample(job, collectionSource) {
+    if (!client || !job.audio || !job.context || !job.expectedTranscript.trim()) {
+      throw new Error('The recording is not available for local evaluation storage.');
+    }
+    return client.saveEvaluationSample({
+      audio: job.audio,
+      metadata: evaluationMetadata(job, collectionSource)
+    });
+  }
+
   async function saveEvaluationSample(job) {
     if (!client || !job.audio || !job.context || !job.expectedTranscript.trim()) return;
     job.evaluationStatus = 'Saving audio and evaluation metadata locally...';
     job.evaluationStatusKind = 'loading';
     publishJobs();
     try {
-      const result = await client.saveEvaluationSample({
-        audio: job.audio,
-        metadata: {
-          capturedSeconds: job.capturedSeconds,
-          context: job.context,
-          originalTranscript: job.transcript,
-          originalEvents: structuredClone(job.response?.events || []),
-          correctedTranscript: job.expectedTranscript.trim(),
-          correctedEvents: structuredClone(job.events),
-          warnings: structuredClone(job.response?.warnings || []),
-          processor: structuredClone(job.response?.processor || {}),
-          timingMs: structuredClone(job.response?.timingMs || {}),
-          outcome: evaluationOutcome(job)
-        }
-      });
+      const result = await persistEvaluationSample(job, 'manual');
       job.evaluationStatus = `Saved evaluation sample ${result.sample.sampleId}.`;
       job.evaluationStatusKind = 'ready';
       await loadEvaluationSamples();
@@ -952,7 +992,10 @@ export function createVoiceCaptureController({
       text.textContent = sample.correctedTranscript || sample.originalTranscript;
       const outcome = documentObject.createElement('p');
       outcome.className = 'message';
-      outcome.textContent = sample.outcome.replaceAll('_', ' ');
+      const source = sample.collectionSource === 'automatic_on_accept'
+        ? 'automatically collected candidate'
+        : 'manually saved';
+      outcome.textContent = `${source} · ${sample.outcome.replaceAll('_', ' ')}`;
       const actions = documentObject.createElement('div');
       actions.className = 'voice-actions';
       const exportButton = documentObject.createElement('button');
@@ -1050,6 +1093,12 @@ export function createVoiceCaptureController({
   pauseVideoInput.addEventListener('change', () => {
     localStorageObject.setItem(PAUSE_VIDEO_STORAGE_KEY, String(pauseVideoInput.checked));
     updateAudioSummary();
+  });
+  dataCollectionInput.addEventListener('change', () => {
+    localStorageObject.setItem(
+      DATA_COLLECTION_STORAGE_KEY,
+      String(dataCollectionInput.checked)
+    );
   });
   evaluationList.addEventListener('click', event => handleEvaluationAction(event.target));
   eventList.addEventListener('click', event => {

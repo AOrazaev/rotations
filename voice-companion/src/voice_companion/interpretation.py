@@ -915,7 +915,8 @@ def _event_type_for_action(action: str) -> str:
         return "steal"
     if normalized.startswith("block"):
         return "block"
-    if normalized.startswith("turnover"):
+    if normalized.startswith(("turnover", "turn over", "turns over", "turned over",
+                              "turn it over", "turns it over", "turned it over")):
         return "turnover"
     if normalized.startswith("foul"):
         return "foul"
@@ -935,7 +936,8 @@ def _explicit_event_facts(transcript: str, context: dict) -> list[dict]:
     action_pattern = (
         r"(?P<action>assist(?:s|ed)?|make|makes|made|miss|misses|missed|"
         r"score|scores|scored|rebound|rebounds|steal|steals|block|blocks|"
-        r"turnover|turnovers|foul|fouls|timeout)"
+        r"turn(?:s|ed)?(?:\s+it)?\s+over|turnover|turnovers|"
+        r"foul|fouls|timeout)"
     )
     before_pattern = re.compile(
         rf"\b{subject_pattern}\s+(?:offensive\s+|defensive\s+)?"
@@ -995,7 +997,15 @@ def _spoken_event_types(transcript: str) -> set[str]:
         "rebound": ("rebound",),
         "steal": ("steal", "stole"),
         "block": ("block",),
-        "turnover": ("turnover", "turned it over"),
+        "turnover": (
+            "turnover",
+            "turn over",
+            "turns over",
+            "turned over",
+            "turn it over",
+            "turns it over",
+            "turned it over",
+        ),
         "foul": ("foul",),
         "timeout": ("timeout",),
         "substitution": (" sub ", " subs ", "substitute", " in for "),

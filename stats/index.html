@@ -170,6 +170,26 @@
           <p id="voiceConnectionStatus" class="message voice-status" aria-live="polite">Companion not connected.</p>
           <p id="voiceDiagnostics" class="message">Service diagnostics appear after connection.</p>
           <p id="voiceEvaluationStatus" class="message voice-status" aria-live="polite"></p>
+          <section class="voice-settings-section" aria-labelledby="voiceDataCollectionTitle">
+            <div class="section-head">
+              <div>
+                <h3 id="voiceDataCollectionTitle">Evaluation data</h3>
+                <p>Optionally retain accepted recordings to improve future voice evaluation.</p>
+              </div>
+            </div>
+            <label class="voice-data-collection-option">
+              <input id="voiceDataCollection" type="checkbox" />
+              <span>
+                <strong>Save accepted voice commands locally</strong>
+                <small>
+                  When enabled, accepting a draft saves its recording, transcript,
+                  context, diagnostics, and approved events on this device. Nothing is
+                  uploaded automatically. Accepted results are candidate labels and
+                  should be reviewed before joining a curated evaluation set.
+                </small>
+              </span>
+            </label>
+          </section>
           <details id="voiceEvaluationSamples" class="voice-connection-settings">
             <summary>Saved evaluation samples</summary>
             <div class="voice-actions">

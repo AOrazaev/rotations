@@ -70,6 +70,7 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
     window.__voiceCommandCount = 0;
     window.__microphoneRequestCount = 0;
     window.__evaluationSamples = [];
+    window.__evaluationSaveShouldFail = false;
     window.__voiceTestMode = initialMode;
 
     function successPayload(context) {
@@ -209,12 +210,16 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
           return { status: 'cancellation_requested' };
         },
         async saveEvaluationSample({ audio, metadata }) {
+          if (window.__evaluationSaveShouldFail) {
+            throw new Error('Simulated evaluation storage failure.');
+          }
           const sample = {
             sampleId: `sample-${window.__evaluationSamples.length + 1}`,
             createdAt: new Date().toISOString(),
             originalTranscript: metadata.originalTranscript,
             correctedTranscript: metadata.correctedTranscript,
-            outcome: metadata.outcome
+            outcome: metadata.outcome,
+            collectionSource: metadata.collectionSource
           };
           window.__evaluationSamples.unshift({
             ...structuredClone(sample),
@@ -657,6 +662,7 @@ test('moves connection and audio controls into the adjacent settings dialog', as
   await page.locator('#voiceOpenSettings').click();
   await expect(page.locator('#voiceSettingsDialog')).toHaveAttribute('open', '');
   await expect(page.locator('#voiceConnectionSettings')).toBeVisible();
+  await expect(page.locator('#voiceDataCollection')).not.toBeChecked();
 
   await page.locator('#voiceAudioProcessing').selectOption('processed');
   await page.locator('#voiceChannelPreference').selectOption('right');
@@ -678,6 +684,73 @@ test('moves connection and audio controls into the adjacent settings dialog', as
   expect(await page.evaluate(
     () => window.__voiceRequests[0].audioChannelPreference
   )).toBe('right');
+});
+
+test('automatically saves accepted drafts only after local collection opt-in', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+  await page.locator('.voice-command-draft [data-voice-action="confirm"]').click();
+  await expect(page.locator('.voice-command-draft')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__evaluationSamples.length)).toBe(0);
+
+  await page.locator('#voiceOpenSettings').click();
+  await page.locator('#voiceDataCollection').check();
+  expect(await page.evaluate(
+    () => localStorage.getItem('basketball-stats-voice-data-collection')
+  )).toBe('true');
+  await page.locator('#voiceCloseSettings').click();
+
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+  const draft = page.locator('.voice-command-draft');
+  await draft.locator('.voice-command-details > summary').click();
+  await draft.locator('[data-voice-field="type"]').first().selectOption('steal');
+  await draft.locator('[data-voice-field="expectedTranscript"]').fill(
+    'Seven steal and thirteen makes two'
+  );
+  await draft.locator('[data-voice-action="confirm"]').click();
+  await expect(draft).toHaveCount(0);
+
+  await expect.poll(
+    async () => page.evaluate(() => window.__evaluationSamples.length)
+  ).toBe(1);
+  const sample = await page.evaluate(() => window.__evaluationSamples[0]);
+  expect(sample.metadata.collectionSource).toBe('automatic_on_accept');
+  expect(sample.metadata.outcome).toBe('corrected');
+  expect(sample.metadata.correctedTranscript).toBe(
+    'Seven steal and thirteen makes two'
+  );
+  expect(sample.metadata.correctedEvents[0].type).toBe('steal');
+  await expect(page.locator('#voiceCommandStatus')).toContainText(
+    'Recording saved locally as an evaluation candidate'
+  );
+
+  await page.reload();
+  await expect(page.locator('#voiceDataCollection')).toBeChecked();
+});
+
+test('keeps accepted game events when automatic evaluation storage fails', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+  await page.locator('#voiceOpenSettings').click();
+  await page.locator('#voiceDataCollection').check();
+  await page.locator('#voiceCloseSettings').click();
+  await page.evaluate(() => { window.__evaluationSaveShouldFail = true; });
+
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+  await page.locator('.voice-command-draft [data-voice-action="confirm"]').click();
+  await expect(page.locator('.voice-command-draft')).toHaveCount(0);
+  await expect(page.locator('#voiceCommandStatus')).toContainText(
+    'Evaluation sample was not saved: Simulated evaluation storage failure.'
+  );
+  expect(await page.evaluate(
+    () => window.__statsApp.eventController.getGame().events.length
+  )).toBe(2);
+  expect(await page.evaluate(() => window.__evaluationSamples.length)).toBe(0);
 });
 
 test('cancels an active command and retries its retained recording', async ({ page }) => {

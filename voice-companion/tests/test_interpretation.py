@@ -431,6 +431,74 @@ class CommandInterpreterTest(unittest.TestCase):
             result.warnings,
         )
 
+    def test_recovers_two_word_turn_over_omitted_by_model(self):
+        request_context = {
+            **context(),
+            "roster": [
+                {"id": "p7", "jersey": "7", "name": "Aman"},
+                {"id": "p70", "jersey": "70", "name": "Yedil"},
+            ],
+            "currentLineupIds": ["p7", "p70"],
+        }
+        payload = {
+            "events": [
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p7",
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": False,
+                    "shotDetails": {"phase": "transition"},
+                },
+                {
+                    "side": "team",
+                    "type": "rebound",
+                    "playerId": "p70",
+                    "confidence": 0.99,
+                    "reboundKind": "offensive",
+                },
+                {
+                    "side": "team",
+                    "type": "assist",
+                    "playerId": "p70",
+                    "confidence": 0.99,
+                },
+            ],
+            "overallConfidence": 0.99,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Number seven misses two pointer. Number seventy offensive rebound. "
+            "Number seventy turn over.",
+            request_context,
+        )
+
+        self.assertEqual(
+            [
+                (event["type"], event["playerId"])
+                for event in result.events
+            ],
+            [
+                ("shot", "p7"),
+                ("rebound", "p70"),
+                ("turnover", "p70"),
+            ],
+        )
+        self.assertNotIn("shotDetails", result.events[0])
+        self.assertIn("Removed 1 unspoken model event.", result.warnings)
+        self.assertIn(
+            "Recovered 1 explicitly spoken turnover event omitted by the "
+            "command model.",
+            result.warnings,
+        )
+
     def test_rejects_team_player_on_opponent_event(self):
         payload = {
             "events": [

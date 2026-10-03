@@ -210,6 +210,7 @@ class ServerTest(unittest.TestCase):
             "processor": {"transcriptionModel": "base.en"},
             "timingMs": {"total": 1000},
             "outcome": "corrected",
+            "collectionSource": "automatic_on_accept",
         }
         boundary, body = self.evaluation_body(metadata)
         headers = {
@@ -228,6 +229,7 @@ class ServerTest(unittest.TestCase):
         sample = json.loads(payload)["sample"]
         sample_id = sample["sampleId"]
         self.assertEqual(sample["correctedTranscript"], metadata["correctedTranscript"])
+        self.assertEqual(sample["collectionSource"], "automatic_on_accept")
 
         status, _, payload = self.request(
             "GET",
@@ -256,6 +258,10 @@ class ServerTest(unittest.TestCase):
                 archive.read(f"{sample_id}.json").decode("utf-8")
             )
             self.assertEqual(exported["correctedEvents"], metadata["correctedEvents"])
+            self.assertEqual(
+                exported["collectionSource"],
+                metadata["collectionSource"],
+            )
 
         status, _, payload = self.request(
             "DELETE",

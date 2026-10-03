@@ -491,8 +491,10 @@ Automatic recommendations may use detected hardware, but the user retains contro
 - Bind to `127.0.0.1` by default.
 - Do not expose the service on the LAN by default.
 - Do not upload audio, transcripts, roster data, or diagnostics.
-- Do not retain audio after the request completes.
-- Do not persist transcripts by default.
+- Do not retain audio or persist transcripts after the request completes by
+  default. The tracker may retain both in the local companion folder only
+  through an explicit manual save or the default-off persisted
+  **Save accepted voice commands locally** preference.
 - Allow an explicit diagnostic mode that stores redacted request metadata without audio.
 - Clearly identify the active processing profile and whether every component is local.
 - Store models under a user-local application directory.
@@ -767,8 +769,11 @@ partial transcript recovery, and an editable non-persistent proposal preview.
 Tracker tests cover companion and microphone failures, overlapping-recording
 prevention, cancellation, invalid proposals, zero game writes, and removal of
 the voice surface from Review mode. Explicit opt-in evaluation collection now
-stores audio, original and corrected results, and diagnostics in the local
-companion folder with tracker review, ZIP export, and deletion controls. The
+stores audio, original and corrected results, diagnostics, and manual or
+automatic provenance in the local companion folder with tracker review, ZIP
+export, and deletion controls. Automatic collection is disabled by default,
+remains local-only, and treats accepted drafts as reviewable candidate labels
+rather than curated ground truth. The
 tracker also supports explicit microphone selection, speech-oriented capture
 constraints, higher-bitrate recording, and immediate playback so poor input can
 be rejected before it enters the evaluation corpus. An optional persisted

@@ -248,6 +248,10 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .voice-microphone-settings select { width: 100%; min-width: 0; padding: 8px 9px; color: var(--text); background: #0a1220; border: 1px solid var(--line); border-radius: 9px; }
 .voice-recording-option { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: .82rem; }
 .voice-recording-option input { width: auto; }
+.voice-data-collection-option { display: flex; gap: 9px; align-items: flex-start; color: var(--text); }
+.voice-data-collection-option input { width: auto; margin-top: 3px; }
+.voice-data-collection-option span { display: grid; gap: 3px; }
+.voice-data-collection-option small { color: var(--muted); line-height: 1.4; }
 .voice-recording-preview { width: 100%; height: 36px; }
 .voice-channel-test { display: grid; gap: 9px; padding: 12px; background: #0f1727; border: 1px solid #202c43; border-radius: 12px; }
 .voice-channel-test .section-head { margin-bottom: 0; }

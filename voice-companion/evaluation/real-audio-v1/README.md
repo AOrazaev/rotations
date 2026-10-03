@@ -1,6 +1,6 @@
 # Real audio evaluation set v1
 
-This set contains eight short English basketball-stat recordings collected
+This set contains sixteen short English basketball-stat recordings collected
 during local voice companion development. The recording owner explicitly
 approved committing the audio to this repository.
 
@@ -17,6 +17,10 @@ Coverage includes:
 - Assist/scorer attribution.
 - Four-event command grounding.
 - Transition shot-phase attribution.
+- Deterministic substitutions.
+- Opponent turnover and standalone foul commands.
+- Multi-event miss, offensive rebound, and turnover sequencing.
+- Two-word `turn over` recovery when the command model omits the event.
 
 Run the complete audio-to-events evaluation from the repository root:
 
@@ -30,14 +34,17 @@ $env:PYTHONPATH = "$PWD\voice-companion\src"
 The evaluator reports raw transcription matches separately from
 active-lineup-normalized transcription and exact semantic event arrays.
 
-`baseline-balanced.json` records the first balanced-profile run with
+`baseline-balanced.json` records the sixteen-case balanced-profile run with
 `base.en` and `Qwen3-4B-Q4_K_M.gguf`:
 
-- 6/8 raw transcript matches.
-- 7/8 roster-normalized transcript matches.
-- 7/8 exact semantic event arrays.
-- 0 processing errors.
+- 13/16 raw transcript matches.
+- 14/16 roster-normalized transcript matches.
+- 14/16 exact semantic event arrays.
+- 1 processing error.
 
-The remaining failure is `number-70-miss-opponent-rebound`: Whisper produced
-`seven T`, and both #7 and #70 were active, so conservative normalization did
-not guess.
+The new `number-7-miss-number-70-rebound-turnover` case passes with all three
+events after adding support for Whisper's two-word `turn over` phrasing.
+Remaining weaknesses are the `seven two` transcription of jersey #70 and an
+occasional command-model rebound response that omits `reboundKind`. The
+`number-70-miss-opponent-rebound` event array is correct, but strict transcript
+matching still rejects Whisper's `defensively rebound` wording.

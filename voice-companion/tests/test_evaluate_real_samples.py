@@ -54,7 +54,7 @@ class RealSampleEvaluationTest(unittest.TestCase):
 
         manifest = load_manifest(manifest_path)
 
-        self.assertEqual(len(manifest["cases"]), 8)
+        self.assertEqual(len(manifest["cases"]), 16)
         for case in manifest["cases"]:
             self.assertTrue((manifest_path.parent / case["audio"]).is_file())
 

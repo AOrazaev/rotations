@@ -42,19 +42,24 @@ the companion, so token authentication remains the default.
 ## Evaluation samples
 
 The stats tracker can explicitly save a completed recording as an evaluation
-sample. Nothing is collected automatically. Before saving, correct the expected
-transcript and edit the proposed events to the expected result.
+sample. Its default-off **Save accepted voice commands locally** setting can
+also retain recordings automatically when a draft is accepted. This preference
+is stored in the browser, and nothing is uploaded automatically. Before manual
+or automatic saving, correct the expected transcript and proposed events to the
+expected result.
 
 Each sample stores the audio, original and corrected transcript, original and
 corrected proposal, request context, warnings, model/profile metadata, timings,
-and outcome under:
+outcome, and whether it was manually saved or automatically collected under:
 
 ```text
 %LOCALAPPDATA%\BaskVoiceCompanion\evaluation-samples
 ```
 
 Use **Saved evaluation samples** in the tracker to review, export, or delete
-samples. Export produces one ZIP containing the audio and JSON metadata.
+samples. Automatically collected items are candidate labels, not curated
+ground truth. Review them before adding them to a committed evaluation set.
+Export produces one ZIP containing the audio and JSON metadata.
 
 Audio interfaces that expose a mono microphone as one side of a stereo stream
 are normalized automatically before transcription. The companion selects the

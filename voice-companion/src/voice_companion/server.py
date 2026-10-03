@@ -1170,7 +1170,12 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             "timingMs",
             "outcome",
         }
-        if not isinstance(metadata, dict) or set(metadata) != required:
+        optional = {"collectionSource"}
+        if (
+            not isinstance(metadata, dict)
+            or not required.issubset(metadata)
+            or set(metadata) - required - optional
+        ):
             raise ValueError("Evaluation metadata has an invalid shape.")
         if (
             not isinstance(metadata["capturedSeconds"], (int, float))
@@ -1186,6 +1191,11 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
         for field in ("context", "processor", "timingMs"):
             if not isinstance(metadata[field], dict):
                 raise ValueError(f"Evaluation {field} must be an object.")
+        if metadata.get("collectionSource", "manual") not in {
+            "manual",
+            "automatic_on_accept",
+        }:
+            raise ValueError("Evaluation collectionSource is invalid.")
 
     @staticmethod
     def _evaluation_summary(record: dict) -> dict:
@@ -1195,6 +1205,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
             "originalTranscript": record["originalTranscript"],
             "correctedTranscript": record["correctedTranscript"],
             "outcome": record["outcome"],
+            "collectionSource": record.get("collectionSource", "manual"),
         }
 
     def _serve_static(self, path: str):
