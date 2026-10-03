@@ -10,6 +10,8 @@ import {
 import { createGameSetupController } from './game-setup.js';
 import { createEventEntryController } from './event-entry.js';
 import { createReviewController } from './review-controller.js';
+import { createVoiceCaptureController } from './voice-capture.js';
+import { VoiceCompanionClient } from './voice-companion-client.js';
 import {
   buildReviewUrl,
   buildSharedReviewUrl,
@@ -317,11 +319,13 @@ const store = new GameStore({
 let setupController;
 let eventController;
 let reviewController;
+let voiceController;
 
 function openGameWorkspace(game) {
   document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
   videoController.loadVideo(game.video.sourceUrl);
   eventController.setGame(game);
+  voiceController?.refresh();
 }
 
 function removeReviewMutationSurfaces() {
@@ -329,6 +333,7 @@ function removeReviewMutationSurfaces() {
     '#gamePanel',
     '#showGamePanel',
     '#eventEntryPanel',
+    '#voiceCapturePanel',
     '#eventEditDialog',
     '#coachCommentDialog',
     '#substitutionDialog',
@@ -451,6 +456,15 @@ if (reviewMode) {
       }
     }
   });
+  const voiceClientFactory = window.__STATS_VOICE_CLIENT_FACTORY__
+    || (options => new VoiceCompanionClient(options));
+  voiceController = createVoiceCaptureController({
+    videoController,
+    getGame: () => eventController.getGame(),
+    clientFactory: voiceClientFactory,
+    mediaDevices: window.__STATS_MEDIA_DEVICES__ || navigator.mediaDevices,
+    MediaRecorderClass: window.__STATS_MEDIA_RECORDER__ || window.MediaRecorder
+  });
   setupController = createGameSetupController({
     store,
     onGameOpened: openGameWorkspace,
@@ -467,11 +481,13 @@ window.__statsApp = {
   videoController,
   setupController,
   eventController,
+  voiceController,
   reviewController,
   store,
   destroy() {
     videoController.destroy();
     eventController?.destroy();
+    voiceController?.destroy();
     reviewController?.destroy();
     store.close();
   }

@@ -760,6 +760,15 @@ Exit gate:
 
 ### Checkpoint 5: Stats recording and proposal preview
 
+**Status: in progress.** The tracker now has an optional loopback-only companion
+client, connection and warmup status, microphone recording with recording-start
+timestamps, cancellation and retry, strict browser-side proposal validation,
+partial transcript recovery, and an editable non-persistent proposal preview.
+Tracker tests cover companion and microphone failures, overlapping-recording
+prevention, cancellation, invalid proposals, zero game writes, and removal of
+the voice surface from Review mode. Real browser-to-companion microphone
+validation and optional local corpus collection remain open.
+
 Deliver:
 
 - Optional companion client.

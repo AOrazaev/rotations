@@ -147,6 +147,48 @@
       </div>
 
       <aside class="panel-stack side-panel capture-panel">
+        <section id="voiceCapturePanel" class="card voice-capture-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Local companion</p>
+              <h2>Voice proposal</h2>
+              <p>Record and edit a proposal. Checkpoint 5 never writes it to the game.</p>
+            </div>
+          </div>
+          <details class="voice-connection-settings">
+            <summary>Companion connection</summary>
+            <div class="voice-connection-grid">
+              <label>URL<input id="voiceCompanionUrl" type="url" value="http://127.0.0.1:8766" /></label>
+              <label>Token<input id="voiceCompanionToken" type="password" autocomplete="off" /></label>
+            </div>
+            <div class="voice-actions">
+              <button id="voiceConnect" class="secondary small" type="button">Connect</button>
+              <button id="voiceWarmup" class="secondary small" type="button" disabled>Warm models</button>
+            </div>
+          </details>
+          <p id="voiceConnectionStatus" class="message voice-status" aria-live="polite">Companion not connected.</p>
+          <div class="voice-actions">
+            <button id="voiceStartRecording" class="primary" type="button" disabled>Start recording</button>
+            <button id="voiceStopRecording" class="secondary" type="button" disabled>Stop recording</button>
+            <button id="voiceCancelProcessing" class="secondary" type="button" disabled>Cancel processing</button>
+          </div>
+          <p id="voiceRecordingStatus" class="message voice-status" aria-live="polite">Connect the companion to enable recording.</p>
+          <div class="voice-timestamp">
+            <span>Proposal timestamp</span>
+            <strong id="voiceCapturedTimestamp">Not captured</strong>
+            <button id="voiceReplaceTimestamp" class="secondary small" type="button" disabled>Use current video time</button>
+          </div>
+          <label class="voice-transcript-label">
+            Latest transcript
+            <textarea id="voiceTranscript" rows="2" readonly placeholder="Transcript appears after processing."></textarea>
+          </label>
+          <ul id="voiceWarnings" class="voice-warnings hidden"></ul>
+          <div id="voiceProposalEvents" class="voice-proposal-events"></div>
+          <div class="voice-actions voice-proposal-actions">
+            <button id="voiceRetryProcessing" class="secondary small" type="button" disabled>Retry processing</button>
+            <button id="voiceDiscardProposal" class="danger small" type="button" disabled>Discard</button>
+          </div>
+        </section>
         <section id="eventEntryPanel" class="card event-entry-card hidden">
             <div class="section-head">
               <div>
