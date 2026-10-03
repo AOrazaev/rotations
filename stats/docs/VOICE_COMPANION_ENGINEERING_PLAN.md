@@ -769,7 +769,10 @@ prevention, cancellation, invalid proposals, zero game writes, and removal of
 the voice surface from Review mode. Explicit opt-in evaluation collection now
 stores audio, original and corrected results, and diagnostics in the local
 companion folder with tracker review, ZIP export, and deletion controls. Real
-browser-to-companion microphone validation remains open.
+browser-to-companion microphone validation remains open. The tracker also
+supports explicit microphone selection, speech-oriented capture constraints,
+higher-bitrate recording, and immediate playback so poor input can be rejected
+before it enters the evaluation corpus.
 
 Deliver:
 

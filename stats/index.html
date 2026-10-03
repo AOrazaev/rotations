@@ -167,12 +167,22 @@
             </div>
           </details>
           <p id="voiceConnectionStatus" class="message voice-status" aria-live="polite">Companion not connected.</p>
+          <div class="voice-microphone-settings">
+            <label>
+              Microphone
+              <select id="voiceMicrophone">
+                <option value="">System default microphone</option>
+              </select>
+            </label>
+            <button id="voiceRefreshMicrophones" class="secondary small" type="button">Refresh microphones</button>
+          </div>
           <div class="voice-actions">
             <button id="voiceStartRecording" class="primary" type="button" disabled>Start recording</button>
             <button id="voiceStopRecording" class="secondary" type="button" disabled>Stop recording</button>
             <button id="voiceCancelProcessing" class="secondary" type="button" disabled>Cancel processing</button>
           </div>
           <p id="voiceRecordingStatus" class="message voice-status" aria-live="polite">Connect the companion to enable recording.</p>
+          <audio id="voiceRecordingPreview" class="voice-recording-preview hidden" controls preload="metadata"></audio>
           <div class="voice-timestamp">
             <span>Proposal timestamp</span>
             <strong id="voiceCapturedTimestamp">Not captured</strong>

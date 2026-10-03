@@ -8,6 +8,7 @@ import {
 const DEFAULT_URL = 'http://127.0.0.1:8766';
 const URL_STORAGE_KEY = 'basketball-stats-voice-url';
 const TOKEN_STORAGE_KEY = 'basketball-stats-voice-token';
+const MICROPHONE_STORAGE_KEY = 'basketball-stats-voice-microphone';
 
 export function createVoiceCaptureController({
   documentObject = document,
@@ -24,6 +25,8 @@ export function createVoiceCaptureController({
   const connectButton = documentObject.querySelector('#voiceConnect');
   const warmupButton = documentObject.querySelector('#voiceWarmup');
   const connectionStatus = documentObject.querySelector('#voiceConnectionStatus');
+  const microphoneSelect = documentObject.querySelector('#voiceMicrophone');
+  const refreshMicrophonesButton = documentObject.querySelector('#voiceRefreshMicrophones');
   const startButton = documentObject.querySelector('#voiceStartRecording');
   const stopButton = documentObject.querySelector('#voiceStopRecording');
   const cancelButton = documentObject.querySelector('#voiceCancelProcessing');
@@ -31,6 +34,7 @@ export function createVoiceCaptureController({
   const discardButton = documentObject.querySelector('#voiceDiscardProposal');
   const replaceTimestampButton = documentObject.querySelector('#voiceReplaceTimestamp');
   const recordingStatus = documentObject.querySelector('#voiceRecordingStatus');
+  const recordingPreview = documentObject.querySelector('#voiceRecordingPreview');
   const timestampOutput = documentObject.querySelector('#voiceCapturedTimestamp');
   const transcript = documentObject.querySelector('#voiceTranscript');
   const expectedTranscript = documentObject.querySelector('#voiceExpectedTranscript');
@@ -48,6 +52,7 @@ export function createVoiceCaptureController({
   let stream = null;
   let chunks = [];
   let audio = null;
+  let audioPreviewUrl = null;
   let capturedSeconds = null;
   let activeRequestId = null;
   let response = null;
@@ -60,6 +65,7 @@ export function createVoiceCaptureController({
 
   endpointInput.value = localStorageObject.getItem(URL_STORAGE_KEY) || DEFAULT_URL;
   tokenInput.value = sessionStorageObject.getItem(TOKEN_STORAGE_KEY) || '';
+  microphoneSelect.value = localStorageObject.getItem(MICROPHONE_STORAGE_KEY) || '';
 
   function setConnectionStatus(message, kind = '') {
     connectionStatus.textContent = message;
@@ -124,6 +130,51 @@ export function createVoiceCaptureController({
     stream = null;
   }
 
+  function clearAudioPreview() {
+    if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+    audioPreviewUrl = null;
+    recordingPreview.removeAttribute('src');
+    recordingPreview.classList.add('hidden');
+  }
+
+  function showAudioPreview() {
+    clearAudioPreview();
+    if (!audio) return;
+    audioPreviewUrl = URL.createObjectURL(audio);
+    recordingPreview.src = audioPreviewUrl;
+    recordingPreview.classList.remove('hidden');
+  }
+
+  async function refreshMicrophones() {
+    if (!mediaDevices?.enumerateDevices) {
+      microphoneSelect.disabled = true;
+      refreshMicrophonesButton.disabled = true;
+      return;
+    }
+    try {
+      const selected = microphoneSelect.value
+        || localStorageObject.getItem(MICROPHONE_STORAGE_KEY)
+        || '';
+      const devices = (await mediaDevices.enumerateDevices())
+        .filter(device => device.kind === 'audioinput');
+      microphoneSelect.replaceChildren(
+        option('', 'System default microphone', !selected)
+      );
+      devices.forEach((device, index) => {
+        microphoneSelect.append(option(
+          device.deviceId,
+          device.label || `Microphone ${index + 1}`,
+          device.deviceId === selected
+        ));
+      });
+    } catch (error) {
+      setRecordingStatus(
+        `Could not list microphones: ${error.message || 'device enumeration failed'}`,
+        'error'
+      );
+    }
+  }
+
   function resetProposal() {
     response = null;
     lastContext = null;
@@ -144,6 +195,7 @@ export function createVoiceCaptureController({
     recorder = null;
     chunks = [];
     audio = null;
+    clearAudioPreview();
     capturedSeconds = null;
     activeRequestId = null;
     state = 'idle';
@@ -461,7 +513,19 @@ export function createVoiceCaptureController({
     audio = null;
     chunks = [];
     try {
-      stream = await mediaDevices.getUserMedia({ audio: true });
+      const selectedDeviceId = microphoneSelect.value;
+      stream = await mediaDevices.getUserMedia({
+        audio: {
+          ...(selectedDeviceId
+            ? { deviceId: { exact: selectedDeviceId } }
+            : {}),
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      await refreshMicrophones();
       capturedSeconds = videoController.getCurrentSeconds();
       timestampOutput.textContent = formatVideoTime(capturedSeconds);
       const preferredType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg']
@@ -469,7 +533,10 @@ export function createVoiceCaptureController({
           || MediaRecorderClass.isTypeSupported(type));
       recorder = new MediaRecorderClass(
         stream,
-        preferredType ? { mimeType: preferredType } : undefined
+        {
+          ...(preferredType ? { mimeType: preferredType } : {}),
+          audioBitsPerSecond: 128000
+        }
       );
       recorder.addEventListener('dataavailable', event => {
         if (event.data?.size) chunks.push(event.data);
@@ -483,6 +550,7 @@ export function createVoiceCaptureController({
           return;
         }
         audio = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        showAudioPreview();
         stopTracks();
         recorder = null;
         processAudio();
@@ -673,6 +741,14 @@ export function createVoiceCaptureController({
   replaceTimestampButton.addEventListener('click', replaceTimestamp);
   saveEvaluationButton.addEventListener('click', saveEvaluationSample);
   refreshEvaluationsButton.addEventListener('click', loadEvaluationSamples);
+  refreshMicrophonesButton.addEventListener('click', refreshMicrophones);
+  microphoneSelect.addEventListener('change', () => {
+    if (microphoneSelect.value) {
+      localStorageObject.setItem(MICROPHONE_STORAGE_KEY, microphoneSelect.value);
+    } else {
+      localStorageObject.removeItem(MICROPHONE_STORAGE_KEY);
+    }
+  });
   expectedTranscript.addEventListener('input', refresh);
   evaluationList.addEventListener('click', event => {
     handleEvaluationAction(event.target);
@@ -686,6 +762,7 @@ export function createVoiceCaptureController({
   const unsubscribeReady = videoController.subscribeReady(refresh);
 
   discard();
+  refreshMicrophones();
   if (tokenInput.value) connect();
 
   return {
@@ -704,6 +781,7 @@ export function createVoiceCaptureController({
       operationVersion += 1;
       unsubscribeReady();
       stopTracks();
+      clearAudioPreview();
       if (recorder?.state === 'recording') recorder.stop();
     }
   };

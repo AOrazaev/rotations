@@ -192,7 +192,17 @@ async function openVoiceTracker(page) {
       });
     };
     window.__STATS_MEDIA_DEVICES__ = {
-      async getUserMedia() {
+      async enumerateDevices() {
+        return [
+          {
+            kind: 'audioinput',
+            deviceId: 'test-microphone',
+            label: 'Test microphone'
+          }
+        ];
+      },
+      async getUserMedia(constraints) {
+        window.__lastAudioConstraints = structuredClone(constraints);
         window.__microphoneRequestCount += 1;
         if (window.__voiceTestMode === 'microphone-denied') {
           throw new Error('Permission denied');
@@ -211,6 +221,7 @@ async function openVoiceTracker(page) {
         this.mimeType = options?.mimeType || 'audio/webm';
         this.state = 'inactive';
         this.listeners = {};
+        window.__recorderOptions = structuredClone(options);
       }
       addEventListener(type, listener) {
         this.listeners[type] = listener;
@@ -236,6 +247,9 @@ async function openVoiceTracker(page) {
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
   await expect(page.locator('#eventLockMessage')).toBeHidden();
+  await page.waitForFunction(() => Boolean(
+    window.__statsApp?.eventController?.getGame()
+  ));
 }
 
 async function connectVoiceCompanion(page) {
@@ -256,10 +270,20 @@ test('records and edits a voice proposal without writing game events', async ({ 
   await page.locator('#voiceStopRecording').click();
 
   await expect(page.locator('#voiceRecordingStatus')).toContainText('2 proposed events');
+  await expect(page.locator('#voiceRecordingPreview')).toBeVisible();
   await expect(page.locator('#voiceTranscript')).toHaveValue('Seven assist and thirteen makes two');
   await expect(page.locator('.voice-proposal-event')).toHaveCount(2);
   await expect(page.locator('#voiceCapturedTimestamp')).toHaveText('0:42.4');
   expect((await page.evaluate(() => window.__voiceRequests[0].capturedSeconds))).toBe(42.4);
+  expect(await page.evaluate(() => window.__lastAudioConstraints.audio)).toEqual({
+    channelCount: 1,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true
+  });
+  expect(await page.evaluate(() => window.__recorderOptions.audioBitsPerSecond)).toBe(
+    128000
+  );
 
   await page.locator('.voice-proposal-event').first().locator('[data-voice-field="type"]').selectOption('steal');
   await expect(page.locator('.voice-proposal-event').first().locator('[data-voice-field="type"]')).toHaveValue('steal');
