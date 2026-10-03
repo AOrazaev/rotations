@@ -2,9 +2,11 @@ import {
   getLineupAtEventPosition,
   STAT_EVENT_TYPES
 } from './game-model.js';
+import {
+  validateVoiceResponse
+} from '../../voice-companion/web/voice-response.js';
 
 const EVENT_TYPES = [...STAT_EVENT_TYPES, 'timeout', 'substitution'];
-const EVENT_TYPE_SET = new Set(EVENT_TYPES);
 
 export function buildVoiceCommandContext(
   game,
@@ -37,41 +39,16 @@ export function validateVoiceCommandResponse(payload, {
   requestId,
   game
 }) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new Error('The companion response must be an object.');
-  }
-  if (payload.protocolVersion !== 1) {
-    throw new Error('The companion returned an unsupported protocol version.');
-  }
-  if (payload.requestId !== requestId) {
-    throw new Error('The companion response does not match the active request.');
-  }
-  if (typeof payload.transcript !== 'string') {
-    throw new Error('The companion response is missing its transcript.');
-  }
-  if (!Array.isArray(payload.events) || payload.events.length > 20) {
-    throw new Error('The companion response contains an invalid event list.');
-  }
-  if (!Array.isArray(payload.warnings)
-    || payload.warnings.some(warning => typeof warning !== 'string')) {
-    throw new Error('The companion response contains invalid warnings.');
-  }
+  const validated = validateVoiceResponse(payload, {
+    requestId,
+    allowedEventTypes: EVENT_TYPES
+  });
 
   const playerIds = new Set(game.players.map(player => player.id));
-  const events = payload.events.map((event, index) => {
+  const events = validated.events.map((event, index) => {
     const label = `Proposal event ${index + 1}`;
     if (!event || typeof event !== 'object' || Array.isArray(event)) {
       throw new Error(`${label} must be an object.`);
-    }
-    if (!['team', 'opponent'].includes(event.side)) {
-      throw new Error(`${label} has an invalid side.`);
-    }
-    if (!EVENT_TYPE_SET.has(event.type)) {
-      throw new Error(`${label} has an unsupported event type.`);
-    }
-    if (['timeout', 'substitution'].includes(event.type)
-      && event.playerId !== null) {
-      throw new Error(`${label} ${event.type} must be playerless.`);
     }
     if (event.side === 'team'
       && !['timeout', 'substitution'].includes(event.type)
@@ -81,16 +58,6 @@ export function validateVoiceCommandResponse(payload, {
     if (event.side === 'opponent' && event.playerId !== null) {
       throw new Error(`${label} opponent statistics must be team-level.`);
     }
-    if (event.type === 'shot') {
-      if (![1, 2, 3].includes(event.shotValue)
-        || typeof event.made !== 'boolean') {
-        throw new Error(`${label} has invalid shot details.`);
-      }
-    }
-    if (event.type === 'rebound'
-      && !['offensive', 'defensive'].includes(event.reboundKind)) {
-      throw new Error(`${label} has an invalid rebound type.`);
-    }
     if (event.type === 'substitution') {
       if (event.side !== 'team'
         || !playerIds.has(event.playerInId)
@@ -99,11 +66,6 @@ export function validateVoiceCommandResponse(payload, {
         throw new Error(`${label} has invalid substitution players.`);
       }
     }
-    if (typeof event.confidence !== 'number'
-      || event.confidence < 0
-      || event.confidence > 1) {
-      throw new Error(`${label} has invalid confidence.`);
-    }
     return structuredClone(event);
   });
   if (events.some(event => event.type === 'substitution') && events.length !== 1) {
@@ -111,7 +73,7 @@ export function validateVoiceCommandResponse(payload, {
   }
 
   return {
-    ...structuredClone(payload),
+    ...validated,
     events
   };
 }

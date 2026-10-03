@@ -895,6 +895,24 @@ voice events do not invalidate a queued command.
 
 ### Checkpoint 7: Integrated resilience and regression
 
+**Status: complete.** Request-time companion failures now move retained audio
+into an explicit retryable error state, mark the connection unavailable, and
+schedule loopback reconnection without reloading the tracker. Reconnection
+rechecks protocol and interpretation compatibility before queued work resumes.
+Returning to a visible page rechecks a disconnected companion and refreshes
+microphone devices.
+
+Recording stops when the page is backgrounded, microphone-track termination
+discards the incomplete capture, hardware changes refresh the microphone list,
+and page exit deterministically cancels active work, stops streams and previews,
+clears timers and temporary rows, and revokes recording URLs. Tracker and
+workbench responses pass through the same browser-side protocol validator
+before tracker-specific roster and lineup validation. Regression coverage now
+includes absence, incompatibility, request-time restart, cancellation,
+malformed proposals, storage failure, backgrounding, permission loss, page
+exit, repeated recording cycles, Review isolation, and release of tracks and
+object URLs.
+
 Deliver:
 
 - Recovery when the companion disconnects, restarts, changes profile, or becomes incompatible while the tracker is open.

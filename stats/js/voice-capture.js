@@ -12,6 +12,15 @@ const AUDIO_PROCESSING_STORAGE_KEY = 'basketball-stats-voice-audio-processing';
 const CHANNEL_PREFERENCE_STORAGE_KEY = 'basketball-stats-voice-channel-preference';
 const PAUSE_VIDEO_STORAGE_KEY = 'basketball-stats-voice-pause-video';
 const DATA_COLLECTION_STORAGE_KEY = 'basketball-stats-voice-data-collection';
+const RECONNECT_DELAY_MS = 1000;
+const CONNECTION_FAILURE_CODES = new Set([
+  'companion_unavailable',
+  'fetch_unavailable',
+  'incompatible_protocol',
+  'interpretation_unavailable',
+  'invalid_response',
+  'unauthorized'
+]);
 
 export function classifyChannelActivity(leftRms, rightRms) {
   const threshold = 0.003;
@@ -73,8 +82,10 @@ export function createVoiceCaptureController({
 
   let client = null;
   let connected = false;
+  let connecting = false;
   let warming = false;
   let destroyed = false;
+  let reconnectTimer = null;
   let recorder = null;
   let stream = null;
   let chunks = [];
@@ -120,6 +131,46 @@ export function createVoiceCaptureController({
   function setStatusNotice(message, kind = '') {
     statusNotice = { message, kind };
     setCommandStatus(message, kind);
+  }
+
+  function isConnectionFailure(error) {
+    return CONNECTION_FAILURE_CODES.has(error?.code)
+      || /could not reach|incompatible protocol/i.test(error?.message || '');
+  }
+
+  function clearReconnectTimer() {
+    if (reconnectTimer === null) return;
+    documentObject.defaultView.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  function scheduleReconnect() {
+    if (
+      destroyed
+      || connected
+      || connecting
+      || reconnectTimer !== null
+      || documentObject.hidden
+    ) {
+      return;
+    }
+    reconnectTimer = documentObject.defaultView.setTimeout(async () => {
+      reconnectTimer = null;
+      await connect();
+      if (!connected) scheduleReconnect();
+    }, RECONNECT_DELAY_MS);
+  }
+
+  function markDisconnected(error) {
+    client = null;
+    connected = false;
+    setConnectionStatus(
+      `${error?.message || 'Voice companion disconnected.'} Retrying locally...`,
+      'error'
+    );
+    diagnostics.textContent = 'Service diagnostics unavailable.';
+    refreshCompactControls();
+    scheduleReconnect();
   }
 
   function updateAudioSummary() {
@@ -291,7 +342,7 @@ export function createVoiceCaptureController({
       }
     }
 
-    connectButton.disabled = warming;
+    connectButton.disabled = warming || connecting;
     warmupButton.disabled = !connected || warming;
     refreshEvaluationsButton.disabled = !client;
   }
@@ -420,6 +471,9 @@ export function createVoiceCaptureController({
   }
 
   async function connect({ openOnFailure = false } = {}) {
+    if (destroyed || connecting) return connected;
+    connecting = true;
+    clearReconnectTimer();
     setConnectionStatus('Checking companion...', 'loading');
     try {
       const nextClient = clientFactory({
@@ -445,14 +499,19 @@ export function createVoiceCaptureController({
       diagnostics.textContent = `Protocol v${capabilities.protocolVersion} · service ${health.status} · loopback ${capabilities.security?.loopbackOnly === false ? 'not enforced' : 'only'} · origin validation ${capabilities.security?.originValidation === false ? 'off' : 'on'}`;
       await loadEvaluationSamples();
       pumpQueue();
+      return true;
     } catch (error) {
       client = null;
       connected = false;
       setConnectionStatus(error.message || 'Could not connect.', 'error');
       diagnostics.textContent = 'Service diagnostics unavailable.';
       if (openOnFailure && !settingsDialog.open) settingsDialog.showModal();
+      scheduleReconnect();
+      return false;
     } finally {
+      connecting = false;
       refreshCompactControls();
+      if (!connected) scheduleReconnect();
     }
   }
 
@@ -466,6 +525,7 @@ export function createVoiceCaptureController({
       setConnectionStatus(`Models ready in ${result.timingMs?.total ?? 0} ms.`, 'ready');
     } catch (error) {
       setConnectionStatus(error.message || 'Model warmup failed.', 'error');
+      if (isConnectionFailure(error)) markDisconnected(error);
     } finally {
       warming = false;
       refreshCompactControls();
@@ -476,6 +536,30 @@ export function createVoiceCaptureController({
   function stopTracks() {
     stream?.getTracks().forEach(track => track.stop());
     stream = null;
+  }
+
+  function handleMicrophoneEnded() {
+    if (!recording || destroyed) return;
+    discardActiveRecording();
+    setStatusNotice(
+      'Microphone access ended. The active recording was discarded.',
+      'error'
+    );
+  }
+
+  function handleVisibilityChange() {
+    if (documentObject.hidden) {
+      if (recorder?.state === 'recording') {
+        stopRecording();
+      }
+      return;
+    }
+    refreshMicrophones();
+    if (!connected) connect();
+  }
+
+  function handleDeviceChange() {
+    refreshMicrophones();
   }
 
   function resumeVideoPlayback() {
@@ -610,6 +694,9 @@ export function createVoiceCaptureController({
     try {
       await stopChannelPreview();
       stream = await mediaDevices.getUserMedia({ audio: audioConstraints() });
+      stream.getTracks().forEach(track => {
+        track.addEventListener?.('ended', handleMicrophoneEnded, { once: true });
+      });
       await refreshMicrophones();
       const capturedSeconds = videoController.getCurrentSeconds();
       resumePlaybackAfterRecording = pauseVideoInput.checked && videoController.isPlaying();
@@ -742,6 +829,7 @@ export function createVoiceCaptureController({
       job.errorMessage = error.code === 'request_cancelled'
         ? 'Processing cancelled.'
         : (error.message || 'Voice processing failed.');
+      if (isConnectionFailure(error)) markDisconnected(error);
     } finally {
       if (processingJobId === job.id) processingJobId = null;
       job.requestId = null;
@@ -759,8 +847,9 @@ export function createVoiceCaptureController({
     try {
       await client.cancel(job.requestId);
     } catch (error) {
-      job.state = 'processing';
+      job.state = isConnectionFailure(error) ? 'error' : 'processing';
       job.errorMessage = error.message || 'Could not cancel processing.';
+      if (isConnectionFailure(error)) markDisconnected(error);
       publishJobs();
     }
   }
@@ -1143,11 +1232,35 @@ export function createVoiceCaptureController({
   });
 
   const unsubscribeReady = videoController.subscribeReady(refreshCompactControls);
+  documentObject.addEventListener('visibilitychange', handleVisibilityChange);
+  documentObject.defaultView.addEventListener('pagehide', destroy);
+  mediaDevices?.addEventListener?.('devicechange', handleDeviceChange);
   updateAudioSummary();
   refreshMicrophones();
   publishJobs();
   refreshCompactControls();
   connect();
+
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    clearReconnectTimer();
+    unsubscribeReady();
+    documentObject.removeEventListener('visibilitychange', handleVisibilityChange);
+    documentObject.defaultView.removeEventListener('pagehide', destroy);
+    mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange);
+    stopRecordingTimer();
+    if (processingJobId && client) client.cancel(activeJob()?.requestId).catch(() => {});
+    if (recorder?.state === 'recording') {
+      discardingRecording = true;
+      recorder.stop();
+    }
+    stopTracks();
+    stopChannelPreview();
+    clearJobs();
+    client = null;
+    connected = false;
+  }
 
   return {
     refresh: refreshCompactControls,
@@ -1159,18 +1272,7 @@ export function createVoiceCaptureController({
         jobs: jobs.map(commandView)
       };
     },
-    destroy() {
-      destroyed = true;
-      unsubscribeReady();
-      stopRecordingTimer();
-      if (processingJobId && client) client.cancel(activeJob()?.requestId).catch(() => {});
-      if (recorder?.state === 'recording') {
-        discardingRecording = true;
-        recorder.stop();
-      }
-      stopTracks();
-      stopChannelPreview();
-      clearJobs();
-    }
+    reconnect: () => connect(),
+    destroy
   };
 }

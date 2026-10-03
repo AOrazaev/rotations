@@ -51,7 +51,7 @@
       "interpretationOnlyWarnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "interpretationOnlyLatencyMs": 60934,
+      "interpretationOnlyLatencyMs": 49217,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -90,7 +90,7 @@
       "interpretationOnlyWarnings": [
         "Removed 1 unspoken model event."
       ],
-      "interpretationOnlyLatencyMs": 17084,
+      "interpretationOnlyLatencyMs": 14338,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -129,7 +129,7 @@
       "interpretationOnlyWarnings": [
         "Removed 1 unspoken model event."
       ],
-      "interpretationOnlyLatencyMs": 17793,
+      "interpretationOnlyLatencyMs": 13967,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -180,7 +180,7 @@
       "interpretationOnlyWarnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "interpretationOnlyLatencyMs": 44663,
+      "interpretationOnlyLatencyMs": 33735,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -229,7 +229,7 @@
       "interpretationOnlyWarnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "interpretationOnlyLatencyMs": 17021,
+      "interpretationOnlyLatencyMs": 87147,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -262,7 +262,7 @@
       ],
       "interpretationOnlyEventArrayExact": true,
       "interpretationOnlyWarnings": [],
-      "interpretationOnlyLatencyMs": 32141,
+      "interpretationOnlyLatencyMs": 36362,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -343,7 +343,7 @@
       "interpretationOnlyWarnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "interpretationOnlyLatencyMs": 58420,
+      "interpretationOnlyLatencyMs": 50369,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -396,7 +396,7 @@
       ],
       "interpretationOnlyEventArrayExact": true,
       "interpretationOnlyWarnings": [],
-      "interpretationOnlyLatencyMs": 20810,
+      "interpretationOnlyLatencyMs": 21774,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -482,7 +482,7 @@
       "interpretationOnlyWarnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "interpretationOnlyLatencyMs": 53879,
+      "interpretationOnlyLatencyMs": 101583,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -515,7 +515,7 @@
       ],
       "interpretationOnlyEventArrayExact": true,
       "interpretationOnlyWarnings": [],
-      "interpretationOnlyLatencyMs": 10883,
+      "interpretationOnlyLatencyMs": 7622,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -552,7 +552,7 @@
       ],
       "interpretationOnlyEventArrayExact": true,
       "interpretationOnlyWarnings": [],
-      "interpretationOnlyLatencyMs": 12632,
+      "interpretationOnlyLatencyMs": 7878,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -577,14 +577,20 @@
       "warnings": [],
       "latencyMs": null,
       "error": null,
-      "interpretationOnlyActualEvents": null,
-      "interpretationOnlyEventArrayExact": false,
-      "interpretationOnlyWarnings": [],
-      "interpretationOnlyLatencyMs": 13416,
-      "interpretationOnlyError": {
-        "type": "InvalidInterpretation",
-        "message": "events[0].reboundKind is required for rebounds."
-      },
+      "interpretationOnlyActualEvents": [
+        {
+          "side": "team",
+          "type": "rebound",
+          "playerId": "p60",
+          "reboundKind": "defensive"
+        }
+      ],
+      "interpretationOnlyEventArrayExact": true,
+      "interpretationOnlyWarnings": [
+        "Corrected rebound kind to defensive from the explicit transcript."
+      ],
+      "interpretationOnlyLatencyMs": 6946,
+      "interpretationOnlyError": null,
       "failureCause": null
     },
     {
@@ -616,7 +622,7 @@
       ],
       "interpretationOnlyEventArrayExact": true,
       "interpretationOnlyWarnings": [],
-      "interpretationOnlyLatencyMs": 13178,
+      "interpretationOnlyLatencyMs": 6561,
       "interpretationOnlyError": null,
       "failureCause": null
     },
@@ -714,7 +720,7 @@
       "interpretationOnlyWarnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "interpretationOnlyLatencyMs": 31460,
+      "interpretationOnlyLatencyMs": 19574,
       "interpretationOnlyError": null,
       "failureCause": null
     }
@@ -724,12 +730,12 @@
     "rawTranscriptMatches": null,
     "normalizedTranscriptMatches": null,
     "exactEventArrays": null,
-    "interpretationOnlyExactEventArrays": 15,
+    "interpretationOnlyExactEventArrays": 16,
     "errorCount": null,
-    "interpretationOnlyErrorCount": 1,
+    "interpretationOnlyErrorCount": 0,
     "medianLatencyMs": null,
     "maxLatencyMs": null,
-    "medianInterpretationOnlyLatencyMs": 17438,
-    "maxInterpretationOnlyLatencyMs": 60934
+    "medianInterpretationOnlyLatencyMs": 16956,
+    "maxInterpretationOnlyLatencyMs": 101583
   }
 }

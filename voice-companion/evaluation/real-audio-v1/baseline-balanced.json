@@ -1,5 +1,6 @@
 {
   "formatVersion": 1,
+  "mode": "end-to-end",
   "transcriptionModel": "base.en",
   "commandModel": "Qwen3-4B-Q4_K_M.gguf",
   "caseResults": [
@@ -45,8 +46,14 @@
       "warnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "latencyMs": 61996,
-      "error": null
+      "latencyMs": 129506,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "number-50-misses-two",
@@ -78,8 +85,14 @@
       "warnings": [
         "Removed 1 unspoken model event."
       ],
-      "latencyMs": 14986,
-      "error": null
+      "latencyMs": 13974,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "fifty-fifteen-confusion",
@@ -112,8 +125,14 @@
         "Normalized jersey Fifteen to Fifty using the active lineup.",
         "Removed 1 unspoken model event."
       ],
-      "latencyMs": 16941,
-      "error": null
+      "latencyMs": 13804,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "number-70-miss-opponent-rebound",
@@ -134,15 +153,15 @@
           "reboundKind": "defensive"
         }
       ],
-      "rawTranscript": "Number 70 misses three pointer. Opponent defensively rebound.",
-      "normalizedTranscript": "Number 70 misses three pointer. Opponent defensively rebound.",
+      "rawTranscript": "Number seven T misses three pointer. Opponent defensively rebound.",
+      "normalizedTranscript": "Number seven T misses three pointer. Opponent defensively rebound.",
       "rawTranscriptMatch": false,
       "normalizedTranscriptMatch": false,
       "actualEvents": [
         {
           "side": "team",
           "type": "shot",
-          "playerId": "p70",
+          "playerId": "p7",
           "shotValue": 3,
           "made": false
         },
@@ -153,12 +172,18 @@
           "reboundKind": "defensive"
         }
       ],
-      "eventArrayExact": true,
+      "eventArrayExact": false,
       "warnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "latencyMs": 35192,
-      "error": null
+      "latencyMs": 34744,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "assist-number-5-made-three-number-13",
@@ -200,8 +225,14 @@
       "warnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "latencyMs": 94896,
-      "error": null
+      "latencyMs": 38190,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "opponent-timeout",
@@ -227,8 +258,14 @@
       ],
       "eventArrayExact": true,
       "warnings": [],
-      "latencyMs": 32812,
-      "error": null
+      "latencyMs": 62879,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "four-event-sequence",
@@ -264,8 +301,8 @@
           }
         }
       ],
-      "rawTranscript": "Number 40 missed two pointer. Defensive rebound by opponent steal by 13. 13 makes two points in transition.",
-      "normalizedTranscript": "Number 40 missed two pointer. Defensive rebound by opponent steal by 13. 13 makes two points in transition.",
+      "rawTranscript": "Number 40 missed two pointer defensive rebound by opponent steal by 13. 13 makes two points in transition",
+      "normalizedTranscript": "Number 40 missed two pointer defensive rebound by opponent steal by 13. 13 makes two points in transition",
       "rawTranscriptMatch": true,
       "normalizedTranscriptMatch": true,
       "actualEvents": [
@@ -302,8 +339,14 @@
       "warnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "latencyMs": 55566,
-      "error": null
+      "latencyMs": 43346,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "transition-miss-opponent-foul",
@@ -326,8 +369,8 @@
           "playerId": null
         }
       ],
-      "rawTranscript": "Number 50 misses two pointer in transition. Opponent foul.",
-      "normalizedTranscript": "Number 50 misses two pointer in transition. Opponent foul.",
+      "rawTranscript": "number 50 misses two pointer in transition. Opponent foul.",
+      "normalizedTranscript": "number 50 misses two pointer in transition. Opponent foul.",
       "rawTranscriptMatch": true,
       "normalizedTranscriptMatch": true,
       "actualEvents": [
@@ -349,8 +392,14 @@
       ],
       "eventArrayExact": true,
       "warnings": [],
-      "latencyMs": 81687,
-      "error": null
+      "latencyMs": 13225,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "substitute-number-70-for-number-50",
@@ -380,8 +429,14 @@
       ],
       "eventArrayExact": true,
       "warnings": [],
-      "latencyMs": 2626,
-      "error": null
+      "latencyMs": 1129,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "number-70-makes-two-assist-number-60",
@@ -423,8 +478,14 @@
       "warnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "latencyMs": 41697,
-      "error": null
+      "latencyMs": 47114,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "opponent-turnover",
@@ -450,8 +511,14 @@
       ],
       "eventArrayExact": true,
       "warnings": [],
-      "latencyMs": 8884,
-      "error": null
+      "latencyMs": 45634,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "opponent-misses-two",
@@ -481,8 +548,14 @@
       ],
       "eventArrayExact": true,
       "warnings": [],
-      "latencyMs": 10401,
-      "error": null
+      "latencyMs": 23331,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "number-60-defensive-rebound",
@@ -500,14 +573,26 @@
       "normalizedTranscript": "Number 60 defensive rebound.",
       "rawTranscriptMatch": true,
       "normalizedTranscriptMatch": true,
-      "actualEvents": null,
-      "eventArrayExact": false,
-      "warnings": [],
-      "latencyMs": 9358,
-      "error": {
-        "type": "InvalidInterpretation",
-        "message": "events[0].reboundKind is required for rebounds."
-      }
+      "actualEvents": [
+        {
+          "side": "team",
+          "type": "rebound",
+          "playerId": "p60",
+          "reboundKind": "defensive"
+        }
+      ],
+      "eventArrayExact": true,
+      "warnings": [
+        "Corrected rebound kind to defensive from the explicit transcript."
+      ],
+      "latencyMs": 13813,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "opponent-foul",
@@ -533,8 +618,14 @@
       ],
       "eventArrayExact": true,
       "warnings": [],
-      "latencyMs": 8400,
-      "error": null
+      "latencyMs": 7943,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "substitute-number-40-for-number-7",
@@ -564,8 +655,14 @@
       ],
       "eventArrayExact": true,
       "warnings": [],
-      "latencyMs": 1393,
-      "error": null
+      "latencyMs": 1260,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     },
     {
       "id": "number-7-miss-number-70-rebound-turnover",
@@ -591,10 +688,10 @@
           "playerId": "p70"
         }
       ],
-      "rawTranscript": "Number seven misses two pointer. Number seventy offensive rebound. Number seventy turn over.",
-      "normalizedTranscript": "Number seven misses two pointer. Number seventy offensive rebound. Number seventy turn over.",
-      "rawTranscriptMatch": true,
-      "normalizedTranscriptMatch": true,
+      "rawTranscript": "Number seven misses two pointer. Number seventy offensive rebound. Number seventy turnover.",
+      "normalizedTranscript": "Number seven misses two pointer. Number seventy offensive rebound. Number seventy turnover.",
+      "rawTranscriptMatch": false,
+      "normalizedTranscriptMatch": false,
       "actualEvents": [
         {
           "side": "team",
@@ -619,17 +716,27 @@
       "warnings": [
         "Removed unspoken shot phase 'transition'."
       ],
-      "latencyMs": 23177,
-      "error": null
+      "latencyMs": 18601,
+      "error": null,
+      "interpretationOnlyActualEvents": null,
+      "interpretationOnlyEventArrayExact": false,
+      "interpretationOnlyWarnings": [],
+      "interpretationOnlyLatencyMs": null,
+      "interpretationOnlyError": null,
+      "failureCause": null
     }
   ],
   "summary": {
     "caseCount": 16,
-    "rawTranscriptMatches": 13,
-    "normalizedTranscriptMatches": 14,
+    "rawTranscriptMatches": 12,
+    "normalizedTranscriptMatches": 13,
     "exactEventArrays": 14,
-    "errorCount": 1,
-    "medianLatencyMs": 20059,
-    "maxLatencyMs": 94896
+    "interpretationOnlyExactEventArrays": null,
+    "errorCount": 0,
+    "interpretationOnlyErrorCount": null,
+    "medianLatencyMs": 20966,
+    "maxLatencyMs": 129506,
+    "medianInterpretationOnlyLatencyMs": null,
+    "maxInterpretationOnlyLatencyMs": null
   }
 }

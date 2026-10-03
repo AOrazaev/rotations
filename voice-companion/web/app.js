@@ -1,3 +1,5 @@
+import { validateVoiceResponse } from './voice-response.js';
+
 const tokenInput = document.querySelector('#token');
 const connectionResult = document.querySelector('#connectionResult');
 const requestResult = document.querySelector('#requestResult');
@@ -63,7 +65,17 @@ function buildContext(seconds) {
     sideHint: null,
     roster,
     currentLineupIds: roster.slice(0, 5).map(player => player.id),
-    allowedEventTypes: ['shot', 'rebound', 'assist', 'steal', 'block', 'turnover', 'foul']
+    allowedEventTypes: [
+      'shot',
+      'rebound',
+      'assist',
+      'steal',
+      'block',
+      'turnover',
+      'foul',
+      'timeout',
+      'substitution'
+    ]
   };
 }
 
@@ -96,10 +108,14 @@ function renderProposal(payload) {
   });
 }
 
-function showResponse(payload) {
-  transcriptResult.textContent = payload.transcript || 'No transcript returned.';
-  renderProposal(payload);
-  show(requestResult, payload);
+function showResponse(payload, context) {
+  const validated = validateVoiceResponse(payload, {
+    requestId: context.requestId,
+    allowedEventTypes: context.allowedEventTypes
+  });
+  transcriptResult.textContent = validated.transcript || 'No transcript returned.';
+  renderProposal(validated);
+  show(requestResult, validated);
 }
 
 function showRequestError(error) {
@@ -302,7 +318,7 @@ async function processAudio(blob, seconds) {
       headers: headers(),
       body: form
     });
-    showResponse(await readJson(response));
+    showResponse(await readJson(response), context);
   } catch (error) {
     showRequestError(error);
   } finally {
@@ -348,7 +364,7 @@ interpretTranscript.addEventListener('click', async () => {
         context
       })
     });
-    showResponse(await readJson(response));
+    showResponse(await readJson(response), context);
   } catch (error) {
     showRequestError(error);
   } finally {

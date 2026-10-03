@@ -106,7 +106,9 @@
             "steal",
             "block",
             "turnover",
-            "foul"
+            "foul",
+            "timeout",
+            "substitution"
           ]
         },
         "playerId": {
@@ -123,6 +125,14 @@
         "reboundKind": {
           "type": "string",
           "enum": ["offensive", "defensive"]
+        },
+        "playerInId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "playerOutId": {
+          "type": "string",
+          "maxLength": 128
         },
         "shotDetails": {
           "type": "object",

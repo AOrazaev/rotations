@@ -57,24 +57,30 @@ otherwise it is classified as `interpretation`.
 `baseline-balanced.json` records the sixteen-case balanced-profile run with
 `base.en` and `Qwen3-4B-Q4_K_M.gguf`:
 
-- 13/16 raw transcript matches.
-- 14/16 roster-normalized transcript matches.
+- 12/16 raw transcript matches.
+- 13/16 roster-normalized transcript matches.
 - 14/16 exact semantic event arrays.
-- 1 processing error.
+- 0 processing errors.
+
+The refreshed reports are functional accuracy snapshots. Another companion
+process may have been active during collection, so their latency fields are not
+valid performance measurements and must be regenerated on an otherwise idle
+machine before making profile or hardware decisions.
 
 `baseline-balanced-interpretation-only.json` runs the same command model
 against curated transcripts without loading Whisper:
 
-- 15/16 exact semantic event arrays.
-- 1 interpretation error.
+- 16/16 exact semantic event arrays.
+- 0 interpretation errors.
 - `number-70-makes-two-assist-number-60` passes, confirming that its `seven
   two` failure is caused by transcription.
-- `number-60-defensive-rebound` still fails because the model omits
-  `reboundKind`, confirming an interpretation/grounding defect.
+- `number-60-defensive-rebound` passes because explicit offensive or defensive
+  wording now repairs a missing or contradictory `reboundKind` before strict
+  validation.
 
 The new `number-7-miss-number-70-rebound-turnover` case passes with all three
 events after adding support for Whisper's two-word `turn over` phrasing.
-Remaining weaknesses are the `seven two` transcription of jersey #70 and an
-occasional command-model rebound response that omits `reboundKind`. The
-`number-70-miss-opponent-rebound` event array is correct, but strict transcript
-matching still rejects Whisper's `defensively rebound` wording.
+Remaining end-to-end weaknesses are the `seven T` and `seven two`
+transcriptions of jersey #70 when both #7 and #70 are active. They remain known
+transcription failures rather than targets for ambiguous roster-based
+correction.

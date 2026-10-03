@@ -940,12 +940,14 @@ def _explicit_event_facts(transcript: str, context: dict) -> list[dict]:
         r"foul|fouls|timeout)"
     )
     before_pattern = re.compile(
-        rf"\b{subject_pattern}\s+(?:offensive\s+|defensive\s+)?"
+        rf"\b{subject_pattern}\s+"
+        r"(?:(?P<rebound_kind>offensive|defensive)\s+)?"
         rf"{action_pattern}\b",
         re.IGNORECASE,
     )
     after_pattern = re.compile(
-        rf"\b(?:offensive\s+|defensive\s+)?{action_pattern}\s+by\s+"
+        r"\b(?:(?P<rebound_kind>offensive|defensive)\s+)?"
+        rf"{action_pattern}\s+by\s+"
         rf"{subject_pattern}\b",
         re.IGNORECASE,
     )
@@ -985,6 +987,14 @@ def _explicit_event_facts(transcript: str, context: dict) -> list[dict]:
                 "side": side,
                 "playerId": player_id,
                 "start": match.start(),
+                **(
+                    {"reboundKind": match.group("rebound_kind").lower()}
+                    if (
+                        event_type == "rebound"
+                        and match.group("rebound_kind")
+                    )
+                    else {}
+                ),
             })
     return sorted(facts, key=lambda fact: fact["start"])
 
@@ -1097,21 +1107,31 @@ def _ground_model_payload(transcript: str, payload: object, context: dict):
             continue
         for event, fact in zip(type_events, type_facts):
             if (
-                event.get("side") == fact["side"]
-                and event.get("playerId") == fact["playerId"]
+                event.get("side") != fact["side"]
+                or event.get("playerId") != fact["playerId"]
             ):
-                continue
-            event["side"] = fact["side"]
-            event["playerId"] = fact["playerId"]
-            subject = (
-                "opponent"
-                if fact["side"] == "opponent"
-                else f"jersey {jerseys_by_id[fact['playerId']]}"
-            )
-            warnings.append(
-                f"Corrected {event_type} attribution to {subject} "
-                "from the explicit transcript."
-            )
+                event["side"] = fact["side"]
+                event["playerId"] = fact["playerId"]
+                subject = (
+                    "opponent"
+                    if fact["side"] == "opponent"
+                    else f"jersey {jerseys_by_id[fact['playerId']]}"
+                )
+                warnings.append(
+                    f"Corrected {event_type} attribution to {subject} "
+                    "from the explicit transcript."
+                )
+            rebound_kind = fact.get("reboundKind")
+            if (
+                event_type == "rebound"
+                and rebound_kind
+                and event.get("reboundKind") != rebound_kind
+            ):
+                event["reboundKind"] = rebound_kind
+                warnings.append(
+                    f"Corrected rebound kind to {rebound_kind} from the "
+                    "explicit transcript."
+                )
     return grounded
 
 

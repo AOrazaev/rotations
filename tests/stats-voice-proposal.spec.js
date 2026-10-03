@@ -68,10 +68,30 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
     window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
     window.__voiceRequests = [];
     window.__voiceCommandCount = 0;
+    window.__voiceCheckCount = 0;
     window.__microphoneRequestCount = 0;
+    window.__microphoneEnumerateCount = 0;
+    window.__trackStopCount = 0;
     window.__evaluationSamples = [];
     window.__evaluationSaveShouldFail = false;
     window.__voiceTestMode = initialMode;
+    window.__activeVoiceObjectUrls = new Set();
+    const createObjectUrl = URL.createObjectURL.bind(URL);
+    const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
+    URL.createObjectURL = blob => {
+      const url = createObjectUrl(blob);
+      window.__activeVoiceObjectUrls.add(url);
+      return url;
+    };
+    URL.revokeObjectURL = url => {
+      window.__activeVoiceObjectUrls.delete(url);
+      revokeObjectUrl(url);
+    };
+    window.__documentHidden = false;
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => window.__documentHidden
+    });
 
     function successPayload(context) {
       return {
@@ -110,11 +130,18 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
       return {
         baseUrl: options.baseUrl,
         async check() {
+          window.__voiceCheckCount += 1;
           if (window.__voiceTestMode === 'unavailable') {
-            throw new Error('Could not reach the local voice companion.');
+            throw Object.assign(
+              new Error('Could not reach the local voice companion.'),
+              { code: 'companion_unavailable' }
+            );
           }
           if (window.__voiceTestMode === 'incompatible') {
-            throw new Error('The companion protocol is incompatible with this tracker.');
+            throw Object.assign(
+              new Error('The companion protocol is incompatible with this tracker.'),
+              { code: 'incompatible_protocol' }
+            );
           }
           return {
             health: { protocolVersion: 1, status: 'ready' },
@@ -199,6 +226,13 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
               partialResult: { transcript: 'Seven assist' }
             });
           }
+          if (window.__voiceTestMode === 'disconnect-once') {
+            window.__voiceTestMode = 'success';
+            throw Object.assign(
+              new Error('Could not reach the local voice companion.'),
+              { code: 'companion_unavailable' }
+            );
+          }
           return successPayload(context);
         },
         async cancel() {
@@ -248,8 +282,10 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
         }
       };
     };
+    const mediaDeviceListeners = new Map();
     window.__STATS_MEDIA_DEVICES__ = {
       async enumerateDevices() {
+        window.__microphoneEnumerateCount += 1;
         return [{
           kind: 'audioinput',
           deviceId: 'test-microphone',
@@ -262,12 +298,29 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
         if (window.__voiceTestMode === 'microphone-denied') {
           throw new Error('Permission denied');
         }
-        return {
-          getTracks() {
-            return [{ stop() {} }];
+        const trackListeners = new Map();
+        const track = {
+          addEventListener(type, listener) {
+            trackListeners.set(type, listener);
+          },
+          stop() {
+            window.__trackStopCount += 1;
           }
         };
+        window.__lastTrackEnd = () => trackListeners.get('ended')?.();
+        return { getTracks: () => [track] };
+      },
+      addEventListener(type, listener) {
+        mediaDeviceListeners.set(type, listener);
+      },
+      removeEventListener(type, listener) {
+        if (mediaDeviceListeners.get(type) === listener) {
+          mediaDeviceListeners.delete(type);
+        }
       }
+    };
+    window.__dispatchMediaDeviceChange = () => {
+      mediaDeviceListeners.get('devicechange')?.();
     };
     window.__STATS_MEDIA_RECORDER__ = class {
       static isTypeSupported() { return true; }
@@ -765,6 +818,126 @@ test('cancels an active command and retries its retained recording', async ({ pa
   await page.locator('.voice-command-error [data-voice-action="retry"]').click();
   await waitForDrafts(page, 1);
   expect(await page.evaluate(() => window.__voiceCommandCount)).toBe(2);
+});
+
+test('reconnects after a request-time companion restart and retains audio for retry', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'disconnect-once' });
+  await waitForConnection(page);
+  await recordCommand(page);
+  await expect(page.locator('.voice-command-error')).toContainText(
+    'Could not reach the local voice companion'
+  );
+
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.voiceController.getState().connected
+  )).toBe(true);
+  expect(await page.evaluate(() => window.__voiceCheckCount)).toBeGreaterThan(1);
+
+  await page.locator('.voice-command-error [data-voice-action="retry"]').click();
+  await waitForDrafts(page, 1);
+  expect(await page.evaluate(() => window.__voiceCommandCount)).toBe(2);
+});
+
+test('detects incompatible companion changes and reconnects after compatibility returns', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+
+  await page.evaluate(async () => {
+    window.__voiceTestMode = 'incompatible';
+    await window.__statsApp.voiceController.reconnect();
+  });
+  expect(await page.evaluate(
+    () => window.__statsApp.voiceController.getState().connected
+  )).toBe(false);
+  await expect(page.locator('#voiceConnectionStatus')).toContainText(
+    'incompatible'
+  );
+
+  await page.evaluate(async () => {
+    window.__voiceTestMode = 'success';
+    await window.__statsApp.voiceController.reconnect();
+  });
+  await waitForConnection(page);
+});
+
+test('stops recording when backgrounded and refreshes devices after hardware changes', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+  const enumerations = await page.evaluate(() => window.__microphoneEnumerateCount);
+
+  await page.locator('#voiceRecordToggle').click();
+  await expect(page.locator('#voiceRecordLabel')).toContainText('Stop');
+  await page.evaluate(() => {
+    window.__documentHidden = true;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await waitForDrafts(page, 1);
+  expect(await page.evaluate(() => window.__trackStopCount)).toBeGreaterThan(0);
+
+  await page.evaluate(() => {
+    window.__documentHidden = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.__dispatchMediaDeviceChange();
+  });
+  await expect.poll(async () => page.evaluate(
+    () => window.__microphoneEnumerateCount
+  )).toBeGreaterThan(enumerations);
+});
+
+test('discards an active recording when microphone access ends', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+  await page.locator('#voiceRecordToggle').click();
+  await expect(page.locator('#voiceRecordLabel')).toContainText('Stop');
+
+  await page.evaluate(() => window.__lastTrackEnd());
+  await expect.poll(async () => page.evaluate(
+    () => window.__statsApp.voiceController.getState().recording
+  )).toBe(false);
+  expect(await page.evaluate(
+    () => window.__statsApp.voiceController.getState().jobs.length
+  )).toBe(0);
+  await expect(page.locator('#voiceCommandStatus')).toContainText(
+    'Microphone access ended'
+  );
+});
+
+test('cleans pending voice state on page exit', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  const state = await page.evaluate(
+    () => window.__statsApp.voiceController.getState()
+  );
+  expect(state.connected).toBe(false);
+  expect(state.recording).toBe(false);
+  expect(state.jobs).toEqual([]);
+});
+
+test('releases tracks and audio URLs across repeated voice command cycles', async ({ page }) => {
+  await openVoiceTracker(page);
+  await waitForConnection(page);
+
+  for (let index = 0; index < 5; index += 1) {
+    await recordCommand(page);
+    await waitForDrafts(page, 1);
+    await page.locator(
+      '.voice-command-draft [data-voice-action="confirm"]'
+    ).click();
+    await expect(page.locator('.voice-command-draft')).toHaveCount(0);
+  }
+
+  const resources = await page.evaluate(() => ({
+    activeObjectUrls: window.__activeVoiceObjectUrls.size,
+    trackStops: window.__trackStopCount,
+    jobs: window.__statsApp.voiceController.getState().jobs.length
+  }));
+  expect(resources.activeObjectUrls).toBe(0);
+  expect(resources.trackStops).toBeGreaterThanOrEqual(5);
+  expect(resources.jobs).toBe(0);
 });
 
 test('keeps partial transcripts and rejects invalid companion proposals', async ({ page }) => {

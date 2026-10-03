@@ -499,6 +499,50 @@ class CommandInterpreterTest(unittest.TestCase):
             result.warnings,
         )
 
+    def test_recovers_explicit_rebound_kind_before_validation(self):
+        request_context = {
+            **context(),
+            "roster": [
+                {"id": "p60", "jersey": "60", "name": "Valya"},
+            ],
+            "currentLineupIds": ["p60"],
+        }
+        payload = {
+            "events": [{
+                "side": "team",
+                "type": "rebound",
+                "playerId": "p60",
+                "confidence": 0.99,
+            }],
+            "overallConfidence": 0.99,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Number 60 defensive rebound.",
+            request_context,
+        )
+
+        self.assertEqual(
+            result.events,
+            [{
+                "side": "team",
+                "type": "rebound",
+                "playerId": "p60",
+                "confidence": 0.99,
+                "reboundKind": "defensive",
+            }],
+        )
+        self.assertIn(
+            "Corrected rebound kind to defensive from the explicit transcript.",
+            result.warnings,
+        )
+
     def test_rejects_team_player_on_opponent_event(self):
         payload = {
             "events": [
