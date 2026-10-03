@@ -77,8 +77,13 @@ roster-aware normalization is applied.
 Interpretation also grounds explicit active-lineup subjects independently. For
 example, `number five assist, number thirteen makes three` must attribute the
 assist to #5 and the shot to #13 even if the local command model repeats one
-player across both events. Unspoken shot phases such as transition or half
-court are removed rather than accepted from the model.
+player across both events. Action-first clauses such as `steal by thirteen` and
+`defensive rebound by opponent` receive the same grounding before strict roster
+validation. Unspoken model events and shot phases such as transition or half
+court are removed rather than accepted.
+
+Voice commands support player statistics plus team-level timeouts. Commands
+such as `opponent timeout` produce a playerless opponent timeline event.
 
 ## API
 

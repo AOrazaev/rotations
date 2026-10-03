@@ -163,6 +163,18 @@ async function openVoiceTracker(page, { mode = 'success' } = {}) {
               }]
             };
           }
+          if (window.__voiceTestMode === 'timeout') {
+            return {
+              ...successPayload(context),
+              transcript: 'Opponent timeout.',
+              events: [{
+                side: 'opponent',
+                type: 'timeout',
+                playerId: null,
+                confidence: 0.99
+              }]
+            };
+          }
           if (window.__voiceTestMode === 'partial-error') {
             throw Object.assign(new Error('Interpretation failed.'), {
               code: 'interpretation_failed',
@@ -409,6 +421,32 @@ test('rerecords a draft in place while preserving its original timestamp', async
   expect(rerecorded.audioUrl).not.toBe(original.audioUrl);
   expect(await page.evaluate(() => window.__voiceRequests[1].capturedSeconds)).toBe(42.4);
   await expect(page.locator('.voice-command-draft .voice-command-time')).toHaveText('0:42.4');
+});
+
+test('accepts an opponent timeout as a playerless voice event', async ({ page }) => {
+  await openVoiceTracker(page, { mode: 'timeout' });
+  await waitForConnection(page);
+  await recordCommand(page);
+  await waitForDrafts(page, 1);
+
+  const draft = page.locator('.voice-command-draft');
+  await expect(draft.locator('.voice-command-event-summary')).toContainText(
+    'Opponent timeout'
+  );
+  expect(await page.evaluate(
+    () => window.__voiceRequests[0].allowedEventTypes.includes('timeout')
+  )).toBe(true);
+  await draft.locator('[data-voice-action="confirm"]').click();
+
+  const events = await page.evaluate(
+    () => window.__statsApp.eventController.getGame().events
+  );
+  expect(events).toHaveLength(1);
+  expect(events[0]).toMatchObject({
+    side: 'opponent',
+    type: 'timeout',
+    playerId: null
+  });
 });
 
 test('confirms completed drafts independently and preserves atomic batch undo', async ({ page }) => {

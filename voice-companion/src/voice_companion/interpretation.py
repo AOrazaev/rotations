@@ -266,6 +266,7 @@ class LlamaCppCommandInterpreter:
             raise InvalidInterpretation(
                 "Command model returned an invalid structured response."
             ) from error
+        payload = _ground_model_payload(transcript, payload, context)
         result = validate_interpretation(payload, context, self.model_name)
         result = _ground_explicit_transcript_facts(transcript, result, context)
         _validate_spoken_event_coverage(transcript, result)
@@ -341,6 +342,8 @@ class LlamaCppCommandInterpreter:
             "basket is a shot with made false. Put a scoring shot before its "
             "related assist so equivalent phrasings produce the same order. "
             "For 'A assist and B makes two', emit B's shot and A's assist. "
+            "A timeout is team-level: use playerId null and side 'team' or "
+            "'opponent' exactly as spoken. "
             "Opponent statistics are team-level: always use side 'opponent' and "
             "playerId null. Never assign a team roster player to an opponent "
             "event. Team statistics require a resolved supplied roster ID. "
@@ -431,6 +434,23 @@ class LlamaCppCommandInterpreter:
                             "type": "rebound",
                             "playerId": None,
                             "reboundKind": "defensive",
+                            "confidence": 0.99,
+                        }
+                    ],
+                    "overallConfidence": 0.99,
+                    "warnings": [],
+                },
+            }
+        )
+        examples.append(
+            {
+                "transcript": "Opponent timeout",
+                "result": {
+                    "events": [
+                        {
+                            "side": "opponent",
+                            "type": "timeout",
+                            "playerId": None,
                             "confidence": 0.99,
                         }
                     ],
@@ -556,9 +576,13 @@ def _validate_event(
         raise InvalidInterpretation(
             f"events[{index}] opponent statistics must use playerId null."
         )
-    if event["side"] == "team" and player_id is None:
+    if event["side"] == "team" and player_id is None and event_type != "timeout":
         raise InvalidInterpretation(
             f"events[{index}] team statistics require a supplied roster player."
+        )
+    if event_type == "timeout" and player_id is not None:
+        raise InvalidInterpretation(
+            f"events[{index}] timeout must use playerId null."
         )
     if not _is_confidence(event["confidence"]):
         raise InvalidInterpretation(
@@ -669,7 +693,7 @@ def _jersey_number_words(value: int) -> str | None:
     )
 
 
-def _explicit_active_subjects(transcript: str, context: dict) -> dict[str, list[str]]:
+def _subject_variants(context: dict) -> dict[str, str]:
     active_ids = set(context["currentLineupIds"])
     variants: dict[str, set[str]] = {}
     for player in context["roster"]:
@@ -683,34 +707,179 @@ def _explicit_active_subjects(transcript: str, context: dict) -> dict[str, list[
             words = _jersey_number_words(int(jersey))
             if words:
                 variants.setdefault(words, set()).add(player["id"])
-    resolved = {
+    return {
         variant: next(iter(player_ids))
         for variant, player_ids in variants.items()
         if len(player_ids) == 1
     }
-    if not resolved:
-        return {}
+
+
+def _event_type_for_action(action: str) -> str:
+    normalized = action.lower()
+    if normalized.startswith(("make", "made", "miss", "score")):
+        return "shot"
+    if normalized.startswith("assist"):
+        return "assist"
+    if normalized.startswith("rebound"):
+        return "rebound"
+    if normalized.startswith("steal"):
+        return "steal"
+    if normalized.startswith("block"):
+        return "block"
+    if normalized.startswith("turnover"):
+        return "turnover"
+    if normalized.startswith("foul"):
+        return "foul"
+    return "timeout"
+
+
+def _explicit_event_facts(transcript: str, context: dict) -> list[dict]:
+    resolved = _subject_variants(context)
     jersey_pattern = "|".join(
         re.escape(variant)
         for variant in sorted(resolved, key=len, reverse=True)
     )
-    pattern = re.compile(
-        rf"\b(?:number\s+|player\s+)?(?P<jersey>{jersey_pattern})\s+"
+    subject_options = r"opponent|opponents|opposing\s+team"
+    if jersey_pattern:
+        subject_options += rf"|(?:(?:number|player)\s+)?(?:{jersey_pattern})"
+    subject_pattern = rf"(?P<subject>{subject_options})"
+    action_pattern = (
         r"(?P<action>assist(?:s|ed)?|make|makes|made|miss|misses|missed|"
-        r"score|scores|scored)\b",
+        r"score|scores|scored|rebound|rebounds|steal|steals|block|blocks|"
+        r"turnover|turnovers|foul|fouls|timeout)"
+    )
+    before_pattern = re.compile(
+        rf"\b{subject_pattern}\s+(?:offensive\s+|defensive\s+)?"
+        rf"{action_pattern}\b",
         re.IGNORECASE,
     )
-    subjects: dict[str, list[str]] = {}
-    for match in pattern.finditer(transcript):
-        preceding = transcript[max(0, match.start() - 24):match.start()].lower()
-        if re.search(r"\b(?:opponent|opponents|opposing\s+team)\s*$", preceding):
-            continue
-        action = match.group("action").lower()
-        event_type = "assist" if action.startswith("assist") else "shot"
-        subjects.setdefault(event_type, []).append(
-            resolved[match.group("jersey").lower()]
+    after_pattern = re.compile(
+        rf"\b(?:offensive\s+|defensive\s+)?{action_pattern}\s+by\s+"
+        rf"{subject_pattern}\b",
+        re.IGNORECASE,
+    )
+    facts = []
+    seen = set()
+    for placement, pattern in (
+        ("before", before_pattern),
+        ("after", after_pattern),
+    ):
+        for match in pattern.finditer(transcript):
+            subject = match.group("subject").lower()
+            preceding = transcript[max(0, match.start() - 32):match.start()].lower()
+            if subject.startswith(("opponent", "opposing team")):
+                if placement == "before" and re.search(r"\bby\s*$", preceding):
+                    continue
+                side = "opponent"
+                player_id = None
+            else:
+                if placement == "before" and re.search(
+                    r"\b(?:opponent|opponents|opposing\s+team)\s*"
+                    r"(?:number|player)?\s*$",
+                    preceding,
+                ):
+                    continue
+                side = "team"
+                jersey = re.sub(r"^(?:number|player)\s+", "", subject)
+                player_id = resolved.get(jersey)
+                if not player_id:
+                    continue
+            event_type = _event_type_for_action(match.group("action"))
+            identity = (event_type, match.start(), player_id, side)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            facts.append({
+                "type": event_type,
+                "side": side,
+                "playerId": player_id,
+                "start": match.start(),
+            })
+    return sorted(facts, key=lambda fact: fact["start"])
+
+
+def _spoken_event_types(transcript: str) -> set[str]:
+    normalized = transcript.lower()
+    padded = f" {normalized} "
+    keywords = {
+        "assist": ("assist",),
+        "rebound": ("rebound",),
+        "steal": ("steal", "stole"),
+        "block": ("block",),
+        "turnover": ("turnover", "turned it over"),
+        "foul": ("foul",),
+        "timeout": ("timeout",),
+        "shot": (
+            " makes ",
+            " made ",
+            " misses ",
+            " missed ",
+            " scores ",
+            " scored ",
+            "free throw",
+        ),
+    }
+    return {
+        event_type
+        for event_type, phrases in keywords.items()
+        if any(phrase in padded for phrase in phrases)
+    }
+
+
+def _ground_model_payload(transcript: str, payload: object, context: dict):
+    if not isinstance(payload, dict) or not isinstance(payload.get("events"), list):
+        return payload
+    grounded = json.loads(json.dumps(payload))
+    warnings = grounded.get("warnings")
+    if not isinstance(warnings, list):
+        return grounded
+    spoken_types = _spoken_event_types(transcript)
+    original_count = len(grounded["events"])
+    grounded["events"] = [
+        event
+        for event in grounded["events"]
+        if not isinstance(event, dict)
+        or event.get("type") in spoken_types
+    ]
+    removed = original_count - len(grounded["events"])
+    if removed:
+        warnings.append(
+            f"Removed {removed} unspoken model event"
+            f"{'s' if removed != 1 else ''}."
         )
-    return subjects
+
+    facts = _explicit_event_facts(transcript, context)
+    jerseys_by_id = {
+        player["id"]: str(player["jersey"])
+        for player in context["roster"]
+    }
+    for event_type in {fact["type"] for fact in facts}:
+        type_facts = [fact for fact in facts if fact["type"] == event_type]
+        type_events = [
+            event
+            for event in grounded["events"]
+            if isinstance(event, dict) and event.get("type") == event_type
+        ]
+        if len(type_facts) != len(type_events):
+            continue
+        for event, fact in zip(type_events, type_facts):
+            if (
+                event.get("side") == fact["side"]
+                and event.get("playerId") == fact["playerId"]
+            ):
+                continue
+            event["side"] = fact["side"]
+            event["playerId"] = fact["playerId"]
+            subject = (
+                "opponent"
+                if fact["side"] == "opponent"
+                else f"jersey {jerseys_by_id[fact['playerId']]}"
+            )
+            warnings.append(
+                f"Corrected {event_type} attribution to {subject} "
+                "from the explicit transcript."
+            )
+    return grounded
 
 
 def _ground_explicit_transcript_facts(
@@ -730,38 +899,38 @@ def _ground_explicit_transcript_facts(
         for event in result.events
     ]
     warnings = list(result.warnings)
-    subjects = _explicit_active_subjects(transcript, context)
-    jerseys_by_id = {
-        player["id"]: str(player["jersey"])
-        for player in context["roster"]
-    }
-    for event_type, player_ids in subjects.items():
-        matching_events = [
-            event for event in events if event["type"] == event_type
-        ]
-        if len(matching_events) != len(player_ids):
-            continue
-        for event, player_id in zip(matching_events, player_ids):
-            if event["side"] == "team" and event["playerId"] == player_id:
-                continue
-            event["side"] = "team"
-            event["playerId"] = player_id
-            warnings.append(
-                f"Corrected {event_type} attribution to jersey "
-                f"{jerseys_by_id[player_id]} from the explicit transcript."
-            )
-
     normalized = re.sub(r"[-_]+", " ", transcript.lower())
-    phase_evidence = {
-        "transition": bool(
-            re.search(r"\btransition\b|\bfast\s+break\b", normalized)
-        ),
-        "half_court": bool(re.search(r"\bhalf\s+court\b", normalized)),
-    }
-    for event in events:
+    facts = _explicit_event_facts(transcript, context)
+    shot_facts = [fact for fact in facts if fact["type"] == "shot"]
+    shot_events = [event for event in events if event["type"] == "shot"]
+    fact_boundaries = [
+        (
+            fact["start"],
+            facts[index + 1]["start"] if index + 1 < len(facts) else len(normalized),
+        )
+        for index, fact in enumerate(facts)
+    ]
+    shot_segments = [
+        normalized[start:end]
+        for fact, (start, end) in zip(facts, fact_boundaries)
+        if fact["type"] == "shot"
+    ]
+    for index, event in enumerate(shot_events):
         details = event.get("shotDetails")
         phase = details.get("phase") if isinstance(details, dict) else None
-        if not phase or phase_evidence.get(phase, False):
+        if not phase:
+            continue
+        segment = (
+            shot_segments[index]
+            if len(shot_segments) == len(shot_events)
+            else ""
+        )
+        has_evidence = (
+            bool(re.search(r"\btransition\b|\bfast\s+break\b", segment))
+            if phase == "transition"
+            else bool(re.search(r"\bhalf\s+court\b", segment))
+        )
+        if has_evidence:
             continue
         del details["phase"]
         if not details:
@@ -799,29 +968,7 @@ def _validate_spoken_event_coverage(
     transcript: str,
     result: InterpretationResult,
 ):
-    normalized = transcript.lower()
-    spoken_types = set()
-    keywords = {
-        "assist": ("assist",),
-        "rebound": ("rebound",),
-        "steal": ("steal", "stole"),
-        "block": ("block",),
-        "turnover": ("turnover", "turned it over"),
-        "foul": ("foul",),
-        "shot": (
-            " makes ",
-            " made ",
-            " misses ",
-            " missed ",
-            " scores ",
-            " scored ",
-            "free throw",
-        ),
-    }
-    padded = f" {normalized} "
-    for event_type, phrases in keywords.items():
-        if any(phrase in padded for phrase in phrases):
-            spoken_types.add(event_type)
+    spoken_types = _spoken_event_types(transcript)
     proposed_types = {event["type"] for event in result.events}
     missing = sorted(spoken_types - proposed_types)
     if missing and not result.warnings:

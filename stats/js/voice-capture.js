@@ -851,6 +851,8 @@ export function createVoiceCaptureController({
         event.made = true;
       } else if (value === 'rebound') {
         event.reboundKind = 'defensive';
+      } else if (value === 'timeout') {
+        event.playerId = null;
       }
     } else if (field === 'shotValue') {
       event.shotValue = Number(value);

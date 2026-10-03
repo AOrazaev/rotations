@@ -635,13 +635,17 @@ export function createEventListController({
       voiceOption('opponent', 'Opponent', event.side === 'opponent')
     ]);
     addSelect('Player', 'playerId', [
-      voiceOption('', 'Select player', !event.playerId),
+      voiceOption(
+        '',
+        event.type === 'timeout' ? 'Not applicable' : 'Select player',
+        !event.playerId
+      ),
       ...players.map(player => voiceOption(
         player.id,
         player.number ? `#${player.number} ${player.name}` : player.name,
         event.playerId === player.id
       ))
-    ], event.side === 'opponent');
+    ], event.side === 'opponent' || event.type === 'timeout');
     addSelect('Event', 'type', editableEventTypes().map(type => voiceOption(
       type,
       type.replace('_', ' '),

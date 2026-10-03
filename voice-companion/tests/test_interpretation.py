@@ -217,6 +217,120 @@ class CommandInterpreterTest(unittest.TestCase):
         self.assertIsNone(result.events[0]["playerId"])
         self.assertEqual(result.warnings, [])
 
+    def test_interprets_opponent_timeout_without_player(self):
+        payload = {
+            "events": [
+                {
+                    "side": "opponent",
+                    "type": "timeout",
+                    "playerId": None,
+                    "confidence": 0.99,
+                }
+            ],
+            "overallConfidence": 0.99,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret("Opponent timeout", {
+            **context(),
+            "allowedEventTypes": [*context()["allowedEventTypes"], "timeout"],
+        })
+
+        self.assertEqual(result.events, payload["events"])
+        self.assertEqual(result.warnings, [])
+        self.assertIn(
+            '"transcript":"Opponent timeout"',
+            model.calls[0]["messages"][1]["content"],
+        )
+
+    def test_recovers_grounded_four_event_command_from_invalid_model_ids(self):
+        request_context = {
+            **context(),
+            "roster": [
+                {"id": "p40", "jersey": "40", "name": "Bek"},
+                {"id": "p13", "jersey": "13", "name": "Dmytro"},
+            ],
+            "currentLineupIds": ["p40", "p13"],
+        }
+        payload = {
+            "events": [
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p40",
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": False,
+                    "shotDetails": {"phase": "transition"},
+                },
+                {
+                    "side": "team",
+                    "type": "rebound",
+                    "playerId": "malformed-player-id",
+                    "confidence": 0.99,
+                    "reboundKind": "defensive",
+                },
+                {
+                    "side": "opponent",
+                    "type": "steal",
+                    "playerId": None,
+                    "confidence": 0.99,
+                },
+                {
+                    "side": "team",
+                    "type": "assist",
+                    "playerId": "p13",
+                    "confidence": 0.99,
+                },
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p13",
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": True,
+                    "shotDetails": {"phase": "transition"},
+                },
+            ],
+            "overallConfidence": 0.99,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Number 40 missed two pointer defensive rebound by opponent "
+            "steal by 13. 13 makes two points in transition",
+            request_context,
+        )
+
+        self.assertEqual(
+            [
+                (event["type"], event["side"], event["playerId"])
+                for event in result.events
+            ],
+            [
+                ("shot", "team", "p40"),
+                ("rebound", "opponent", None),
+                ("steal", "team", "p13"),
+                ("shot", "team", "p13"),
+            ],
+        )
+        self.assertNotIn("shotDetails", result.events[0])
+        self.assertEqual(
+            result.events[3]["shotDetails"],
+            {"phase": "transition"},
+        )
+        self.assertIn("Removed 1 unspoken model event.", result.warnings)
+
     def test_rejects_team_player_on_opponent_event(self):
         payload = {
             "events": [

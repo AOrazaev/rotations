@@ -95,7 +95,9 @@ export function appendVoiceEventBatch(game, {
   const eventIds = [];
 
   proposalEvents.forEach((proposal, index) => {
-    if (proposal.side === 'team' && !lineupSet.has(proposal.playerId)) {
+    if (proposal.side === 'team'
+      && proposal.type !== 'timeout'
+      && !lineupSet.has(proposal.playerId)) {
       throw mutationError(
         'voice_player_not_on_court',
         `Proposal event ${index + 1} references a player who is not on court at this timestamp.`

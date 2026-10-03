@@ -865,6 +865,10 @@ queues audio immediately and sends commands to the companion sequentially to
 avoid competing local-model inference. Completed drafts may be confirmed,
 edited, retried, or discarded independently.
 
+The voice proposal boundary supports the seven player-stat event types and
+team-level timeouts. Timeout proposals preserve the spoken team/opponent side
+and never require or accept a player.
+
 Connection, token, warmup, microphone, processing, channel, playback-isolation,
 diagnostic, and saved-evaluation controls move into the voice settings dialog.
 Remembered settings auto-connect when possible. An unavailable microphone

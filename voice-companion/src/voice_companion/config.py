@@ -35,6 +35,7 @@ ALLOWED_EVENT_TYPES = {
     "block",
     "turnover",
     "foul",
+    "timeout",
 }
 
 

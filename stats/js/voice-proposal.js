@@ -3,7 +3,7 @@ import {
   STAT_EVENT_TYPES
 } from './game-model.js';
 
-const EVENT_TYPES = [...STAT_EVENT_TYPES];
+const EVENT_TYPES = [...STAT_EVENT_TYPES, 'timeout'];
 const EVENT_TYPE_SET = new Set(EVENT_TYPES);
 
 export function buildVoiceCommandContext(
@@ -69,7 +69,12 @@ export function validateVoiceCommandResponse(payload, {
     if (!EVENT_TYPE_SET.has(event.type)) {
       throw new Error(`${label} has an unsupported event type.`);
     }
-    if (event.side === 'team' && !playerIds.has(event.playerId)) {
+    if (event.type === 'timeout' && event.playerId !== null) {
+      throw new Error(`${label} timeout must be team-level.`);
+    }
+    if (event.side === 'team'
+      && event.type !== 'timeout'
+      && !playerIds.has(event.playerId)) {
       throw new Error(`${label} does not reference a current game player.`);
     }
     if (event.side === 'opponent' && event.playerId !== null) {
