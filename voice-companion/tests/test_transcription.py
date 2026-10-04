@@ -122,6 +122,24 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         )
         self.assertEqual(inactive_warnings, [])
 
+    def test_normalizes_three_throw_without_changing_three_pointer(self):
+        transcript, warnings = normalize_basketball_transcript(
+            "Opponent makes three throw.",
+            {"roster": [], "currentLineupIds": []},
+        )
+        pointer, pointer_warnings = normalize_basketball_transcript(
+            "Opponent makes three pointer.",
+            {"roster": [], "currentLineupIds": []},
+        )
+
+        self.assertEqual(transcript, "Opponent makes free throw.")
+        self.assertEqual(
+            warnings,
+            ["Normalized 'three throw' to 'free throw'."],
+        )
+        self.assertEqual(pointer, "Opponent makes three pointer.")
+        self.assertEqual(pointer_warnings, [])
+
     def test_loads_model_once_and_deletes_temporary_audio(self):
         calls = []
         model = FakeModel()

@@ -9,7 +9,7 @@ param(
   [string]$Model = "",
   [string]$Device = "",
   [string]$ComputeType = "",
-  [ValidateSet("none", "llama-cpp")]
+  [ValidateSet("none", "llama-cpp", "llama-cpp-fact-dsl")]
   [string]$CommandInterpreter = "none",
   [string]$CommandModel = "",
   [int]$CommandContextSize = 4096,

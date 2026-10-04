@@ -212,6 +212,43 @@ Start transcription and interpretation together:
   -CommandInterpreter llama-cpp
 ```
 
+The structured-JSON interpreter remains the default. An experimental compact
+fact interpreter can be selected without changing the API response contract:
+
+```powershell
+.\voice-companion\scripts\run.ps1 `
+  -Token manual-test-token `
+  -Profile balanced `
+  -CommandInterpreter llama-cpp-fact-dsl
+```
+
+The experimental interpreter asks the same Qwen model for compact typed
+basketball facts, then resolves jerseys and constructs events deterministically.
+Responses and diagnostics identify the selected backend as
+`processor.commandInterpreter`.
+Compare either backend against curated transcripts:
+
+```powershell
+.\voice-companion\.venv\Scripts\python.exe `
+  -m voice_companion.evaluate_real_samples `
+  --mode interpretation-only `
+  --interpreter structured-json-v1 `
+  --output .\structured-json-evaluation.json
+
+.\voice-companion\.venv\Scripts\python.exe `
+  -m voice_companion.evaluate_real_samples `
+  --mode interpretation-only `
+  --interpreter fact-dsl-v2 `
+  --output .\fact-dsl-evaluation.json
+```
+
+On the initial 27-case interpretation-only comparison, both backends produced
+27/27 exact event arrays with zero errors. The compact fact backend reduced
+median interpretation latency from 18.9 seconds to 4.2 seconds and p90 latency
+among model-invoked cases from 87.5 seconds to 22.6 seconds. These are
+functional development-machine measurements with observed contention outliers,
+not release performance claims.
+
 Use the workbench's **Transcript interpretation** section to exercise Qwen
 without recording audio. When transcription succeeds but interpretation fails,
 the API returns the transcript in `partialResult` and the workbench keeps it

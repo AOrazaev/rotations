@@ -146,6 +146,7 @@ class CommandInterpreter(Protocol):
 
 
 class DisabledCommandInterpreter:
+    interpreter_name = "disabled"
     ready = False
     model_name = None
     state = "configuration_required"
@@ -173,6 +174,8 @@ class DisabledCommandInterpreter:
 
 
 class LlamaCppCommandInterpreter:
+    interpreter_name = "structured-json-v1"
+
     def __init__(
         self,
         *,
@@ -207,6 +210,7 @@ class LlamaCppCommandInterpreter:
     def metadata(self) -> dict:
         return {
             "runtime": "llama-cpp-python",
+            "interpreter": self.interpreter_name,
             "model": self.model_name,
             "modelPath": str(self.model_path),
             "contextSize": self.context_size,
@@ -1290,7 +1294,15 @@ def create_interpreter(
             context_size=context_size,
             gpu_layers=gpu_layers,
         )
+    if runtime == "llama-cpp-fact-dsl":
+        from .fact_interpretation import FactDslCommandInterpreter
+
+        return FactDslCommandInterpreter(
+            model_path=model_path,
+            context_size=context_size,
+            gpu_layers=gpu_layers,
+        )
     raise ValueError(
         f"Unknown command interpreter runtime '{runtime}'. "
-        "Choose 'none' or 'llama-cpp'."
+        "Choose 'none', 'llama-cpp', or 'llama-cpp-fact-dsl'."
     )

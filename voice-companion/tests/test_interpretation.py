@@ -10,9 +10,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from voice_companion.interpretation import (
+    create_interpreter,
     InvalidInterpretation,
     LlamaCppCommandInterpreter,
     validate_interpretation,
+)
+from voice_companion.fact_interpretation import (
+    FactDslCommandInterpreter,
+    parse_fact_dsl,
 )
 
 
@@ -48,6 +53,24 @@ class FakeLlama:
                 {
                     "message": {
                         "content": json.dumps(self.payload),
+                    }
+                }
+            ]
+        }
+
+
+class FakeTextLlama:
+    def __init__(self, content):
+        self.content = content
+        self.calls = []
+
+    def create_chat_completion(self, **options):
+        self.calls.append(options)
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": self.content,
                     }
                 }
             ]
@@ -771,6 +794,148 @@ class CommandInterpreterTest(unittest.TestCase):
         self.assertEqual([event["type"] for event in result.events], ["shot", "assist"])
         self.assertNotIn("shotDetails", result.events[0])
         self.assertEqual(result.warnings, ["Removed 1 duplicate model event."])
+
+
+class FactDslCommandInterpreterTest(unittest.TestCase):
+    def test_parses_compact_facts_into_validated_events(self):
+        payload = parse_fact_dsl(
+            "\n".join([
+                "<think>",
+                "",
+                "</think>",
+                "SHOT TEAM 13 2 MADE TRANSITION",
+                "ASSIST TEAM 7",
+                "FOUL OPPONENT -",
+            ]),
+            context(),
+        )
+
+        result = validate_interpretation(payload, context(), "test-model")
+
+        self.assertEqual(
+            [
+                {
+                    key: value
+                    for key, value in event.items()
+                    if key != "confidence"
+                }
+                for event in result.events
+            ],
+            [
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p13",
+                    "shotValue": 2,
+                    "made": True,
+                    "shotDetails": {"phase": "transition"},
+                },
+                {
+                    "side": "team",
+                    "type": "assist",
+                    "playerId": "p7",
+                },
+                {
+                    "side": "opponent",
+                    "type": "foul",
+                    "playerId": None,
+                },
+            ],
+        )
+
+    def test_interprets_with_fact_prompt_and_short_output_limit(self):
+        model = FakeTextLlama(
+            "SHOT TEAM 13 2 MADE TRANSITION\nASSIST TEAM 7"
+        )
+        interpreter = FactDslCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Seven assist and thirteen makes two in transition",
+            context(),
+        )
+
+        self.assertEqual(
+            [event["type"] for event in result.events],
+            ["shot", "assist"],
+        )
+        self.assertEqual(result.events[0]["playerId"], "p13")
+        self.assertEqual(result.events[1]["playerId"], "p7")
+        request = model.calls[0]
+        self.assertEqual(request["max_tokens"], 256)
+        self.assertNotIn("response_format", request)
+        self.assertIn("compact fact language", request["messages"][0]["content"])
+        self.assertIn(
+            '"jersey":"13","onCourt":true',
+            request["messages"][1]["content"],
+        )
+
+    def test_rejects_invalid_or_unknown_fact_jerseys(self):
+        with self.assertRaisesRegex(InvalidInterpretation, "Invalid fact"):
+            parse_fact_dsl("SHOT TEAM 99 2 MADE -", context())
+        with self.assertRaisesRegex(InvalidInterpretation, "Invalid fact"):
+            parse_fact_dsl("SHOT TEAM 13 2 MAYBE -", context())
+
+    def test_aligns_reordered_and_extra_facts_to_transcript(self):
+        request_context = {
+            **context(),
+            "roster": [
+                *context()["roster"],
+                {"id": "p40", "jersey": "40", "name": "Forty"},
+            ],
+            "currentLineupIds": ["p13", "p40"],
+        }
+        model = FakeTextLlama(
+            "\n".join([
+                "REBOUND OPPONENT 40 DEFENSIVE",
+                "STEAL OPPONENT 13",
+                "SHOT OPPONENT - 2 MISSED -",
+                "REBOUND TEAM 13 DEFENSIVE",
+                "SHOT TEAM 13 2 MADE TRANSITION",
+            ])
+        )
+        interpreter = FactDslCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Number 40 missed two pointer defensive rebound by opponent "
+            "steal by 13. 13 makes two points in transition.",
+            request_context,
+        )
+
+        self.assertEqual(
+            [
+                (event["type"], event["side"], event["playerId"])
+                for event in result.events
+            ],
+            [
+                ("shot", "team", "p40"),
+                ("rebound", "opponent", None),
+                ("steal", "team", "p13"),
+                ("shot", "team", "p13"),
+            ],
+        )
+        self.assertFalse(result.events[0]["made"])
+        self.assertTrue(result.events[3]["made"])
+        self.assertIn("Removed 1 extra DSL fact.", result.warnings)
+
+    def test_factory_selects_fact_dsl_without_changing_default(self):
+        structured = create_interpreter(
+            "llama-cpp",
+            model_path=Path("model.gguf"),
+        )
+        facts = create_interpreter(
+            "llama-cpp-fact-dsl",
+            model_path=Path("model.gguf"),
+        )
+
+        self.assertIsInstance(structured, LlamaCppCommandInterpreter)
+        self.assertNotIsInstance(structured, FactDslCommandInterpreter)
+        self.assertIsInstance(facts, FactDslCommandInterpreter)
 
 
 if __name__ == "__main__":

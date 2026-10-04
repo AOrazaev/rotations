@@ -214,6 +214,7 @@ class RealSampleEvaluationTest(unittest.TestCase):
         self.assertIsNone(case["latencyMs"])
         self.assertTrue(case["interpretationOnlyEventArrayExact"])
         self.assertIsNone(report["summary"]["exactEventArrays"])
+        self.assertEqual(report["interpreter"], "FixtureInterpreter")
 
     def test_rejects_duplicate_case_ids(self):
         with tempfile.TemporaryDirectory() as directory:

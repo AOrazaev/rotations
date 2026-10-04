@@ -139,6 +139,22 @@ def normalize_basketball_transcript(
         transcript,
         context,
     )
+    three_throw_pattern = re.compile(
+        r"\bthree(?=\s+throw\b)",
+        re.IGNORECASE,
+    )
+
+    def replace_three_throw(match: re.Match) -> str:
+        replacement = "Free" if match.group(0)[0].isupper() else "free"
+        warnings.append(
+            "Normalized 'three throw' to 'free throw'."
+        )
+        return replacement
+
+    normalized = three_throw_pattern.sub(
+        replace_three_throw,
+        normalized,
+    )
     roster_by_id = {
         player["id"]: player
         for player in context.get("roster", [])

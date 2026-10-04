@@ -895,6 +895,11 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 "transcriptionModel": transcription_model,
                 "audioChannelMode": audio_channel_mode,
                 "commandModel": interpretation.model,
+                "commandInterpreter": getattr(
+                    self.server.interpreter,
+                    "interpreter_name",
+                    type(self.server.interpreter).__name__,
+                ),
                 "profile": self.server.settings.profile,
             },
             "timingMs": {
@@ -919,6 +924,11 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 "transcriptionModel": transcription.model,
                 "audioChannelMode": transcription.audio_channel_mode,
                 "commandModel": self.server.interpreter.model_name,
+                "commandInterpreter": getattr(
+                    self.server.interpreter,
+                    "interpreter_name",
+                    type(self.server.interpreter).__name__,
+                ),
                 "profile": self.server.settings.profile,
             },
             "timingMs": {
@@ -1361,7 +1371,7 @@ def main():
     )
     parser.add_argument(
         "--command-interpreter",
-        choices=["none", "llama-cpp"],
+        choices=["none", "llama-cpp", "llama-cpp-fact-dsl"],
         default=os.environ.get("BASK_VOICE_COMMAND_INTERPRETER", "none"),
     )
     parser.add_argument(

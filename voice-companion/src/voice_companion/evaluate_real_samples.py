@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from .evaluate import normalize_transcript
+from .fact_interpretation import FactDslCommandInterpreter
 from .interpretation import LlamaCppCommandInterpreter
 from .profiles import default_model_directory, resolve_profile
 from .transcription import (
@@ -240,6 +241,11 @@ def evaluate_samples(
         "mode": mode,
         "transcriptionModel": getattr(transcriber, "model_name", None),
         "commandModel": interpreter.model_name,
+        "interpreter": getattr(
+            interpreter,
+            "interpreter_name",
+            type(interpreter).__name__,
+        ),
         "caseResults": results,
         "summary": {
             "caseCount": len(results),
@@ -325,6 +331,11 @@ def main():
     parser.add_argument("--compute-type")
     parser.add_argument("--model-directory")
     parser.add_argument("--command-model")
+    parser.add_argument(
+        "--interpreter",
+        choices=["structured-json-v1", "fact-dsl-v2"],
+        default="structured-json-v1",
+    )
     parser.add_argument("--context-size", type=int, default=4096)
     parser.add_argument("--gpu-layers", type=int, default=0)
     parser.add_argument(
@@ -363,7 +374,12 @@ def main():
         if profile is not None
         else None
     )
-    interpreter = LlamaCppCommandInterpreter(
+    interpreter_type = (
+        FactDslCommandInterpreter
+        if args.interpreter == "fact-dsl-v2"
+        else LlamaCppCommandInterpreter
+    )
+    interpreter = interpreter_type(
         model_path=(
             Path(args.command_model)
             if args.command_model
