@@ -201,10 +201,24 @@ Run the real-audio corpus on GPU with:
   -Output .\podman-gpu-real-audio-evaluation.json
 ```
 
+The validated RTX 4070 `maximum_accuracy` run uses `medium.en` and the Qwen3
+fact interpreter:
+
+- 81/81 exact event arrays.
+- Zero processing errors.
+- 359-millisecond median end-to-end latency.
+- 3.614-second maximum end-to-end latency.
+- 62/81 raw and 66/81 normalized literal transcript matches.
+
+The lower literal transcript scores reflect `medium.en` paraphrasing and
+punctuation differences; event extraction remained exact across the corpus.
+`balanced` remains the faster default, while `maximum_accuracy` is the
+optional accuracy-first GPU tier.
+
 After startup, `/v1/warmup` and `/v1/diagnostics` should report a CUDA device,
 Faster Whisper device `cuda`, compute type `float16`, and command-model GPU
-layers `-1`. Full device execution must be validated on the gaming PC; the
-CUDA image itself can be built on a machine without an NVIDIA GPU.
+layers `-1`. Full device execution is validated on an RTX 4070 gaming PC; the
+CUDA image itself can still be built on a machine without an NVIDIA GPU.
 
 The initial balanced-profile CPU baseline is stored as
 `evaluation/real-audio-v1/baseline-balanced-81-fact-dsl-podman-cpu.json`:
