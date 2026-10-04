@@ -175,6 +175,120 @@
         {"side": "team", "type": "rebound", "playerId": "p70", "reboundKind": "offensive"},
         {"side": "team", "type": "turnover", "playerId": "p70"}
       ]
+    },
+    {
+      "id": "opponent-miss-three-number-5-rebound-turnover",
+      "audio": "17-opponent-miss-three-five-rebound-turnover.webm",
+      "expectedTranscript": "Opponent misses three pointer. Defensive rebound by number five. Number five turn over.",
+      "currentLineupIds": ["p13", "p40", "p5", "p60", "p70"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 3, "made": false},
+        {"side": "team", "type": "rebound", "playerId": "p5", "reboundKind": "defensive"},
+        {"side": "team", "type": "turnover", "playerId": "p5"}
+      ]
+    },
+    {
+      "id": "opponent-miss-three-rebound-turnover",
+      "audio": "18-opponent-miss-rebound-turnover.webm",
+      "expectedTranscript": "Opponent misses three pointer. Opponent defensive rebound. Opponent turn over.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 3, "made": false},
+        {"side": "opponent", "type": "rebound", "playerId": null, "reboundKind": "defensive"},
+        {"side": "opponent", "type": "turnover", "playerId": null}
+      ]
+    },
+    {
+      "id": "number-40-turnover-opponent-steal",
+      "audio": "19-forty-turnover-opponent-steal.webm",
+      "expectedTranscript": "Turnover by number 40. Opponent steal.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "team", "type": "turnover", "playerId": "p40"},
+        {"side": "opponent", "type": "steal", "playerId": null}
+      ]
+    },
+    {
+      "id": "assist-number-60-number-7-makes-two",
+      "audio": "20-assist-sixty-seven-make.webm",
+      "expectedTranscript": "Assist by number 60. Number seven makes two points.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p7", "shotValue": 2, "made": true},
+        {"side": "team", "type": "assist", "playerId": "p60"}
+      ]
+    },
+    {
+      "id": "five-event-transition-sequence",
+      "audio": "21-five-event-sequence.webm",
+      "expectedTranscript": "Opponent misses two pointer. Number sixty defensive rebound. Number thirteen makes two points in transition. Number sixty assist. Opponent foul.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 2, "made": false},
+        {"side": "team", "type": "rebound", "playerId": "p60", "reboundKind": "defensive"},
+        {"side": "team", "type": "shot", "playerId": "p13", "shotValue": 2, "made": true, "shotDetails": {"phase": "transition"}},
+        {"side": "team", "type": "assist", "playerId": "p60"},
+        {"side": "opponent", "type": "foul", "playerId": null}
+      ]
+    },
+    {
+      "id": "number-60-assist-number-7-makes-two",
+      "audio": "22-sixty-assist-seven-make.webm",
+      "expectedTranscript": "Number 60 assist number seven makes two points.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p7", "shotValue": 2, "made": true},
+        {"side": "team", "type": "assist", "playerId": "p60"}
+      ]
+    },
+    {
+      "id": "number-13-makes-free-throw",
+      "audio": "23-thirteen-made-free-throw.webm",
+      "expectedTranscript": "Number thirteen makes free throw.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "team", "type": "shot", "playerId": "p13", "shotValue": 1, "made": true}
+      ]
+    },
+    {
+      "id": "opponent-misses-free-throw",
+      "audio": "24-opponent-missed-free-throw.webm",
+      "expectedTranscript": "Opponent misses free throw.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 1, "made": false}
+      ]
+    },
+    {
+      "id": "substitute-number-70-for-number-13",
+      "audio": "25-seventy-sub-thirteen.webm",
+      "expectedTranscript": "Number 70 subs for 13.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "team", "type": "substitution", "playerId": null, "playerInId": "p70", "playerOutId": "p13"}
+      ]
+    },
+    {
+      "id": "opponent-miss-two-foul-number-60",
+      "audio": "26-opponent-miss-foul-sixty.webm",
+      "expectedTranscript": "Opponent misses two point shot foul by 60.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 2, "made": false},
+        {"side": "team", "type": "foul", "playerId": "p60"}
+      ]
+    },
+    {
+      "id": "four-event-transition-assist",
+      "audio": "27-four-event-transition-assist.webm",
+      "expectedTranscript": "Opponent misses two pointer. Number sixty defensive rebound. Number thirteen assist. Number sixty makes two points in transition.",
+      "currentLineupIds": ["p13", "p7", "p50", "p40", "p60"],
+      "expectedEvents": [
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 2, "made": false},
+        {"side": "team", "type": "rebound", "playerId": "p60", "reboundKind": "defensive"},
+        {"side": "team", "type": "assist", "playerId": "p13"},
+        {"side": "team", "type": "shot", "playerId": "p60", "shotValue": 2, "made": true, "shotDetails": {"phase": "transition"}}
+      ]
     }
   ]
 }

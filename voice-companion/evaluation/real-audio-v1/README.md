@@ -1,6 +1,6 @@
 # Real audio evaluation set v1
 
-This set contains sixteen short English basketball-stat recordings collected
+This set contains twenty-seven short English basketball-stat recordings collected
 during local voice companion development. The recording owner explicitly
 approved committing the audio to this repository.
 
@@ -21,6 +21,10 @@ Coverage includes:
 - Opponent turnover and standalone foul commands.
 - Multi-event miss, offensive rebound, and turnover sequencing.
 - Two-word `turn over` recovery when the command model omits the event.
+- Free throws and opponent/team foul attribution.
+- Three-event turnover sequences and a five-event transition sequence.
+- `Assessed by` transcription normalization for an active assist player.
+- Removal of hallucinated shot details from non-shot events.
 
 Run the complete audio-to-events evaluation from the repository root:
 
@@ -54,8 +58,8 @@ the pass criterion for both paths. In paired mode, an end-to-end event failure
 is classified as `transcription` when curated-transcript interpretation passes;
 otherwise it is classified as `interpretation`.
 
-`baseline-balanced.json` records the sixteen-case balanced-profile run with
-`base.en` and `Qwen3-4B-Q4_K_M.gguf`:
+`baseline-balanced.json` records the first sixteen cases with a
+balanced-profile run using `base.en` and `Qwen3-4B-Q4_K_M.gguf`:
 
 - 12/16 raw transcript matches.
 - 13/16 roster-normalized transcript matches.
@@ -67,8 +71,12 @@ process may have been active during collection, so their latency fields are not
 valid performance measurements and must be regenerated on an otherwise idle
 machine before making profile or hardware decisions.
 
-`baseline-balanced-interpretation-only.json` runs the same command model
-against curated transcripts without loading Whisper:
+Cases 17-27 were added after those reports and require a fresh idle-machine
+end-to-end baseline before their aggregate transcription accuracy is
+documented.
+
+`baseline-balanced-interpretation-only.json` runs those same first sixteen
+curated transcripts through the command model without loading Whisper:
 
 - 16/16 exact semantic event arrays.
 - 0 interpretation errors.
@@ -84,3 +92,14 @@ Remaining end-to-end weaknesses are the `seven T` and `seven two`
 transcriptions of jersey #70 when both #7 and #70 are active. They remain known
 transcription failures rather than targets for ambiguous roster-based
 correction.
+
+`baseline-balanced-27-interpretation-only.json` is a functional snapshot for
+all twenty-seven curated transcripts:
+
+- 27/27 exact semantic event arrays.
+- 0 interpretation errors.
+- Both the `assessed by` assist sample and the non-shot `shotDetails` failure
+  sample produce their intended event arrays.
+
+Its latency fields are not representative because the machine was not isolated
+during the run.
