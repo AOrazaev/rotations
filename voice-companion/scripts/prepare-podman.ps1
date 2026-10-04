@@ -23,6 +23,11 @@ if (-not $Image) {
 if ($Runtime -eq "cpu" -and $Profile -eq "high_accuracy") {
   throw "The high_accuracy transcription profile requires -Runtime cuda124."
 }
+$containerRuntimeArguments = if ($Runtime -eq "cuda124") {
+  @("--cgroups", "disabled")
+} else {
+  @()
+}
 
 if (-not $SkipBuild) {
   Write-Host "Building $Runtime companion image $Image..."
@@ -43,14 +48,16 @@ if ($LASTEXITCODE -ne 0) {
   Invoke-BaskPodman -Arguments @("volume", "create", $DataVolume)
 }
 
-Invoke-BaskPodman -Arguments @(
+$volumeArguments = @(
   "run", "--rm",
+  $containerRuntimeArguments
   "--user", "0",
   "--volume", "${DataVolume}:/data",
   "--entrypoint", "sh",
   $Image,
   "-c", "mkdir -p /data/models /data/evaluation-samples /data/huggingface && chown -R 10001:10001 /data"
 )
+Invoke-BaskPodman -Arguments $volumeArguments
 
 if (-not $SkipModelDownload) {
   $forceArgument = @()
@@ -61,6 +68,7 @@ if (-not $SkipModelDownload) {
   Write-Host "Downloading the $Profile transcription model..."
   $transcriptionArguments = @(
     "run", "--rm",
+    $containerRuntimeArguments
     "--volume", "${DataVolume}:/data",
     "--entrypoint", "python",
     $Image,
@@ -73,6 +81,7 @@ if (-not $SkipModelDownload) {
   Write-Host "Downloading the $ModelCandidate command model..."
   $commandArguments = @(
     "run", "--rm",
+    $containerRuntimeArguments
     "--volume", "${DataVolume}:/data",
     "--entrypoint", "python",
     $Image,

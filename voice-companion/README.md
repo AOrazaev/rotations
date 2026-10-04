@@ -172,12 +172,12 @@ CTranslate2 sees at least one CUDA device and that llama.cpp was built with GPU
 offload. GPU setup failures stop startup rather than silently using CPU.
 
 Podman 6 on WSL can fail GPU containers before startup with
-`controller pids is not available`. GPU verification, service, and evaluation
-commands therefore use `--cgroups=disabled`, the upstream per-container
-workaround for the WSL cgroup-delegation regression. The companion does not
-configure container CPU, memory, or PID limits, so this does not remove limits
-the workflow otherwise depended on. CPU containers retain normal cgroup
-management.
+`controller pids is not available`. GPU preparation, verification, service,
+and evaluation commands therefore use `--cgroups=disabled`, the upstream
+per-container workaround for the WSL cgroup-delegation regression. The
+companion does not configure container CPU, memory, or PID limits, so this
+does not remove limits the workflow otherwise depended on. CPU containers
+retain normal cgroup management.
 
 Run the real-audio corpus on GPU with:
 
