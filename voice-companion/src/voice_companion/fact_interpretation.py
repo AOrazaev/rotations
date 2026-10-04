@@ -210,6 +210,36 @@ def parse_fact_dsl(content: str, context: dict) -> dict:
         event_type = tokens[0].upper()
         if (
             event_type == "SHOT"
+            and len(tokens) == 8
+            and tokens[1].upper() == "OPPONENT"
+            and tokens[2] == "-"
+            and tokens[5].upper() == "FOULED"
+            and tokens[6].upper() == "BY"
+        ):
+            try:
+                shot = _parse_fact_tokens(
+                    event_type,
+                    tokens[:5] + ["-"],
+                    jersey_ids,
+                    line_number,
+                )
+                foul = _parse_fact_tokens(
+                    "FOUL",
+                    ["FOUL", "TEAM", tokens[7]],
+                    jersey_ids,
+                    line_number,
+                )
+            except (IndexError, ValueError) as error:
+                raise InvalidInterpretation(
+                    f"Invalid fact on line {line_number}: {line}"
+                ) from error
+            events.extend((shot, foul))
+            warnings.append(
+                f"Split a fused opponent shot and team foul on fact line {line_number}."
+            )
+            continue
+        if (
+            event_type == "SHOT"
             and len(tokens) == 6
             and tokens[5] == tokens[3]
             and tokens[5] in {"1", "2", "3"}

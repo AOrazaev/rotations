@@ -880,7 +880,6 @@ class FactDslCommandInterpreterTest(unittest.TestCase):
 
     def test_removes_redundant_shot_value_used_as_phase(self):
         payload = parse_fact_dsl("SHOT TEAM 13 1 MISSED 1", context())
-
         self.assertEqual(
             payload["events"],
             [
@@ -897,6 +896,40 @@ class FactDslCommandInterpreterTest(unittest.TestCase):
         self.assertEqual(
             payload["warnings"],
             ["Removed a redundant shot value from fact line 1."],
+        )
+
+    def test_splits_fused_opponent_shot_and_team_foul(self):
+        request_context = context()
+        request_context["roster"].append(
+            {"id": "p60", "jersey": "60", "name": "Sam"}
+        )
+        request_context["currentLineupIds"].append("p60")
+        payload = parse_fact_dsl(
+            "SHOT OPPONENT - 2 MISSED FOULED BY 60",
+            request_context,
+        )
+        self.assertEqual(
+            payload["events"],
+            [
+                {
+                    "side": "opponent",
+                    "type": "shot",
+                    "playerId": None,
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": False,
+                },
+                {
+                    "side": "team",
+                    "type": "foul",
+                    "playerId": "p60",
+                    "confidence": 0.99,
+                },
+            ],
+        )
+        self.assertEqual(
+            payload["warnings"],
+            ["Split a fused opponent shot and team foul on fact line 1."],
         )
 
     def test_aligns_reordered_and_extra_facts_to_transcript(self):
