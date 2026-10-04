@@ -17,6 +17,7 @@ from voice_companion.transcription import (
     BASKETBALL_INITIAL_PROMPT,
     FasterWhisperTranscriber,
     normalize_active_jersey_confusions,
+    normalize_basketball_transcript,
 )
 
 
@@ -88,6 +89,38 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         self.assertEqual(ambiguous_warnings, [])
         self.assertEqual(non_stat, "Fifteen seconds remaining.")
         self.assertEqual(non_stat_warnings, [])
+
+    def test_normalizes_assessed_by_for_an_active_jersey(self):
+        context = {
+            "roster": [
+                {"id": "p7", "jersey": "7", "name": "Aman"},
+                {"id": "p60", "jersey": "60", "name": "Valya"},
+            ],
+            "currentLineupIds": ["p7", "p60"],
+        }
+
+        transcript, warnings = normalize_basketball_transcript(
+            "Assessed by number 60. Number seven makes two points.",
+            context,
+        )
+        inactive, inactive_warnings = normalize_basketball_transcript(
+            "Assessed by number 50. Number seven makes two points.",
+            context,
+        )
+
+        self.assertEqual(
+            transcript,
+            "Assist by number 60. Number seven makes two points.",
+        )
+        self.assertIn(
+            "Normalized 'assessed by' to 'assist by' for an active player.",
+            warnings,
+        )
+        self.assertEqual(
+            inactive,
+            "Assessed by number 50. Number seven makes two points.",
+        )
+        self.assertEqual(inactive_warnings, [])
 
     def test_loads_model_once_and_deletes_temporary_audio(self):
         calls = []

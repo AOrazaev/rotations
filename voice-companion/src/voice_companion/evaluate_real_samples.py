@@ -11,7 +11,7 @@ from .interpretation import LlamaCppCommandInterpreter
 from .profiles import default_model_directory, resolve_profile
 from .transcription import (
     FasterWhisperTranscriber,
-    normalize_active_jersey_confusions,
+    normalize_basketball_transcript,
 )
 
 
@@ -133,7 +133,7 @@ def evaluate_samples(
                 )
                 result["rawTranscript"] = transcription.text
                 normalized, normalization_warnings = (
-                    normalize_active_jersey_confusions(
+                    normalize_basketball_transcript(
                         transcription.text,
                         context,
                     )

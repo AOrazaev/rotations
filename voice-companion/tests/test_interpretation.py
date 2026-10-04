@@ -543,6 +543,74 @@ class CommandInterpreterTest(unittest.TestCase):
             result.warnings,
         )
 
+    def test_removes_shot_details_from_non_shot_multi_event_command(self):
+        request_context = {
+            **context(),
+            "roster": [
+                {"id": "p13", "jersey": "13", "name": "Dmytro"},
+                {"id": "p60", "jersey": "60", "name": "Valya"},
+            ],
+            "currentLineupIds": ["p13", "p60"],
+        }
+        payload = {
+            "events": [
+                {
+                    "side": "opponent",
+                    "type": "shot",
+                    "playerId": None,
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": False,
+                },
+                {
+                    "side": "team",
+                    "type": "rebound",
+                    "playerId": "p60",
+                    "confidence": 0.99,
+                    "reboundKind": "defensive",
+                },
+                {
+                    "side": "team",
+                    "type": "assist",
+                    "playerId": "p13",
+                    "confidence": 0.99,
+                    "shotDetails": {"phase": "transition"},
+                },
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p60",
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": True,
+                    "shotDetails": {"phase": "transition"},
+                },
+            ],
+            "overallConfidence": 0.99,
+            "warnings": [],
+        }
+        model = FakeLlama(payload)
+        interpreter = LlamaCppCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Opponent misses two pointer. Number sixty defensive rebound. "
+            "Number thirteen assist. Number sixty makes two points in transition.",
+            request_context,
+        )
+
+        self.assertNotIn("shotDetails", result.events[2])
+        self.assertEqual(
+            result.events[3]["shotDetails"],
+            {"phase": "transition"},
+        )
+        self.assertIn(
+            "Removed shot details from non-shot assist event.",
+            result.warnings,
+        )
+
     def test_rejects_team_player_on_opponent_event(self):
         payload = {
             "events": [

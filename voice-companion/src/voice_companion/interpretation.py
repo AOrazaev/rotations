@@ -1057,6 +1057,16 @@ def _ground_model_payload(transcript: str, payload: object, context: dict):
             f"Removed {removed} unspoken model event"
             f"{'s' if removed != 1 else ''}."
         )
+    for event in grounded["events"]:
+        if (
+            isinstance(event, dict)
+            and event.get("type") not in {None, "shot"}
+            and "shotDetails" in event
+        ):
+            del event["shotDetails"]
+            warnings.append(
+                f"Removed shot details from non-shot {event['type']} event."
+            )
 
     facts = _explicit_event_facts(transcript, context)
     recoverable_types = {

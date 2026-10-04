@@ -42,7 +42,7 @@ from .transcription import (
     Transcriber,
     TranscriptionUnavailable,
     create_transcriber,
-    normalize_active_jersey_confusions,
+    normalize_basketball_transcript,
 )
 from .validation import RequestValidationError, validate_context
 from .profiles import default_model_directory, resolve_profile
@@ -600,7 +600,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                 channel_preference=context.get("audioChannelPreference", "auto"),
             )
             normalized_text, transcription_warnings = (
-                normalize_active_jersey_confusions(
+                normalize_basketball_transcript(
                     transcription.text,
                     context,
                 )

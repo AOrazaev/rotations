@@ -57,6 +57,20 @@ class ConfusedJerseyTranscriber(FixtureTranscriber):
         )
 
 
+class AssessedAssistTranscriber(FixtureTranscriber):
+    def transcribe(
+        self,
+        audio: bytes,
+        suffix: str,
+        *,
+        channel_preference: str = "auto",
+    ):
+        return TranscriptionResult(
+            text="Assessed by number 60. Number seven makes two points.",
+            model="fixture",
+        )
+
+
 class FixtureInterpreter:
     ready = True
     state = "ready"
@@ -449,6 +463,51 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(interpreter.transcript, "Fifty misses two pointer.")
         self.assertIn(
             "Normalized jersey Fifteen to Fifty using the active lineup.",
+            result["warnings"],
+        )
+
+    def test_voice_command_normalizes_assessed_by_active_player(self):
+        context = {
+            "protocolVersion": 1,
+            "requestId": "request-assessed-assist",
+            "capturedSeconds": 12.3,
+            "language": "en",
+            "sideHint": None,
+            "roster": [
+                {"id": "p7", "jersey": "7", "name": "Aman"},
+                {"id": "p60", "jersey": "60", "name": "Valya"},
+            ],
+            "currentLineupIds": ["p7", "p60"],
+            "allowedEventTypes": ["shot", "assist"],
+        }
+        boundary, body = self.voice_body(context)
+        original_transcriber = self.server.transcriber
+        original_interpreter = self.server.interpreter
+        interpreter = CapturingInterpreter()
+        self.server.transcriber = AssessedAssistTranscriber()
+        self.server.interpreter = interpreter
+        try:
+            status, _, payload = self.request(
+                "POST",
+                "/v1/voice-command",
+                headers={
+                    "Content-Type": f"multipart/form-data; boundary={boundary}",
+                    "Content-Length": str(len(body)),
+                    "X-Bask-Voice-Token": "test-token",
+                },
+                body=body,
+            )
+        finally:
+            self.server.transcriber = original_transcriber
+            self.server.interpreter = original_interpreter
+
+        self.assertEqual(status, 200)
+        result = json.loads(payload)
+        expected = "Assist by number 60. Number seven makes two points."
+        self.assertEqual(result["transcript"], expected)
+        self.assertEqual(interpreter.transcript, expected)
+        self.assertIn(
+            "Normalized 'assessed by' to 'assist by' for an active player.",
             result["warnings"],
         )
 

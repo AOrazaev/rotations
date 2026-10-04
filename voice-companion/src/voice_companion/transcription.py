@@ -26,7 +26,8 @@ BASKETBALL_INITIAL_PROMPT = (
     "Basketball statistics commands. Opponent makes two pointer. "
     "Opponent misses two pointer. Opponent makes three pointer. "
     "Opponent misses three pointer. Player seven makes two. "
-    "Player thirteen makes three. Player seven assist. Player seven steal. "
+    "Player thirteen makes three. Player seven assist. Assist by player sixty. "
+    "Player seven steal. "
     "Player seven subs for player thirteen. "
     "Offensive rebound. Defensive rebound. Turnover. Foul."
 )
@@ -128,6 +129,52 @@ def normalize_active_jersey_confusions(
         return replacement
 
     return STAT_SUBJECT_PATTERN.sub(replace, transcript), warnings
+
+
+def normalize_basketball_transcript(
+    transcript: str,
+    context: dict,
+) -> tuple[str, list[str]]:
+    normalized, warnings = normalize_active_jersey_confusions(
+        transcript,
+        context,
+    )
+    roster_by_id = {
+        player["id"]: player
+        for player in context.get("roster", [])
+        if isinstance(player, dict)
+    }
+    active_jerseys = {
+        str(roster_by_id[player_id]["jersey"]).strip().lower()
+        for player_id in context.get("currentLineupIds", [])
+        if player_id in roster_by_id
+    }
+    active_subjects = set(active_jerseys)
+    for jersey in active_jerseys:
+        if jersey.isdigit():
+            word = JERSEY_NUMBER_WORDS.get(int(jersey))
+            if word:
+                active_subjects.add(word)
+    if not active_subjects:
+        return normalized, warnings
+    subject_pattern = "|".join(
+        re.escape(subject)
+        for subject in sorted(active_subjects, key=len, reverse=True)
+    )
+    assessed_pattern = re.compile(
+        r"\bassessed(?=\s+by\s+(?:(?:number|player)\s+)?"
+        rf"(?:{subject_pattern})\b)",
+        re.IGNORECASE,
+    )
+
+    def replace_assessed(match: re.Match) -> str:
+        replacement = "Assist" if match.group(0)[0].isupper() else "assist"
+        warnings.append(
+            "Normalized 'assessed by' to 'assist by' for an active player."
+        )
+        return replacement
+
+    return assessed_pattern.sub(replace_assessed, normalized), warnings
 
 
 class TranscriptionUnavailable(RuntimeError):
