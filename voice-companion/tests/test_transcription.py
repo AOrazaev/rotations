@@ -246,6 +246,35 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         )
         self.assertIn("trailing opponent", trailing_warnings[0])
 
+    def test_joins_active_player_fragment_to_rebound(self):
+        context = {
+            "roster": [
+                {"id": "p60", "jersey": "60", "name": "Sixty"},
+                {"id": "p50", "jersey": "50", "name": "Fifty"},
+            ],
+            "currentLineupIds": ["p60"],
+        }
+
+        normalized, warnings = normalize_basketball_transcript(
+            "Opponent misses two pointer. Number sixty. Defensive rebound.",
+            context,
+        )
+        inactive, inactive_warnings = normalize_basketball_transcript(
+            "Opponent misses two pointer. Number fifty. Defensive rebound.",
+            context,
+        )
+
+        self.assertEqual(
+            normalized,
+            "Opponent misses two pointer. Number sixty defensive rebound.",
+        )
+        self.assertIn("jersey fragment", warnings[0])
+        self.assertEqual(
+            inactive,
+            "Opponent misses two pointer. Number fifty. Defensive rebound.",
+        )
+        self.assertEqual(inactive_warnings, [])
+
     def test_loads_model_once_and_deletes_temporary_audio(self):
         calls = []
         model = FakeModel()

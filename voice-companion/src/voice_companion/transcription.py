@@ -279,6 +279,26 @@ def normalize_basketball_transcript(
         re.escape(subject)
         for subject in sorted(active_subjects, key=len, reverse=True)
     )
+    fragmented_rebound_pattern = re.compile(
+        rf"\b(?P<subject>(?:(?:number|player)\s+)?(?:{subject_pattern}))"
+        r"\s*[.!?]\s*"
+        r"(?P<kind>offensive|defensive)\s+rebound\b",
+        re.IGNORECASE,
+    )
+
+    def join_fragmented_rebound(match: re.Match) -> str:
+        warnings.append(
+            "Joined an active-player jersey fragment to its rebound statistic."
+        )
+        return (
+            f"{match.group('subject')} "
+            f"{match.group('kind').lower()} rebound"
+        )
+
+    normalized = fragmented_rebound_pattern.sub(
+        join_fragmented_rebound,
+        normalized,
+    )
     assessed_pattern = re.compile(
         r"\bassessed(?=\s+by\s+(?:(?:number|player)\s+)?"
         rf"(?:{subject_pattern})\b)",
