@@ -3,7 +3,7 @@ param(
   [string]$Runtime = "cpu",
   [string]$Image = "",
   [string]$DataVolume = "bask-voice-companion-data",
-  [ValidateSet("lightweight", "balanced", "high_accuracy")]
+  [ValidateSet("lightweight", "balanced", "high_accuracy", "maximum_accuracy")]
   [string]$Profile = "balanced",
   [string]$Output = ".\podman-real-audio-evaluation.json"
 )
@@ -20,8 +20,8 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 if (-not $Image) {
   $Image = "localhost/bask-voice-companion:$Runtime"
 }
-if ($Runtime -eq "cpu" -and $Profile -eq "high_accuracy") {
-  throw "The high_accuracy transcription profile requires -Runtime cuda124."
+if ($Runtime -eq "cpu" -and $Profile -in @("high_accuracy", "maximum_accuracy")) {
+  throw "The $Profile transcription profile requires -Runtime cuda124."
 }
 $Device = if ($Runtime -eq "cuda124") { "cuda" } else { "cpu" }
 $ComputeType = if ($Runtime -eq "cuda124") { "float16" } else { "int8" }

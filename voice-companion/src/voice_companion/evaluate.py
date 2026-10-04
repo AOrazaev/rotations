@@ -101,7 +101,7 @@ def main():
     parser.add_argument("--manifest")
     parser.add_argument(
         "--profile",
-        choices=["lightweight", "balanced", "high_accuracy"],
+        choices=["lightweight", "balanced", "high_accuracy", "maximum_accuracy"],
         default="balanced",
     )
     parser.add_argument("--model")

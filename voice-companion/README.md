@@ -144,7 +144,8 @@ This modifies the Podman machine rather than Windows. Rerun it after replacing
 the GPU, changing MIG configuration, or updating drivers if CDI becomes stale.
 
 Build the CUDA 12.4 companion image. The balanced profile runs `base.en` with
-CUDA `float16`; the high-accuracy profile downloads and runs `small.en`:
+CUDA `float16`; the high-accuracy profile uses `small.en`. The experimental
+maximum-accuracy profile uses the substantially larger `medium.en` model:
 
 ```powershell
 .\voice-companion\scripts\prepare-podman.ps1 `
@@ -155,6 +156,11 @@ CUDA `float16`; the high-accuracy profile downloads and runs `small.en`:
 .\voice-companion\scripts\prepare-podman.ps1 `
   -Runtime cuda124 `
   -Profile high_accuracy
+
+# Experimental maximum-accuracy model for 12 GB or larger GPUs.
+.\voice-companion\scripts\prepare-podman.ps1 `
+  -Runtime cuda124 `
+  -Profile maximum_accuracy
 ```
 
 Start the GPU service:
@@ -336,8 +342,9 @@ Available profiles:
 - `lightweight`: `tiny.en`, CPU, `int8`
 - `balanced`: `base.en`, automatic device selection, `int8`
 - `high_accuracy`: `small.en`, CUDA, `float16`
+- `maximum_accuracy`: `medium.en`, CUDA, `float16` (experimental)
 
-Install all three:
+Install all four:
 
 ```powershell
 .\voice-companion\scripts\install-transcription.ps1 -AllProfiles

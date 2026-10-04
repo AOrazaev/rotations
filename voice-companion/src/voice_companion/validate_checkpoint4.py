@@ -370,7 +370,7 @@ def main():
     parser.add_argument("--gpu-layers", type=int, default=-1)
     parser.add_argument(
         "--transcription-profile",
-        choices=["lightweight", "balanced", "high_accuracy"],
+        choices=["lightweight", "balanced", "high_accuracy", "maximum_accuracy"],
         default="balanced",
     )
     parser.add_argument("--transcription-device")

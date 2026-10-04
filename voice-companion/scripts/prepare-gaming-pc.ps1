@@ -1,7 +1,7 @@
 param(
   [ValidateSet("cuda124", "cpu")]
   [string]$CommandRuntime = "cuda124",
-  [ValidateSet("lightweight", "balanced", "high_accuracy")]
+  [ValidateSet("lightweight", "balanced", "high_accuracy", "maximum_accuracy")]
   [string]$TranscriptionProfile = "balanced",
   [switch]$ForceRuntimeReinstall
 )

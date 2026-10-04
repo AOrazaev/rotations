@@ -4,7 +4,7 @@ param(
   [int]$Port = 8766,
   [ValidateSet("faster-whisper", "external-command")]
   [string]$Transcriber = "faster-whisper",
-  [ValidateSet("lightweight", "balanced", "high_accuracy")]
+  [ValidateSet("lightweight", "balanced", "high_accuracy", "maximum_accuracy")]
   [string]$Profile = "balanced",
   [string]$Model = "",
   [string]$Device = "",

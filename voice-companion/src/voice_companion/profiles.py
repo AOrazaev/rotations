@@ -32,6 +32,12 @@ PROFILES = {
         device="cuda",
         compute_type="float16",
     ),
+    "maximum_accuracy": TranscriptionProfile(
+        name="maximum_accuracy",
+        model="medium.en",
+        device="cuda",
+        compute_type="float16",
+    ),
 }
 
 

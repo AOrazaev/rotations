@@ -25,7 +25,7 @@ def main():
     parser.add_argument(
         "--profile",
         action="append",
-        choices=["lightweight", "balanced", "high_accuracy"],
+        choices=["lightweight", "balanced", "high_accuracy", "maximum_accuracy"],
         dest="profiles",
     )
     parser.add_argument("--model-directory")

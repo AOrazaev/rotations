@@ -1,5 +1,5 @@
 param(
-  [ValidateSet("lightweight", "balanced", "high_accuracy")]
+  [ValidateSet("lightweight", "balanced", "high_accuracy", "maximum_accuracy")]
   [string[]]$Profile = @("balanced"),
   [switch]$AllProfiles,
   [string]$Python = "py",
@@ -24,7 +24,7 @@ if ($Python -eq "py") {
 }
 
 if ($AllProfiles) {
-  $Profile = @("lightweight", "balanced", "high_accuracy")
+  $Profile = @("lightweight", "balanced", "high_accuracy", "maximum_accuracy")
 }
 
 if (-not (Test-Path $VirtualPython)) {

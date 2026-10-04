@@ -353,6 +353,7 @@ class ServerTest(unittest.TestCase):
             connection.close()
             self.assertEqual(response.status, 200)
             self.assertFalse(payload["security"]["tokenRequired"])
+            self.assertIn("maximum_accuracy", payload["transcriptionProfiles"])
 
             connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
             connection.request(

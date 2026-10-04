@@ -6,7 +6,7 @@ param(
   [string]$ContainerName = "bask-voice-companion",
   [string]$Token = $env:BASK_VOICE_TOKEN,
   [int]$Port = 8766,
-  [ValidateSet("lightweight", "balanced", "high_accuracy")]
+  [ValidateSet("lightweight", "balanced", "high_accuracy", "maximum_accuracy")]
   [string]$Profile = "balanced",
   [string]$Model = "",
   [ValidateSet("none", "llama-cpp", "llama-cpp-fact-dsl")]
@@ -24,8 +24,8 @@ $ErrorActionPreference = "Stop"
 if (-not $Image) {
   $Image = "localhost/bask-voice-companion:$Runtime"
 }
-if ($Runtime -eq "cpu" -and $Profile -eq "high_accuracy") {
-  throw "The high_accuracy transcription profile requires -Runtime cuda124."
+if ($Runtime -eq "cpu" -and $Profile -in @("high_accuracy", "maximum_accuracy")) {
+  throw "The $Profile transcription profile requires -Runtime cuda124."
 }
 $Device = if ($Runtime -eq "cuda124") { "cuda" } else { "cpu" }
 $ComputeType = if ($Runtime -eq "cuda124") { "float16" } else { "int8" }

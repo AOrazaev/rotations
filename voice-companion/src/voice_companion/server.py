@@ -45,7 +45,7 @@ from .transcription import (
     normalize_basketball_transcript,
 )
 from .validation import RequestValidationError, validate_context
-from .profiles import default_model_directory, resolve_profile
+from .profiles import PROFILES, default_model_directory, resolve_profile
 
 
 class VoiceCompanionServer(ThreadingHTTPServer):
@@ -162,6 +162,7 @@ class VoiceCompanionHandler(BaseHTTPRequestHandler):
                     "protocolVersion": PROTOCOL_VERSION,
                     "audioTypes": sorted(ALLOWED_AUDIO_TYPES),
                     "languages": ["en"],
+                    "transcriptionProfiles": sorted(PROFILES),
                     "maxAudioBytes": self.server.settings.max_audio_bytes,
                     "maxContextBytes": self.server.settings.max_context_bytes,
                     "maxDurationSeconds": self.server.settings.max_duration_seconds,
@@ -1379,7 +1380,7 @@ def main():
     )
     parser.add_argument(
         "--profile",
-        choices=["lightweight", "balanced", "high_accuracy"],
+        choices=["lightweight", "balanced", "high_accuracy", "maximum_accuracy"],
         default=os.environ.get("BASK_VOICE_PROFILE", "balanced"),
     )
     parser.add_argument("--model", default=os.environ.get("BASK_VOICE_MODEL"))

@@ -28,6 +28,12 @@ class ProfileTest(unittest.TestCase):
         self.assertEqual(profile.device, "cuda")
         self.assertEqual(profile.compute_type, "float16")
 
+    def test_maximum_accuracy_profile_uses_medium_cuda_model(self):
+        profile = resolve_profile("maximum_accuracy")
+        self.assertEqual(profile.model, "medium.en")
+        self.assertEqual(profile.device, "cuda")
+        self.assertEqual(profile.compute_type, "float16")
+
     def test_unknown_profile_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unknown transcription profile"):
             resolve_profile("unknown")

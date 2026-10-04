@@ -2,7 +2,7 @@ param(
   [int]$CommandGpuLayers = -1,
   [int]$Repetitions = 7,
   [int]$DelayBetweenRoundsSeconds = 300,
-  [ValidateSet("lightweight", "balanced", "high_accuracy")]
+  [ValidateSet("lightweight", "balanced", "high_accuracy", "maximum_accuracy")]
   [string]$TranscriptionProfile = "balanced",
   [ValidateSet("", "auto", "cpu", "cuda")]
   [string]$TranscriptionDevice = "",
