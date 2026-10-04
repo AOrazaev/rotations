@@ -1,7 +1,9 @@
 param(
-  [string]$Image = "localhost/bask-voice-companion:cpu",
+  [ValidateSet("cpu", "cuda124")]
+  [string]$Runtime = "cpu",
+  [string]$Image = "",
   [string]$DataVolume = "bask-voice-companion-data",
-  [ValidateSet("lightweight", "balanced")]
+  [ValidateSet("lightweight", "balanced", "high_accuracy")]
   [string]$Profile = "balanced",
   [ValidateSet("qwen3", "phi4mini")]
   [string]$ModelCandidate = "qwen3",
@@ -14,13 +16,20 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "podman-common.ps1")
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
+$Target = if ($Runtime -eq "cuda124") { "cuda" } else { "cpu" }
+if (-not $Image) {
+  $Image = "localhost/bask-voice-companion:$Runtime"
+}
+if ($Runtime -eq "cpu" -and $Profile -eq "high_accuracy") {
+  throw "The high_accuracy transcription profile requires -Runtime cuda124."
+}
 
 if (-not $SkipBuild) {
-  Write-Host "Building CPU companion image $Image..."
+  Write-Host "Building $Runtime companion image $Image..."
   Invoke-BaskPodman -Arguments @(
     "build",
     "--format", "docker",
-    "--target", "cpu",
+    "--target", $Target,
     "--tag", $Image,
     "--file", (Join-Path $ProjectRoot "Containerfile"),
     $ProjectRoot
@@ -76,5 +85,5 @@ if (-not $SkipModelDownload) {
 
 Write-Host ""
 Write-Host "Podman preparation complete."
-Write-Host "Start the CPU companion with:"
-Write-Host "  .\voice-companion\scripts\run-podman.ps1"
+Write-Host "Start the $Runtime companion with:"
+Write-Host "  .\voice-companion\scripts\run-podman.ps1 -Runtime $Runtime"

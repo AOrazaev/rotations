@@ -733,7 +733,7 @@ Exit gate:
 
 ### Checkpoint 4: Standalone companion readiness
 
-**Status: complete.** Explicit dual-model warmup, bounded hardware detection, profile recommendation, CPU/GPU placement reporting, workbench readiness feedback, corpus evaluation, redacted diagnostics, model comparison, cancellation, timeout, out-of-memory handling, recovery tests, and long-session validation are implemented. The gaming-PC CPU profile completed 56/56 exact commands with zero errors, 3.7-second median latency, and stable memory. CPU execution is the accepted initial baseline; CUDA acceleration is deferred as an optional optimization. See [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
+**Status: complete.** Explicit dual-model warmup, bounded hardware detection, profile recommendation, CPU/GPU placement reporting, workbench readiness feedback, corpus evaluation, redacted diagnostics, model comparison, cancellation, timeout, out-of-memory handling, recovery tests, and long-session validation are implemented. The gaming-PC CPU profile completed 56/56 exact commands with zero errors, 3.7-second median latency, and stable memory. CPU execution was accepted as the initial baseline; optional CUDA acceleration is now provided by the later Checkpoint 8 Podman workflow. See [`VOICE_COMPANION_CHECKPOINT_4.md`](VOICE_COMPANION_CHECKPOINT_4.md).
 
 Deliver:
 
@@ -946,8 +946,10 @@ Deliver:
   documentation.
 - An 81-recording end-to-end baseline and manual game workflow.
 - An optional CPU-first Podman workflow with loopback-only host publishing,
-  persistent model/sample storage, and a runtime layout that can add a CUDA
-  target without changing the service API.
+  persistent model/sample storage, and separate CPU and CUDA targets sharing
+  the same service API.
+- A CUDA 12.4 Podman target using NVIDIA CDI passthrough, GPU Faster Whisper,
+  full supported llama.cpp layer offload, and fail-fast GPU capability checks.
 - Continued local evaluation collection and regression curation.
 
 Verification:
@@ -962,6 +964,8 @@ Verification:
 - A complete recorded-game workflow succeeds on both target machines.
 - The Podman CPU image builds reproducibly, remains unreachable through
   non-loopback Windows interfaces, and matches the native functional baseline.
+- The Podman CUDA image builds independently from the CPU image and refuses to
+  start when CDI, CTranslate2 CUDA access, or llama.cpp GPU offload is missing.
 
 ### Deferred: Windows packaging and release hardening
 

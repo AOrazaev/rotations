@@ -56,11 +56,12 @@ The older structured-JSON interpreter remains available explicitly:
   -CommandInterpreter llama-cpp
 ```
 
-## Podman CPU proof of concept
+## Podman CPU and NVIDIA GPU containers
 
 Podman provides an optional reproducible Linux runtime for technical users.
-The native PowerShell workflow remains supported, and CUDA container support is
-deferred until the CPU path has been measured on the real audio corpus.
+The native PowerShell workflow remains supported. The CPU image is the
+validated fallback, and the separate CUDA 12.4 image is available for gaming
+PCs with NVIDIA CDI passthrough.
 
 Requirements:
 
@@ -119,10 +120,70 @@ Useful variations:
   -Output .\podman-real-audio-evaluation.json
 ```
 
-The image has an explicit CPU target and keeps model/data paths independent
-from the inference runtime. A later CUDA target can reuse the same API,
-persistent volume, and launch contract while adding NVIDIA Container Toolkit
-and CDI device access.
+The image has separate CPU and CUDA 12.4 targets while keeping the same API,
+persistent volume, and launch contract.
+
+### Podman NVIDIA GPU runtime
+
+Requirements:
+
+- NVIDIA Pascal-or-newer GPU with the current Windows driver and WSL2 CUDA
+  support.
+- The WSL2 Podman machine; Hyper-V GPU passthrough is not supported.
+- Approximately 9 GB of Podman image storage for the CUDA target, excluding
+  models.
+
+Install NVIDIA Container Toolkit inside the running Podman machine, generate
+its CDI device specification, and verify `nvidia-smi` in a test container:
+
+```powershell
+.\voice-companion\scripts\prepare-podman-gpu.ps1
+```
+
+This modifies the Podman machine rather than Windows. Rerun it after replacing
+the GPU, changing MIG configuration, or updating drivers if CDI becomes stale.
+
+Build the CUDA 12.4 companion image. The balanced profile runs `base.en` with
+CUDA `float16`; the high-accuracy profile downloads and runs `small.en`:
+
+```powershell
+.\voice-companion\scripts\prepare-podman.ps1 `
+  -Runtime cuda124 `
+  -Profile balanced
+
+# Optional larger Whisper model.
+.\voice-companion\scripts\prepare-podman.ps1 `
+  -Runtime cuda124 `
+  -Profile high_accuracy
+```
+
+Start the GPU service:
+
+```powershell
+.\voice-companion\scripts\run-podman.ps1 `
+  -Runtime cuda124 `
+  -Profile balanced
+```
+
+The launcher passes the CDI device `nvidia.com/gpu=all`, uses CUDA `float16`
+for Faster Whisper, and offloads all supported Qwen layers with
+`--command-gpu-layers -1`. Before opening the service it verifies that
+CTranslate2 sees at least one CUDA device and that llama.cpp was built with GPU
+offload. GPU setup failures stop startup rather than silently using CPU.
+
+Run the real-audio corpus on GPU with:
+
+```powershell
+.\voice-companion\scripts\evaluate-podman.ps1 `
+  -Runtime cuda124 `
+  -Profile balanced `
+  -Output .\podman-gpu-real-audio-evaluation.json
+```
+
+After startup, `/v1/warmup` and `/v1/diagnostics` should report a CUDA device,
+Faster Whisper device `cuda`, compute type `float16`, and command-model GPU
+layers `-1`. Full device execution must be validated on the gaming PC; the
+CUDA image itself can be built on a machine without an NVIDIA GPU.
 
 The initial balanced-profile CPU baseline is stored as
 `evaluation/real-audio-v1/baseline-balanced-81-fact-dsl-podman-cpu.json`:

@@ -38,6 +38,36 @@ function Invoke-BaskPodman {
   }
 }
 
+function Get-BaskPodmanMachine {
+  $podman = Get-BaskPodman
+  $machineJson = & $podman machine inspect
+  if ($LASTEXITCODE -ne 0) {
+    throw "Could not inspect the active Podman machine."
+  }
+  $machines = @(($machineJson -join "`n") | ConvertFrom-Json)
+  if ($machines.Count -ne 1 -or $machines[0].State -ne "running") {
+    throw "Exactly one running Podman machine is required."
+  }
+  return $machines[0]
+}
+
+function Assert-BaskPodmanGpu {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Image
+  )
+
+  Write-Host "Verifying CDI GPU access and CUDA inference libraries..."
+  Invoke-BaskPodman -Arguments @(
+    "run", "--rm",
+    "--device", "nvidia.com/gpu=all",
+    "--entrypoint", "python",
+    $Image,
+    "-c",
+    "import ctranslate2, llama_cpp; devices=ctranslate2.get_cuda_device_count(); offload=llama_cpp.llama_supports_gpu_offload(); print(f'CUDA devices: {devices}; llama.cpp GPU offload: {offload}'); raise SystemExit(0 if devices > 0 and offload else 1)"
+  )
+}
+
 function Start-BaskPodmanLoopbackTunnel {
   param(
     [Parameter(Mandatory)]
@@ -49,16 +79,7 @@ function Start-BaskPodmanLoopbackTunnel {
     throw "Windows OpenSSH Client is required for Podman loopback forwarding."
   }
 
-  $podman = Get-BaskPodman
-  $machineJson = & $podman machine inspect
-  if ($LASTEXITCODE -ne 0) {
-    throw "Could not inspect the active Podman machine."
-  }
-  $machines = @(($machineJson -join "`n") | ConvertFrom-Json)
-  if ($machines.Count -ne 1 -or $machines[0].State -ne "running") {
-    throw "Exactly one running Podman machine is required."
-  }
-  $machine = $machines[0]
+  $machine = Get-BaskPodmanMachine
 
   $arguments = @(
     "-N",
