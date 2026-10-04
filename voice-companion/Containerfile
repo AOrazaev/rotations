@@ -46,6 +46,9 @@ RUN python -m pip install --no-cache-dir --prefer-binary \
 COPY --from=cpu-dependencies \
     /usr/local/lib/python3.12/site-packages/llama_cpp/lib/libggml-cpu.so* \
     /usr/local/lib/python3.12/site-packages/llama_cpp/lib/
+COPY --from=cpu-dependencies \
+    /usr/local/lib/python3.12/site-packages/llama_cpp_python.libs/libgomp-*.so.* \
+    /usr/local/lib/python3.12/site-packages/llama_cpp_python.libs/
 
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/usr/local/lib/python3.12/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib
 
