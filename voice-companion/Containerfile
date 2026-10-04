@@ -1,0 +1,53 @@
+FROM python:3.12-slim-bookworm AS runtime-base
+
+ARG LLAMA_CPP_WHEEL_INDEX=https://abetlen.github.io/llama-cpp-python/whl/cpu
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src \
+    HF_HUB_DISABLE_XET=1 \
+    HF_HOME=/data/huggingface \
+    BASK_VOICE_CONTAINER=1 \
+    BASK_VOICE_MODEL_DIRECTORY=/data/models \
+    BASK_VOICE_EVALUATION_DIRECTORY=/data/evaluation-samples
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-transcription.txt requirements-interpretation.txt ./
+RUN python -m pip install --no-cache-dir --prefer-binary \
+    --extra-index-url "${LLAMA_CPP_WHEEL_INDEX}" \
+    -r requirements-transcription.txt \
+    -r requirements-interpretation.txt
+
+COPY pyproject.toml ./
+COPY src ./src
+COPY web ./web
+COPY scripts/download_models.py scripts/download_command_model.py ./scripts/
+
+RUN groupadd --gid 10001 bask \
+    && useradd --uid 10001 --gid bask --create-home --home-dir /home/bask bask \
+    && mkdir -p /data/models /data/evaluation-samples /data/huggingface \
+    && chown -R bask:bask /data /home/bask
+
+VOLUME ["/data"]
+
+USER bask
+
+EXPOSE 8766
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import os, urllib.request; request=urllib.request.Request('http://127.0.0.1:8766/v1/health', headers={'X-Bask-Voice-Token': os.environ['BASK_VOICE_TOKEN']}); urllib.request.urlopen(request, timeout=4).read()" || exit 1
+
+ENTRYPOINT ["python", "-m", "voice_companion"]
+CMD ["--host", "0.0.0.0", "--port", "8766", "--container-mode", "--transcriber", "faster-whisper", "--profile", "balanced", "--device", "cpu", "--compute-type", "int8", "--command-interpreter", "llama-cpp-fact-dsl", "--command-gpu-layers", "0"]
+
+FROM runtime-base AS cpu
+
+LABEL org.opencontainers.image.title="Bask Voice Companion" \
+      org.opencontainers.image.description="CPU runtime for the local Bask voice companion" \
+      org.opencontainers.image.source="https://github.com/aorazaev/bask"

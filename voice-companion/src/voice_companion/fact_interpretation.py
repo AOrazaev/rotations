@@ -208,6 +208,16 @@ def parse_fact_dsl(content: str, context: dict) -> dict:
             continue
         tokens = line.split()
         event_type = tokens[0].upper()
+        if (
+            event_type == "SHOT"
+            and len(tokens) == 6
+            and tokens[5] == tokens[3]
+            and tokens[5] in {"1", "2", "3"}
+        ):
+            tokens[5] = "-"
+            warnings.append(
+                f"Removed a redundant shot value from fact line {line_number}."
+            )
         try:
             event = _parse_fact_tokens(
                 event_type,

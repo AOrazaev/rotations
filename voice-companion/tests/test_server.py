@@ -14,7 +14,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from voice_companion.server import build_server
+from voice_companion.server import build_server, validate_bind_configuration
 from voice_companion.interpretation import (
     InterpretationResult,
     InvalidInterpretation,
@@ -41,6 +41,38 @@ class FixtureTranscriber:
             text="Seven assist and thirteen makes two in transition",
             model="fixture",
         )
+
+
+class BindConfigurationTest(unittest.TestCase):
+    def test_loopback_bind_is_allowed_without_container_mode(self):
+        validate_bind_configuration(
+            "127.0.0.1",
+            container_mode=False,
+            authentication_required=False,
+        )
+
+    def test_authenticated_container_bind_is_allowed(self):
+        validate_bind_configuration(
+            "0.0.0.0",
+            container_mode=True,
+            authentication_required=True,
+        )
+
+    def test_container_bind_requires_authentication(self):
+        with self.assertRaisesRegex(ValueError, "requires token authentication"):
+            validate_bind_configuration(
+                "0.0.0.0",
+                container_mode=True,
+                authentication_required=False,
+            )
+
+    def test_external_native_bind_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "must bind to loopback"):
+            validate_bind_configuration(
+                "0.0.0.0",
+                container_mode=False,
+                authentication_required=True,
+            )
 
 
 class ConfusedJerseyTranscriber(FixtureTranscriber):

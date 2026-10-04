@@ -142,3 +142,17 @@ mismatch still produces the exact expected event array.
 All timing values are development-machine observations rather than release
 performance measurements. Regenerate them on an otherwise idle target machine
 before making profile or hardware decisions.
+
+`baseline-balanced-81-fact-dsl-podman-cpu.json` runs the same corpus in the
+CPU-targeted Podman image:
+
+- 70/81 raw transcript matches.
+- 78/81 roster-normalized transcript matches.
+- 79/81 exact semantic event arrays.
+- 0 processing errors.
+- 8.8-second median end-to-end latency.
+- 77.9-second maximum latency.
+
+Its two misses are the known `seven T` and `seven two` transcriptions of #70
+when both #7 and #70 are active. No broad roster-based correction is applied
+because either active player could otherwise be selected incorrectly.

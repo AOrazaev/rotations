@@ -878,6 +878,27 @@ class FactDslCommandInterpreterTest(unittest.TestCase):
         with self.assertRaisesRegex(InvalidInterpretation, "Invalid fact"):
             parse_fact_dsl("SHOT TEAM 13 2 MAYBE -", context())
 
+    def test_removes_redundant_shot_value_used_as_phase(self):
+        payload = parse_fact_dsl("SHOT TEAM 13 1 MISSED 1", context())
+
+        self.assertEqual(
+            payload["events"],
+            [
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p13",
+                    "confidence": 0.99,
+                    "shotValue": 1,
+                    "made": False,
+                }
+            ],
+        )
+        self.assertEqual(
+            payload["warnings"],
+            ["Removed a redundant shot value from fact line 1."],
+        )
+
     def test_aligns_reordered_and_extra_facts_to_transcript(self):
         request_context = {
             **context(),

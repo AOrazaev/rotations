@@ -1284,6 +1284,23 @@ def parse_origins(value: str | None) -> set[str]:
     return origins
 
 
+def validate_bind_configuration(
+    host: str,
+    *,
+    container_mode: bool,
+    authentication_required: bool,
+):
+    if host in {"127.0.0.1", "::1", "localhost"}:
+        return
+    if host == "0.0.0.0" and container_mode:
+        if not authentication_required:
+            raise ValueError(
+                "Container mode requires token authentication when binding to 0.0.0.0."
+            )
+        return
+    raise ValueError("The companion must bind to loopback or authenticated container mode.")
+
+
 def build_server(
     *,
     host: str,
@@ -1326,6 +1343,12 @@ def main():
     parser = argparse.ArgumentParser(description="Run the local voice companion spike.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8766)
+    parser.add_argument(
+        "--container-mode",
+        action="store_true",
+        default=os.environ.get("BASK_VOICE_CONTAINER") == "1",
+        help="Allow an authenticated 0.0.0.0 bind for loopback-published containers.",
+    )
     parser.add_argument(
         "--token",
         default=os.environ.get("BASK_VOICE_TOKEN") or secrets.token_urlsafe(24),
@@ -1370,6 +1393,10 @@ def main():
         default=os.environ.get("BASK_VOICE_MODEL_DIRECTORY"),
     )
     parser.add_argument(
+        "--evaluation-directory",
+        default=os.environ.get("BASK_VOICE_EVALUATION_DIRECTORY"),
+    )
+    parser.add_argument(
         "--command-interpreter",
         choices=["none", "llama-cpp", "llama-cpp-fact-dsl"],
         default=os.environ.get(
@@ -1392,8 +1419,14 @@ def main():
         default=int(os.environ.get("BASK_VOICE_COMMAND_GPU_LAYERS", "0")),
     )
     args = parser.parse_args()
-    if args.host not in {"127.0.0.1", "::1", "localhost"}:
-        parser.error("Checkpoint 0 binds to loopback only.")
+    try:
+        validate_bind_configuration(
+            args.host,
+            container_mode=args.container_mode,
+            authentication_required=not args.disable_authentication,
+        )
+    except ValueError as error:
+        parser.error(str(error))
     if args.max_concurrent_requests <= 0:
         parser.error("--max-concurrent-requests must be positive.")
     if args.processing_timeout_seconds <= 0:
@@ -1438,6 +1471,9 @@ def main():
         profile_name=profile_name,
         transcriber=transcriber,
         interpreter=interpreter,
+        evaluation_directory=(
+            Path(args.evaluation_directory) if args.evaluation_directory else None
+        ),
     )
     print(f"Voice companion workbench: http://127.0.0.1:{args.port}/")
     if args.disable_authentication:

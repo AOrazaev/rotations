@@ -945,6 +945,9 @@ Deliver:
 - Setup, CPU/CUDA selection, pairing, troubleshooting, privacy, and update
   documentation.
 - An 81-recording end-to-end baseline and manual game workflow.
+- An optional CPU-first Podman workflow with loopback-only host publishing,
+  persistent model/sample storage, and a runtime layout that can add a CUDA
+  target without changing the service API.
 - Continued local evaluation collection and regression curation.
 
 Verification:
@@ -957,6 +960,8 @@ Verification:
 - The workbench remains available for diagnostics and model evaluation.
 - Full browser regression tests pass with the companion integration disabled and mocked.
 - A complete recorded-game workflow succeeds on both target machines.
+- The Podman CPU image builds reproducibly, remains unreachable through
+  non-loopback Windows interfaces, and matches the native functional baseline.
 
 ### Deferred: Windows packaging and release hardening
 

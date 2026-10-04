@@ -30,6 +30,8 @@ The launcher uses the pinned dependencies in
 `requirements-transcription.txt` and `requirements-interpretation.txt`. It
 requires the repository-managed Python 3.12 environment and fails with setup
 instructions rather than falling back to an unrelated system Python.
+PyAV is pinned alongside Faster Whisper because PyAV 19 is not compatible with
+the decoder API used by Faster Whisper 1.2.1.
 
 The command starts Faster Whisper with the balanced profile and the fact DSL V2
 command interpreter. It prints a random pairing token and serves the workbench:
@@ -53,6 +55,89 @@ The older structured-JSON interpreter remains available explicitly:
 .\voice-companion\scripts\run.ps1 `
   -CommandInterpreter llama-cpp
 ```
+
+## Podman CPU proof of concept
+
+Podman provides an optional reproducible Linux runtime for technical users.
+The native PowerShell workflow remains supported, and CUDA container support is
+deferred until the CPU path has been measured on the real audio corpus.
+
+Requirements:
+
+- Podman Desktop with its Podman engine and WSL2 machine configured.
+- `podman version` and `podman machine list` working in a new PowerShell window.
+- Enough Podman-machine memory for the Whisper and Qwen models.
+
+Build the CPU image, create its persistent data volume, and download the
+balanced Whisper and Qwen models:
+
+```powershell
+Set-Location 'C:\path\to\rotations'
+.\voice-companion\scripts\prepare-podman.ps1
+```
+
+Start the service:
+
+```powershell
+.\voice-companion\scripts\run-podman.ps1
+```
+
+The runtime container executes as a non-root user with all Linux capabilities
+dropped, a read-only application filesystem, and a temporary `/tmp`. Models,
+Hugging Face caches, and saved evaluation samples persist in the
+`bask-voice-companion-data` Podman volume.
+
+The service listens on `0.0.0.0` only inside authenticated container mode.
+The launcher publishes it exclusively as `127.0.0.1:8766` on Windows; do not
+replace that publish address with an all-interface binding.
+
+Podman 6 on the WSL2 provider currently has a Windows-localhost forwarding
+regression. The launcher therefore creates an authenticated SSH local tunnel
+to the running Podman machine, bound only to Windows `127.0.0.1`, and removes
+the tunnel when the container exits. Windows OpenSSH Client is required. Once
+the upstream forwarding issue is fixed, bypass the compatibility tunnel with:
+
+```powershell
+.\voice-companion\scripts\run-podman.ps1 -UseSshTunnel:$false
+```
+
+Useful variations:
+
+```powershell
+# Use a different host port.
+.\voice-companion\scripts\run-podman.ps1 -Port 8877
+
+# Rebuild without redownloading models.
+.\voice-companion\scripts\prepare-podman.ps1 -SkipModelDownload
+
+# Use the lightweight Whisper profile.
+.\voice-companion\scripts\prepare-podman.ps1 -Profile lightweight
+.\voice-companion\scripts\run-podman.ps1 -Profile lightweight
+
+# Run the complete real-audio corpus inside the CPU image.
+.\voice-companion\scripts\evaluate-podman.ps1 `
+  -Output .\podman-real-audio-evaluation.json
+```
+
+The image has an explicit CPU target and keeps model/data paths independent
+from the inference runtime. A later CUDA target can reuse the same API,
+persistent volume, and launch contract while adding NVIDIA Container Toolkit
+and CDI device access.
+
+The initial balanced-profile CPU baseline is stored as
+`evaluation/real-audio-v1/baseline-balanced-81-fact-dsl-podman-cpu.json`:
+
+- 70/81 raw transcript matches.
+- 78/81 normalized transcript matches.
+- 79/81 exact semantic event arrays.
+- 0 processing errors.
+- 8.8-second median end-to-end latency.
+- 77.9-second maximum latency.
+
+The two event misses are the accepted ambiguous #70 transcriptions `seven T`
+and `seven two` while both #7 and #70 are active. The container run is
+functionally consistent with the known transcription limitations, but its
+development-machine timing is not a release benchmark.
 
 ## Local workbench and security
 
