@@ -14,7 +14,9 @@ MAX_PROCESSING_SECONDS = 120
 
 DEFAULT_ALLOWED_ORIGINS = {
     "https://aorazaev.github.io",
+    "http://127.0.0.1:8000",
     "http://127.0.0.1:4173",
+    "http://localhost:8000",
     "http://localhost:4173",
 }
 

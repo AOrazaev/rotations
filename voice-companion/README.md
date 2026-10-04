@@ -219,7 +219,9 @@ development-machine timing is not a release benchmark.
 
 The service binds to loopback only. API requests require the pairing token in
 `X-Bask-Voice-Token`, and browser requests must come from the workbench,
-configured development origins, or the production GitHub Pages origin.
+configured development origins, or the production GitHub Pages origin. The
+default development origins include `localhost` and `127.0.0.1` on ports
+`4173` and `8000`, including sites served with `python -m http.server 8000`.
 
 For a simpler local-only setup, explicitly disable token authentication:
 

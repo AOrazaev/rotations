@@ -14,7 +14,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from voice_companion.server import build_server, validate_bind_configuration
+from voice_companion.server import (
+    build_server,
+    parse_origins,
+    validate_bind_configuration,
+)
 from voice_companion.interpretation import (
     InterpretationResult,
     InvalidInterpretation,
@@ -186,7 +190,7 @@ class ServerTest(unittest.TestCase):
             host="127.0.0.1",
             port=0,
             token="test-token",
-            allowed_origins={"https://aorazaev.github.io"},
+            allowed_origins=parse_origins(None),
             transcriber=FixtureTranscriber(),
             evaluation_directory=Path(cls.evaluation_directory.name),
         )
@@ -381,6 +385,20 @@ class ServerTest(unittest.TestCase):
             json.loads(payload)["commandModelState"],
             "configuration_required",
         )
+
+    def test_python_http_server_origins_receive_cors_headers(self):
+        for origin in ("http://localhost:8000", "http://127.0.0.1:8000"):
+            with self.subTest(origin=origin):
+                status, headers, _ = self.request(
+                    "GET",
+                    "/v1/capabilities",
+                    headers={
+                        "Origin": origin,
+                        "X-Bask-Voice-Token": "test-token",
+                    },
+                )
+                self.assertEqual(status, 200)
+                self.assertIn(("Access-Control-Allow-Origin", origin), headers)
 
     def test_diagnostics_are_redacted(self):
         status, _, payload = self.request(
