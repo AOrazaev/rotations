@@ -20,7 +20,10 @@ async function openLineupGame(page) {
   await page.locator('#gameTitle').fill('Lineup game');
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
+  await expect(page.locator('#gamesStatus')).toContainText('Saved Lineup game');
   await expect(page.locator('#eventLockMessage')).toBeHidden();
+  await expect(page.locator('#currentLineup .player-chip')).toHaveCount(5);
+  await expect(page.locator('#benchPlayers .player-chip')).toHaveCount(1);
 }
 
 async function currentAndBenchIds(page) {

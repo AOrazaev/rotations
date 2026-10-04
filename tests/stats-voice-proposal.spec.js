@@ -416,6 +416,7 @@ test('uses one compact microphone control and keeps drafts out of game storage',
   await draft.locator('.voice-command-details > summary').click();
   await expect(draft.locator('.voice-proposal-event').first()).toBeVisible();
   await draft.locator('[data-voice-field="type"]').first().selectOption('steal');
+  await expect(draft.locator('[data-voice-action="replace-timestamp"]')).toBeVisible();
   await page.evaluate(() => { window.__statsFakePlayer.current = 99; });
   await draft.locator('[data-voice-action="replace-timestamp"]').click();
   await expect(draft.locator('.voice-command-time')).toHaveText('1:39.0');
@@ -924,10 +925,18 @@ test('releases tracks and audio URLs across repeated voice command cycles', asyn
   for (let index = 0; index < 5; index += 1) {
     await recordCommand(page);
     await waitForDrafts(page, 1);
+    const beforeEvents = await page.evaluate(
+      () => window.__statsApp.eventController.getGame().events.length
+    );
     await page.locator(
       '.voice-command-draft [data-voice-action="confirm"]'
     ).click();
-    await expect(page.locator('.voice-command-draft')).toHaveCount(0);
+    await expect.poll(async () => page.evaluate(
+      () => window.__statsApp.eventController.getGame().events.length
+    )).toBe(beforeEvents + 2);
+    await expect.poll(async () => page.evaluate(
+      () => window.__statsApp.voiceController.getState().jobs.length
+    )).toBe(0);
   }
 
   const resources = await page.evaluate(() => ({
