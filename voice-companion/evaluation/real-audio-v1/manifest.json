@@ -132,10 +132,10 @@
     {
       "id": "opponent-misses-two",
       "audio": "12-opponent-miss-two.webm",
-      "expectedTranscript": "Opponent misses two pointer.",
+      "expectedTranscript": "Opponent misses three pointer.",
       "currentLineupIds": ["p13", "p7", "p5", "p60", "p70"],
       "expectedEvents": [
-        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 2, "made": false}
+        {"side": "opponent", "type": "shot", "playerId": null, "shotValue": 3, "made": false}
       ]
     },
     {

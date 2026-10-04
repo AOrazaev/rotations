@@ -932,6 +932,35 @@ class FactDslCommandInterpreterTest(unittest.TestCase):
             ["Split a fused opponent shot and team foul on fact line 1."],
         )
 
+    def test_splits_missided_team_shot_and_opponent_foul(self):
+        payload = parse_fact_dsl(
+            "SHOT OPPONENT 13 2 MISSED FOULED",
+            context(),
+        )
+        self.assertEqual(
+            payload["events"],
+            [
+                {
+                    "side": "team",
+                    "type": "shot",
+                    "playerId": "p13",
+                    "confidence": 0.99,
+                    "shotValue": 2,
+                    "made": False,
+                },
+                {
+                    "side": "opponent",
+                    "type": "foul",
+                    "playerId": None,
+                    "confidence": 0.99,
+                },
+            ],
+        )
+        self.assertEqual(
+            payload["warnings"],
+            ["Split a fused team shot and opponent foul on fact line 1."],
+        )
+
     def test_aligns_reordered_and_extra_facts_to_transcript(self):
         request_context = {
             **context(),
