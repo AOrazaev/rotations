@@ -60,6 +60,7 @@ function Assert-BaskPodmanGpu {
   Write-Host "Verifying CDI GPU access and CUDA inference libraries..."
   Invoke-BaskPodman -Arguments @(
     "run", "--rm",
+    "--cgroups", "disabled",
     "--device", "nvidia.com/gpu=all",
     "--entrypoint", "python",
     $Image,

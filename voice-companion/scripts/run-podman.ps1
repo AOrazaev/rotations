@@ -50,7 +50,10 @@ $arguments = @(
   "--security-opt", "no-new-privileges"
 )
 if ($Runtime -eq "cuda124") {
-  $arguments += @("--device", "nvidia.com/gpu=all")
+  $arguments += @(
+    "--cgroups", "disabled",
+    "--device", "nvidia.com/gpu=all"
+  )
 }
 $arguments += @(
   "--env", "BASK_VOICE_TOKEN=$Token",

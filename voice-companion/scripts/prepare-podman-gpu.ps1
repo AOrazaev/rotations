@@ -37,6 +37,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Verifying NVIDIA GPU access through CDI..."
 Invoke-BaskPodman -Arguments @(
   "run", "--rm",
+  "--cgroups", "disabled",
   "--device", "nvidia.com/gpu=all",
   "docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04",
   "nvidia-smi"
