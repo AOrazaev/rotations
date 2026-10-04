@@ -34,7 +34,7 @@ $arguments = @(
 if ($Runtime -eq "cuda124") {
   Assert-BaskPodmanGpu -Image $Image
   $arguments += @(
-    "--cgroups", "disabled",
+    "--cgroups=disabled",
     "--device", "nvidia.com/gpu=all"
   )
 }

@@ -24,7 +24,7 @@ if ($Runtime -eq "cpu" -and $Profile -eq "high_accuracy") {
   throw "The high_accuracy transcription profile requires -Runtime cuda124."
 }
 $containerRuntimeArguments = if ($Runtime -eq "cuda124") {
-  @("--cgroups", "disabled")
+  @("--cgroups=disabled")
 } else {
   @()
 }

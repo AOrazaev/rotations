@@ -51,7 +51,7 @@ $arguments = @(
 )
 if ($Runtime -eq "cuda124") {
   $arguments += @(
-    "--cgroups", "disabled",
+    "--cgroups=disabled",
     "--device", "nvidia.com/gpu=all"
   )
 }
