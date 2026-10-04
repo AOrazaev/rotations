@@ -41,6 +41,12 @@ RUN python -m pip install --no-cache-dir --prefer-binary \
     -r requirements-interpretation.txt \
     -r requirements-gpu.txt
 
+# The upstream CUDA wheel's CPU backend is built with AVX-512 instructions.
+# Keep its CUDA backend, but use the same-version CPU wheel's portable backend.
+COPY --from=cpu-dependencies \
+    /usr/local/lib/python3.12/site-packages/llama_cpp/lib/libggml-cpu.so* \
+    /usr/local/lib/python3.12/site-packages/llama_cpp/lib/
+
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/usr/local/lib/python3.12/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.12/site-packages/nvidia/cudnn/lib
 
 FROM cpu-dependencies AS cpu

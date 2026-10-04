@@ -171,6 +171,13 @@ for Faster Whisper, and offloads all supported Qwen layers with
 CTranslate2 sees at least one CUDA device and that llama.cpp was built with GPU
 offload. GPU setup failures stop startup rather than silently using CPU.
 
+The official llama-cpp-python CUDA 12.4 wheel bundles a CPU backend containing
+AVX-512 instructions, which crash on common AVX2-only gaming CPUs before CUDA
+model loading begins. The image retains that wheel's CUDA backend but replaces
+only `libggml-cpu.so` with the portable backend from the exact same package
+version's CPU wheel. GPU layer offload remains enabled and is checked during
+startup.
+
 Podman 6 on WSL can fail GPU containers before startup with
 `controller pids is not available`. GPU preparation, verification, service,
 and evaluation commands therefore use `--cgroups=disabled`, the upstream
