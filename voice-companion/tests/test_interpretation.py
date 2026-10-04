@@ -923,6 +923,68 @@ class FactDslCommandInterpreterTest(unittest.TestCase):
         self.assertTrue(result.events[3]["made"])
         self.assertIn("Removed 1 extra DSL fact.", result.warnings)
 
+    def test_recovers_explicit_non_shot_fact_missing_from_dsl(self):
+        model = FakeTextLlama("SHOT OPPONENT - 2 MISSED -")
+        interpreter = FactDslCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Opponent misses two pointer. Opponent defensive rebound.",
+            context(),
+        )
+
+        self.assertEqual(
+            [event["type"] for event in result.events],
+            ["shot", "rebound"],
+        )
+        self.assertEqual(result.events[1]["side"], "opponent")
+        self.assertEqual(result.events[1]["reboundKind"], "defensive")
+        self.assertIn(
+            "Recovered 1 explicit transcript fact",
+            result.warnings[-1],
+        )
+
+    def test_recovers_explicit_shot_missing_from_dsl(self):
+        request_context = {
+            **context(),
+            "roster": [
+                *context()["roster"],
+                {"id": "p40", "jersey": "40", "name": "Forty"},
+            ],
+            "currentLineupIds": ["p13", "p40"],
+        }
+        model = FakeTextLlama(
+            "\n".join([
+                "SHOT TEAM 40 2 MISSED -",
+                "REBOUND OPPONENT - DEFENSIVE",
+                "STEAL TEAM 13",
+            ])
+        )
+        interpreter = FactDslCommandInterpreter(
+            model_path=Path("model.gguf"),
+            model_factory=lambda **options: model,
+        )
+
+        result = interpreter.interpret(
+            "Number forty missed two pointer defensive rebound by opponent "
+            "steal by thirteen. Thirteen makes two points in transition.",
+            request_context,
+        )
+
+        self.assertEqual(
+            [event["type"] for event in result.events],
+            ["shot", "rebound", "steal", "shot"],
+        )
+        self.assertEqual(result.events[3]["playerId"], "p13")
+        self.assertTrue(result.events[3]["made"])
+        self.assertEqual(result.events[3]["shotValue"], 2)
+        self.assertEqual(
+            result.events[3]["shotDetails"],
+            {"phase": "transition"},
+        )
+
     def test_factory_selects_fact_dsl_without_changing_default(self):
         structured = create_interpreter(
             "llama-cpp",

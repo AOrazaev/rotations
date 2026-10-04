@@ -1,29 +1,60 @@
 # Bask Voice Companion
 
-This directory contains the local-only voice companion feasibility spike. It does not yet interpret transcripts or modify stats games.
+This directory contains the local-only voice companion used by the GitHub
+Pages basketball tracker. Faster Whisper transcribes microphone recordings and
+Qwen converts normalized transcripts into reviewable basketball events. Audio,
+rosters, transcripts, and models remain on the local Windows machine.
 
-## Checkpoint 0 workbench
+## Repository quick start
 
 Requirements:
 
 - Windows 11
-- Python 3.12
+- Python 3.12 with the `py` launcher
 - Chrome or Edge
+- Current Microsoft Visual C++ x64 redistributable
 
-Run from PowerShell:
+From a fresh clone, install the balanced transcription profile, CPU command
+runtime, and default Qwen model:
 
 ```powershell
 Set-Location 'C:\path\to\rotations'
+
+.\voice-companion\scripts\prepare-gaming-pc.ps1 `
+  -CommandRuntime cpu
+
 .\voice-companion\scripts\run.ps1
 ```
 
-The command prints a random pairing token and starts:
+The launcher uses the pinned dependencies in
+`requirements-transcription.txt` and `requirements-interpretation.txt`. It
+requires the repository-managed Python 3.12 environment and fails with setup
+instructions rather than falling back to an unrelated system Python.
+
+The command starts Faster Whisper with the balanced profile and the fact DSL V2
+command interpreter. It prints a random pairing token and serves the workbench:
 
 ```text
 http://127.0.0.1:8766/
 ```
 
 Paste the token into the workbench and choose **Check service**.
+
+Use the CUDA 12.4 llama.cpp wheel on a compatible machine:
+
+```powershell
+.\voice-companion\scripts\prepare-gaming-pc.ps1 `
+  -CommandRuntime cuda124
+```
+
+The older structured-JSON interpreter remains available explicitly:
+
+```powershell
+.\voice-companion\scripts\run.ps1 `
+  -CommandInterpreter llama-cpp
+```
+
+## Local workbench and security
 
 The service binds to loopback only. API requests require the pairing token in
 `X-Bask-Voice-Token`, and browser requests must come from the workbench,
@@ -208,21 +239,20 @@ Start transcription and interpretation together:
 ```powershell
 .\voice-companion\scripts\run.ps1 `
   -Token manual-test-token `
-  -Profile balanced `
-  -CommandInterpreter llama-cpp
+  -Profile balanced
 ```
 
-The structured-JSON interpreter remains the default. An experimental compact
-fact interpreter can be selected without changing the API response contract:
+The compact fact interpreter is the default. The structured-JSON V1 backend
+can be selected for comparison or fallback without changing the API contract:
 
 ```powershell
 .\voice-companion\scripts\run.ps1 `
   -Token manual-test-token `
   -Profile balanced `
-  -CommandInterpreter llama-cpp-fact-dsl
+  -CommandInterpreter llama-cpp
 ```
 
-The experimental interpreter asks the same Qwen model for compact typed
+The default interpreter asks the same Qwen model for compact typed
 basketball facts, then resolves jerseys and constructs events deterministically.
 Responses and diagnostics identify the selected backend as
 `processor.commandInterpreter`.
@@ -274,7 +304,8 @@ $env:PYTHONPATH = "$PWD\voice-companion\src"
 
 Evaluate an alternate model by supplying its full path with `--model`.
 
-Run the committed eight-recording real-audio evaluation set:
+Run the committed 81-recording real-audio evaluation set with the default fact
+DSL interpreter:
 
 ```powershell
 $env:PYTHONPATH = "$PWD\voice-companion\src"
@@ -287,6 +318,16 @@ The set lives under `voice-companion/evaluation/real-audio-v1`. Its manifest
 uses synthetic player identities and manually curated transcripts/events.
 Reports score raw transcription, active-lineup-aware transcript normalization,
 and exact end-to-end semantic event arrays separately.
+
+Select the structured-JSON interpreter explicitly when comparing backends:
+
+```powershell
+.\voice-companion\.venv\Scripts\python.exe `
+  -m voice_companion.evaluate_real_samples `
+  --interpreter structured-json-v1 `
+  --mode interpretation-only `
+  --output .\structured-json-evaluation.json
+```
 
 Processing defaults to a 120-second timeout and can be cancelled from the
 workbench. Override the timeout when starting the service:
@@ -310,6 +351,37 @@ run:
 The setup script installs the balanced faster-whisper model, Qwen3 Q4_K_M, and
 the CUDA 12.4 llama.cpp wheel. It now verifies that the native llama.cpp DLL can
 load before reporting success.
+
+## Repository update and troubleshooting
+
+After pulling repository changes, rerun the setup command to apply pinned
+dependency updates and download any missing models:
+
+```powershell
+.\voice-companion\scripts\prepare-gaming-pc.ps1 `
+  -CommandRuntime cpu
+```
+
+Common failures:
+
+- **Missing `.venv`:** run `prepare-gaming-pc.ps1`; `run.ps1` intentionally
+  does not fall back to system Python.
+- **Wrong Python version:** remove the disposable `voice-companion\.venv`
+  directory and rerun setup with Python 3.12 installed.
+- **llama.cpp native DLL failure:** install the current Visual C++ x64
+  redistributable. For CUDA, also install the CUDA 12.4 runtime, then open a new
+  PowerShell window.
+- **CUDA setup unavailable:** rerun with `-CommandRuntime cpu`.
+- **Port 8766 already in use:** stop the existing companion or start with
+  `-Port <unused-port>`.
+- **Pairing fails:** use the token printed by the current companion process and
+  confirm the tracker is loaded from an allowed origin.
+- **Model load failure:** rerun the relevant installer with
+  `-ForceModelDownload`; use `-ForceRuntimeReinstall` for a broken llama.cpp
+  wheel.
+
+The virtual environment is disposable. Models and local evaluation samples are
+stored outside the repository under `%LOCALAPPDATA%\BaskVoiceCompanion\`.
 
 To keep transcription on CPU while testing Qwen on the GPU, run:
 

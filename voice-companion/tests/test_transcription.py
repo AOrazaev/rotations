@@ -124,6 +124,35 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         self.assertEqual(unchanged, "Six team misses free throw.")
         self.assertEqual(unchanged_warnings, [])
 
+    def test_normalizes_split_thirteen_only_when_unambiguous(self):
+        active_thirteen = {
+            "roster": [
+                {"id": "p13", "jersey": "13", "name": "Thirteen"},
+            ],
+            "currentLineupIds": ["p13"],
+        }
+        ambiguous = {
+            "roster": [
+                {"id": "p3", "jersey": "3", "name": "Three"},
+                {"id": "p13", "jersey": "13", "name": "Thirteen"},
+            ],
+            "currentLineupIds": ["p3", "p13"],
+        }
+
+        transcript, warnings = normalize_basketball_transcript(
+            "Third in makes free throw.",
+            active_thirteen,
+        )
+        unchanged, unchanged_warnings = normalize_basketball_transcript(
+            "Third in makes free throw.",
+            ambiguous,
+        )
+
+        self.assertEqual(transcript, "Thirteen makes free throw.")
+        self.assertIn("jersey thirteen", warnings[0])
+        self.assertEqual(unchanged, "Third in makes free throw.")
+        self.assertEqual(unchanged_warnings, [])
+
     def test_normalizes_assessed_by_for_an_active_jersey(self):
         context = {
             "roster": [
@@ -196,6 +225,26 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         )
         self.assertEqual(unrelated, "Opponent is offensively minded.")
         self.assertEqual(unrelated_warnings, [])
+
+    def test_normalizes_defensive_rebound_variants(self):
+        context = {"roster": [], "currentLineupIds": []}
+
+        adverb, adverb_warnings = normalize_basketball_transcript(
+            "Number fifty defensively rebound.",
+            context,
+        )
+        trailing, trailing_warnings = normalize_basketball_transcript(
+            "Number seven misses two. Defensive rebound. Opponent.",
+            context,
+        )
+
+        self.assertEqual(adverb, "Number fifty defensive rebound.")
+        self.assertIn("defensive rebound transcription", adverb_warnings[0])
+        self.assertEqual(
+            trailing,
+            "Number seven misses two. Defensive rebound by opponent.",
+        )
+        self.assertIn("trailing opponent", trailing_warnings[0])
 
     def test_loads_model_once_and_deletes_temporary_audio(self):
         calls = []

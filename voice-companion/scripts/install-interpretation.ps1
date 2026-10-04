@@ -22,10 +22,18 @@ if (-not (Test-Path $VirtualPython)) {
   & $Python312 -m venv $VirtualEnvironment
 }
 
+$VirtualVersion = (& $VirtualPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')").Trim()
+if ($LASTEXITCODE -ne 0 -or $VirtualVersion -ne "3.12") {
+  throw @"
+The existing environment uses Python $VirtualVersion instead of Python 3.12.
+Remove this disposable directory and rerun the installer:
+  $VirtualEnvironment
+"@
+}
+
 $pipArguments = @(
   "-m", "pip", "install",
-  "huggingface-hub>=0.34,<2",
-  "llama-cpp-python==0.3.35",
+  "-r", (Join-Path $ProjectRoot "requirements-interpretation.txt"),
   "--extra-index-url", $WheelIndexUrl
 )
 if ($ForceRuntimeReinstall) {

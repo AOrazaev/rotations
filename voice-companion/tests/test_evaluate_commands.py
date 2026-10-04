@@ -18,6 +18,7 @@ from voice_companion.interpretation import InterpretationResult
 
 
 class FakeInterpreter:
+    interpreter_name = "fixture-interpreter"
     model_name = "fixture-model"
 
     def interpret(self, transcript, context):
@@ -74,6 +75,7 @@ class CommandEvaluationTest(unittest.TestCase):
         self.assertEqual(report["summary"]["exactEventArrays"], 2)
         self.assertEqual(report["summary"]["warningExpectationsMet"], 2)
         self.assertEqual(report["summary"]["errorCount"], 0)
+        self.assertEqual(report["interpreter"], "fixture-interpreter")
 
     def test_reports_case_progress(self):
         events = []

@@ -258,6 +258,7 @@ def _align_payload_to_explicit_facts(
             available.remove(exact[0])
     selected = []
     corrections = 0
+    recovered = 0
     for fact_index, fact in enumerate(facts):
         if fact_index in assignments:
             index = assignments[fact_index]
@@ -268,7 +269,31 @@ def _align_payload_to_explicit_facts(
                 if events[index].get("type") == fact["type"]
             ]
             if not candidates:
-                return payload
+                if fact["type"] == "shot":
+                    event = _explicit_shot_event(
+                        transcript,
+                        facts,
+                        fact_index,
+                    )
+                    if event is None:
+                        return payload
+                else:
+                    if (
+                        fact["type"] == "rebound"
+                        and not fact.get("reboundKind")
+                    ):
+                        return payload
+                    event = {
+                        "side": fact["side"],
+                        "type": fact["type"],
+                        "playerId": fact["playerId"],
+                        "confidence": 0.99,
+                    }
+                    if fact["type"] == "rebound":
+                        event["reboundKind"] = fact["reboundKind"]
+                selected.append(event)
+                recovered += 1
+                continue
             index = max(
                 candidates,
                 key=lambda candidate: (
@@ -292,7 +317,7 @@ def _align_payload_to_explicit_facts(
             event["reboundKind"] = fact["reboundKind"]
         selected.append(event)
 
-    removed = len(events) - len(selected)
+    removed = len(available)
     payload["events"] = selected
     if corrections:
         payload["warnings"].append(
@@ -304,7 +329,53 @@ def _align_payload_to_explicit_facts(
             f"Removed {removed} extra DSL fact"
             f"{'s' if removed != 1 else ''}."
         )
+    if recovered:
+        payload["warnings"].append(
+            f"Recovered {recovered} explicit transcript fact"
+            f"{'s' if recovered != 1 else ''} missing from the DSL output."
+        )
     return payload
+
+
+def _explicit_shot_event(
+    transcript: str,
+    facts: list[dict],
+    fact_index: int,
+) -> dict | None:
+    fact = facts[fact_index]
+    end = (
+        facts[fact_index + 1]["start"]
+        if fact_index + 1 < len(facts)
+        else len(transcript)
+    )
+    clause = transcript[fact["start"]:end].lower()
+    if "free throw" in clause:
+        shot_value = 1
+    elif re.search(r"\bthree\b|\b3\b", clause):
+        shot_value = 3
+    elif re.search(r"\btwo\b|\b2\b", clause):
+        shot_value = 2
+    else:
+        return None
+    if re.search(r"\b(?:miss|misses|missed)\b", clause):
+        made = False
+    elif re.search(r"\b(?:make|makes|made|score|scores|scored)\b", clause):
+        made = True
+    else:
+        return None
+    event = {
+        "side": fact["side"],
+        "type": "shot",
+        "playerId": fact["playerId"],
+        "shotValue": shot_value,
+        "made": made,
+        "confidence": 0.99,
+    }
+    if "transition" in clause:
+        event["shotDetails"] = {"phase": "transition"}
+    elif re.search(r"\bhalf[\s-]+court\b", clause):
+        event["shotDetails"] = {"phase": "half_court"}
+    return event
 
 
 def _parse_fact_tokens(

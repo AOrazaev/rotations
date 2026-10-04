@@ -6,6 +6,7 @@ import statistics
 import time
 from pathlib import Path
 
+from .fact_interpretation import FactDslCommandInterpreter
 from .interpretation import LlamaCppCommandInterpreter
 
 
@@ -129,6 +130,11 @@ def evaluate_corpus(corpus: dict, interpreter, progress=None) -> dict:
     return {
         "formatVersion": 1,
         "model": interpreter.model_name,
+        "interpreter": getattr(
+            interpreter,
+            "interpreter_name",
+            type(interpreter).__name__,
+        ),
         "caseResults": results,
         "summary": {
             "caseCount": len(results),
@@ -160,6 +166,11 @@ def main():
         ),
     )
     parser.add_argument("--model")
+    parser.add_argument(
+        "--interpreter",
+        choices=["structured-json-v1", "fact-dsl-v2"],
+        default="fact-dsl-v2",
+    )
     parser.add_argument("--context-size", type=int, default=4096)
     parser.add_argument("--gpu-layers", type=int, default=0)
     parser.add_argument("--output")
@@ -170,7 +181,12 @@ def main():
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
 
-    interpreter = LlamaCppCommandInterpreter(
+    interpreter_type = (
+        FactDslCommandInterpreter
+        if args.interpreter == "fact-dsl-v2"
+        else LlamaCppCommandInterpreter
+    )
+    interpreter = interpreter_type(
         model_path=Path(args.model) if args.model else None,
         context_size=args.context_size,
         gpu_layers=args.gpu_layers,

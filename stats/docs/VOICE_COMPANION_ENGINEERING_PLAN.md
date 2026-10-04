@@ -929,26 +929,40 @@ Verification:
 - Review, shared Review, backups, reports, and existing event entry remain unchanged.
 - Long game sessions do not leak browser listeners, recordings, requests, or proposal state.
 
-### Checkpoint 8: Windows packaging and release hardening
+### Checkpoint 8: Repository-operated stabilization
+
+The packaged Windows application is deferred until non-technical distribution
+is required. The current users are expected to clone the repository and run
+the companion through its checked-in PowerShell scripts.
 
 Deliver:
 
-- Native Windows packaging or another agreed dependable launcher.
-- Start, stop, restart, and model-management workflow.
-- Local log and diagnostic collection without audio retention.
-- Version compatibility messaging.
-- GitHub Release artifacts and checksums.
-- User installation, troubleshooting, privacy, and uninstall documentation.
-- End-to-end release fixture and manual game workflow.
+- Fact DSL V2 as the default command interpreter, with structured JSON V1
+  retained as an explicit comparison and fallback backend.
+- Pinned top-level transcription and interpretation dependencies.
+- Fail-fast Python 3.12 and virtual-environment checks.
+- One-command technical-user setup and a dependable repository launcher.
+- Setup, CPU/CUDA selection, pairing, troubleshooting, privacy, and update
+  documentation.
+- An 81-recording end-to-end baseline and manual game workflow.
+- Continued local evaluation collection and regression curation.
 
 Verification:
 
-- A clean Windows machine can install, pair, run, update, and uninstall the companion.
-- GitHub Pages detects compatible and incompatible versions correctly.
-- The packaged workbench remains available for diagnostics and model evaluation.
-- No administrator privileges are required unless technically unavoidable and documented.
+- A clean Windows repository clone can install models, start, pair, and run the
+  companion using documented scripts without source edits.
+- Missing or incompatible Python environments fail with actionable messages.
+- CPU installation works without CUDA; CUDA setup and fallback are documented.
+- GitHub Pages detects compatible and incompatible companion versions correctly.
+- The workbench remains available for diagnostics and model evaluation.
 - Full browser regression tests pass with the companion integration disabled and mocked.
 - A complete recorded-game workflow succeeds on both target machines.
+
+### Deferred: Windows packaging and release hardening
+
+When non-technical distribution is required, add native or embedded Windows
+packaging, start/stop/update integration, release artifacts and checksums,
+installer and uninstall workflows, and clean-machine release verification.
 
 ## Stretch goals
 

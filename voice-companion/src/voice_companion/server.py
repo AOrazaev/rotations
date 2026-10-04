@@ -1372,7 +1372,10 @@ def main():
     parser.add_argument(
         "--command-interpreter",
         choices=["none", "llama-cpp", "llama-cpp-fact-dsl"],
-        default=os.environ.get("BASK_VOICE_COMMAND_INTERPRETER", "none"),
+        default=os.environ.get(
+            "BASK_VOICE_COMMAND_INTERPRETER",
+            "llama-cpp-fact-dsl",
+        ),
     )
     parser.add_argument(
         "--command-model",

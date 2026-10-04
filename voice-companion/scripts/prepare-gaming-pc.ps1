@@ -32,4 +32,8 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Gaming-PC setup complete."
-Write-Host "Run scripts\validate-checkpoint-4.ps1 to create the report."
+Write-Host "Start the companion with:"
+Write-Host "  .\voice-companion\scripts\run.ps1 -Profile $TranscriptionProfile"
+Write-Host ""
+Write-Host "Optional validation:"
+Write-Host "  .\voice-companion\scripts\validate-checkpoint-4.ps1"

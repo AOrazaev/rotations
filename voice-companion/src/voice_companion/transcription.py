@@ -26,7 +26,8 @@ BASKETBALL_INITIAL_PROMPT = (
     "Basketball statistics commands. Opponent makes two pointer. "
     "Opponent misses two pointer. Opponent makes three pointer. "
     "Opponent misses three pointer. Player seven makes two. "
-    "Player thirteen makes three. Player seven assist. Assist by player sixty. "
+    "Player thirteen makes three. Player thirteen makes free throw. "
+    "Player seven assist. Assist by player sixty. "
     "Player seven steal. "
     "Player seven subs for player thirteen. "
     "Offensive rebound. Defensive rebound. Opponent offensive rebound. "
@@ -81,6 +82,12 @@ STAT_SUBJECT_PATTERN = re.compile(
 )
 SIX_TEAM_SUBJECT_PATTERN = re.compile(
     r"\bsix\s+team\b(?=\s+(?:make|makes|made|miss|misses|missed|assist|"
+    r"assists|steal|steals|block|blocks|rebound|rebounds|offensive|"
+    r"defensive|turnover|turnovers|foul|fouls)\b)",
+    re.IGNORECASE,
+)
+THIRD_IN_SUBJECT_PATTERN = re.compile(
+    r"\bthird\s+in\b(?=\s+(?:make|makes|made|miss|misses|missed|assist|"
     r"assists|steal|steals|block|blocks|rebound|rebounds|offensive|"
     r"defensive|turnover|turnovers|foul|fouls)\b)",
     re.IGNORECASE,
@@ -152,6 +159,22 @@ def normalize_active_jersey_confusions(
             replace_six_team,
             normalized,
         )
+    if 13 in active_numbers and not active_numbers.intersection({3, 30}):
+        def replace_third_in(match: re.Match) -> str:
+            replacement = (
+                "Thirteen"
+                if match.group(0)[0].isupper()
+                else "thirteen"
+            )
+            warnings.append(
+                "Normalized 'third in' to jersey thirteen using the active lineup."
+            )
+            return replacement
+
+        normalized = THIRD_IN_SUBJECT_PATTERN.sub(
+            replace_third_in,
+            normalized,
+        )
     return normalized, warnings
 
 
@@ -195,6 +218,43 @@ def normalize_basketball_transcript(
 
     normalized = offensively_bound_pattern.sub(
         replace_offensively_bound,
+        normalized,
+    )
+    defensively_rebound_pattern = re.compile(
+        r"\bdefensively\s+(?:bound|rebound)\b",
+        re.IGNORECASE,
+    )
+
+    def replace_defensively_rebound(match: re.Match) -> str:
+        replacement = "Defensive rebound"
+        if match.group(0)[0].islower():
+            replacement = replacement.lower()
+        warnings.append(
+            "Normalized a defensive rebound transcription variant."
+        )
+        return replacement
+
+    normalized = defensively_rebound_pattern.sub(
+        replace_defensively_rebound,
+        normalized,
+    )
+    trailing_opponent_pattern = re.compile(
+        r"\b(?P<kind>offensive|defensive)\s+rebound"
+        r"[.!?]\s+opponent(?P<ending>[.!?]|$)",
+        re.IGNORECASE,
+    )
+
+    def replace_trailing_opponent(match: re.Match) -> str:
+        warnings.append(
+            "Joined a trailing opponent rebound subject."
+        )
+        return (
+            f"{match.group('kind')} rebound by opponent"
+            f"{match.group('ending')}"
+        )
+
+    normalized = trailing_opponent_pattern.sub(
+        replace_trailing_opponent,
         normalized,
     )
     roster_by_id = {

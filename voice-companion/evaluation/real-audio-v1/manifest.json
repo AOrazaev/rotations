@@ -681,13 +681,13 @@
       ]
     },
     {
-      "id": "real-68-opp-miss-2-5-off-reb",
-      "audio": "68-opp-miss-2-5-off-reb.webm",
-      "expectedTranscript": "Opponent misses two pointer. The offensive rebound by number five.",
+      "id": "real-68-opp-miss-2-5-def-reb",
+      "audio": "68-opp-miss-2-5-def-reb.webm",
+      "expectedTranscript": "Opponent misses two pointer. Defensive rebound by number five.",
       "currentLineupIds": ["p60","p13","p70","p5","p50"],
       "expectedEvents": [
         {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false},
-        {"side": "team","type": "rebound","playerId": "p5","reboundKind": "offensive"}
+        {"side": "team","type": "rebound","playerId": "p5","reboundKind": "defensive"}
       ]
     },
     {

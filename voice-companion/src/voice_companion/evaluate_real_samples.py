@@ -334,7 +334,7 @@ def main():
     parser.add_argument(
         "--interpreter",
         choices=["structured-json-v1", "fact-dsl-v2"],
-        default="structured-json-v1",
+        default="fact-dsl-v2",
     )
     parser.add_argument("--context-size", type=int, default=4096)
     parser.add_argument("--gpu-layers", type=int, default=0)

@@ -55,7 +55,7 @@ $pipArguments = @(
   "--retries", $Retries,
   "--timeout", $TimeoutSeconds,
   "--only-binary=:all:",
-  "faster-whisper==1.2.1"
+  "-r", (Join-Path $ProjectRoot "requirements-transcription.txt")
 )
 foreach ($hostName in $TrustedHost) {
   $pipArguments += @("--trusted-host", $hostName)

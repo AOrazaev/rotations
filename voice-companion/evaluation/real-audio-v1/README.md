@@ -116,13 +116,29 @@ Its latency fields are not representative because the machine was not isolated
 during the run.
 
 `baseline-balanced-81-fact-dsl-interpretation-only.json` is the expanded
-functional snapshot using the experimental compact fact interpreter:
+functional snapshot using the compact fact interpreter:
 
 - 81/81 exact semantic event arrays.
 - 0 interpretation errors.
 - 4.0-second median interpretation latency.
 - 44.5-second maximum latency.
 
-The timing values are development-machine observations rather than release
-performance measurements. A new end-to-end run is still required to measure
-Whisper accuracy across cases 28-81.
+`baseline-balanced-81-fact-dsl-end-to-end.json` runs all eighty-one recordings
+through the current default transcription and fact DSL interpretation pipeline:
+
+- 70/81 raw transcript matches.
+- 79/81 roster-normalized transcript matches.
+- 80/81 exact semantic event arrays.
+- 0 processing errors.
+- 4.9-second median end-to-end latency.
+- 41.5-second maximum latency.
+
+The sole event mismatch is
+`number-70-makes-two-assist-number-60`: Whisper transcribes jersey #70 as
+`seven two` while both #7 and #70 are active. The pipeline intentionally does
+not guess between those active players. The other normalized-transcript
+mismatch still produces the exact expected event array.
+
+All timing values are development-machine observations rather than release
+performance measurements. Regenerate them on an otherwise idle target machine
+before making profile or hardware decisions.
