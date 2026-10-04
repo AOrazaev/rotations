@@ -1,6 +1,6 @@
 # Real audio evaluation set v1
 
-This set contains twenty-seven short English basketball-stat recordings collected
+This set contains eighty-one short English basketball-stat recordings collected
 during local voice companion development. The recording owner explicitly
 approved committing the audio to this repository.
 
@@ -24,7 +24,12 @@ Coverage includes:
 - Free throws and opponent/team foul attribution.
 - Three-event turnover sequences and a five-event transition sequence.
 - `Assessed by` transcription normalization for an active assist player.
+- `Three throw` to `free throw` transcription normalization.
+- `Offensively bound` to `offensive rebound` transcription normalization.
+- Roster-gated `six team` to jersey `sixty` normalization.
 - Removal of hallucinated shot details from non-shot events.
+- Repeated free throws, rebounds, turnovers, timeouts, and multi-possession
+  sequences across several active lineups.
 
 Run the complete audio-to-events evaluation from the repository root:
 
@@ -75,6 +80,12 @@ Cases 17-27 were added after those reports and require a fresh idle-machine
 end-to-end baseline before their aggregate transcription accuracy is
 documented.
 
+Cases 28-81 add fifty-four unique recordings from a longer live collection
+session. They include the recent free-throw and rebound transcription failures,
+their corrected post-fix variants, repeated commands, multiple lineup states,
+and a six-event offensive-rebound sequence. They are not represented in the
+historical baseline files.
+
 `baseline-balanced-interpretation-only.json` runs those same first sixteen
 curated transcripts through the command model without loading Whisper:
 
@@ -93,8 +104,8 @@ transcriptions of jersey #70 when both #7 and #70 are active. They remain known
 transcription failures rather than targets for ambiguous roster-based
 correction.
 
-`baseline-balanced-27-interpretation-only.json` is a functional snapshot for
-all twenty-seven curated transcripts:
+`baseline-balanced-27-interpretation-only.json` is a historical functional
+snapshot for the first twenty-seven curated transcripts:
 
 - 27/27 exact semantic event arrays.
 - 0 interpretation errors.
@@ -103,3 +114,15 @@ all twenty-seven curated transcripts:
 
 Its latency fields are not representative because the machine was not isolated
 during the run.
+
+`baseline-balanced-81-fact-dsl-interpretation-only.json` is the expanded
+functional snapshot using the experimental compact fact interpreter:
+
+- 81/81 exact semantic event arrays.
+- 0 interpretation errors.
+- 4.0-second median interpretation latency.
+- 44.5-second maximum latency.
+
+The timing values are development-machine observations rather than release
+performance measurements. A new end-to-end run is still required to measure
+Whisper accuracy across cases 28-81.

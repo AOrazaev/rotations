@@ -289,6 +289,528 @@
         {"side": "team", "type": "assist", "playerId": "p13"},
         {"side": "team", "type": "shot", "playerId": "p60", "shotValue": 2, "made": true, "shotDetails": {"phase": "transition"}}
       ]
+    },
+    {
+      "id": "real-28-opp-make-ft",
+      "audio": "28-opp-make-ft.webm",
+      "expectedTranscript": "Opponent makes free throw.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 1,"made": true}
+      ]
+    },
+    {
+      "id": "real-29-40-miss-3-opp-def-reb",
+      "audio": "29-40-miss-3-opp-def-reb.webm",
+      "expectedTranscript": "Number forty misses three pointer defensive rebound by opponent",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p40","shotValue": 3,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-30-opp-make-ft",
+      "audio": "30-opp-make-ft.webm",
+      "expectedTranscript": "Opponent makes free throw.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 1,"made": true}
+      ]
+    },
+    {
+      "id": "real-31-7-turnover-opp-steal",
+      "audio": "31-7-turnover-opp-steal.webm",
+      "expectedTranscript": "Number seven turnover. Opponent steal.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "turnover","playerId": "p7"},
+        {"side": "opponent","type": "steal","playerId": null}
+      ]
+    },
+    {
+      "id": "real-32-opp-miss-3-5-def-reb",
+      "audio": "32-opp-miss-3-5-def-reb.webm",
+      "expectedTranscript": "Opponent misses three pointer. Number five defensive rebound.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "team","type": "rebound","playerId": "p5","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-33-opp-make-2",
+      "audio": "33-opp-make-2.webm",
+      "expectedTranscript": "Opponent makes two pointer.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": true}
+      ]
+    },
+    {
+      "id": "real-34-5-turnover",
+      "audio": "34-5-turnover.webm",
+      "expectedTranscript": "Number five turn over.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "turnover","playerId": "p5"}
+      ]
+    },
+    {
+      "id": "real-35-opp-miss-3-40-foul",
+      "audio": "35-opp-miss-3-40-foul.webm",
+      "expectedTranscript": "Opponent misses three pointer. Foul by forty.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "team","type": "foul","playerId": "p40"}
+      ]
+    },
+    {
+      "id": "real-36-opp-miss-3-5-def-reb",
+      "audio": "36-opp-miss-3-5-def-reb.webm",
+      "expectedTranscript": "Opponent misses three pointer. Defensive rebound by number five.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "team","type": "rebound","playerId": "p5","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-37-5-make-2",
+      "audio": "37-5-make-2.webm",
+      "expectedTranscript": "Number five makes two pointer.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p5","shotValue": 2,"made": true}
+      ]
+    },
+    {
+      "id": "real-38-opp-miss-3-50-def-reb",
+      "audio": "38-opp-miss-3-50-def-reb.webm",
+      "expectedTranscript": "Opponent misses three pointer. Defensive rebound by number fifty.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "team","type": "rebound","playerId": "p50","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-39-70-miss-3-opp-def-reb",
+      "audio": "39-70-miss-3-opp-def-reb.webm",
+      "expectedTranscript": "Number seventy misses three pointer. Defensive rebound by opponent.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p70","shotValue": 3,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-40-opp-miss-2",
+      "audio": "40-opp-miss-2.webm",
+      "expectedTranscript": "Opponent misses two pointer.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false}
+      ]
+    },
+    {
+      "id": "real-41-5-def-reb",
+      "audio": "41-5-def-reb.webm",
+      "expectedTranscript": "Defensive rebound by five.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "rebound","playerId": "p5","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-42-opp-miss-3-40-def-reb-40-assist-5-make-2-trans",
+      "audio": "42-opp-miss-3-40-def-reb-40-assist-5-make-2-trans.webm",
+      "expectedTranscript": "Opponent misses three pointer. Number forty defensive rebound. Number forty assist. Number five makes two pointer in transition.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "team","type": "rebound","playerId": "p40","reboundKind": "defensive"},
+        {"side": "team","type": "assist","playerId": "p40"},
+        {"side": "team","type": "shot","playerId": "p5","shotValue": 2,"made": true,"shotDetails": {"phase": "transition"}}
+      ]
+    },
+    {
+      "id": "real-43-50-miss-2-trans-opp-foul",
+      "audio": "43-50-miss-2-trans-opp-foul.webm",
+      "expectedTranscript": "Number 50 misses two pointer in transition. Opponent foul.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p50","shotValue": 2,"made": false,"shotDetails": {"phase": "transition"}},
+        {"side": "opponent","type": "foul","playerId": null}
+      ]
+    },
+    {
+      "id": "real-44-50-miss-ft",
+      "audio": "44-50-miss-ft.webm",
+      "expectedTranscript": "Number 50 misses free throw.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p50","shotValue": 1,"made": false}
+      ]
+    },
+    {
+      "id": "real-45-50-miss-ft-5-off-reb-5-miss-2-70-off-reb-70-miss-2-opp-def-reb",
+      "audio": "45-50-miss-ft-5-off-reb-5-miss-2-70-off-reb-70-miss-2-opp-def-reb.webm",
+      "expectedTranscript": "Number 50 misses free throw. Offensive rebound by number five. Number five misses two pointer. Offensive rebound by seventy. Seventy misses two pointer. Defensive rebound by opponent.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p50","shotValue": 1,"made": false},
+        {"side": "team","type": "rebound","playerId": "p5","reboundKind": "offensive"},
+        {"side": "team","type": "shot","playerId": "p5","shotValue": 2,"made": false},
+        {"side": "team","type": "rebound","playerId": "p70","reboundKind": "offensive"},
+        {"side": "team","type": "shot","playerId": "p70","shotValue": 2,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-46-opp-timeout",
+      "audio": "46-opp-timeout.webm",
+      "expectedTranscript": "Opponent timeout.",
+      "currentLineupIds": ["p40","p50","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "timeout","playerId": null}
+      ]
+    },
+    {
+      "id": "real-47-opp-miss-2-trans-70-def-reb",
+      "audio": "47-opp-miss-2-trans-70-def-reb.webm",
+      "expectedTranscript": "Opponent misses two pointer in transition number 70 defensive rebound.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false,"shotDetails": {"phase": "transition"}},
+        {"side": "team","type": "rebound","playerId": "p70","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-48-opp-miss-3-70-def-reb",
+      "audio": "48-opp-miss-3-70-def-reb.webm",
+      "expectedTranscript": "Opponent misses three pointer. Number seventy defensive rebound.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "team","type": "rebound","playerId": "p70","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-49-13-make-2-trans",
+      "audio": "49-13-make-2-trans.webm",
+      "expectedTranscript": "Number thirteen makes two points in transition",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p13","shotValue": 2,"made": true,"shotDetails": {"phase": "transition"}}
+      ]
+    },
+    {
+      "id": "real-50-opp-make-3",
+      "audio": "50-opp-make-3.webm",
+      "expectedTranscript": "Opponent makes three pointer.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": true}
+      ]
+    },
+    {
+      "id": "real-51-70-miss-3-40-off-reb-7-miss-2-opp-def-reb",
+      "audio": "51-70-miss-3-40-off-reb-7-miss-2-opp-def-reb.webm",
+      "expectedTranscript": "Number seventy misses three pointer. Number forty offensive rebound. Number seven misses two pointer. Defensive rebound by opponent.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p70","shotValue": 3,"made": false},
+        {"side": "team","type": "rebound","playerId": "p40","reboundKind": "offensive"},
+        {"side": "team","type": "shot","playerId": "p7","shotValue": 2,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-52-13-miss-2-opp-foul",
+      "audio": "52-13-miss-2-opp-foul.webm",
+      "expectedTranscript": "Number thirteen misses two pointer. Foul by Opponent.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p13","shotValue": 2,"made": false},
+        {"side": "opponent","type": "foul","playerId": null}
+      ]
+    },
+    {
+      "id": "real-53-13-miss-ft",
+      "audio": "53-13-miss-ft.webm",
+      "expectedTranscript": "Thirteen misses free throw.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p13","shotValue": 1,"made": false}
+      ]
+    },
+    {
+      "id": "real-54-13-make-ft",
+      "audio": "54-13-make-ft.webm",
+      "expectedTranscript": "Thirteen makes free throw.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p13","shotValue": 1,"made": true}
+      ]
+    },
+    {
+      "id": "real-55-opp-turnover",
+      "audio": "55-opp-turnover.webm",
+      "expectedTranscript": "Opponent turn over.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "turnover","playerId": null}
+      ]
+    },
+    {
+      "id": "real-56-13-steal-13-turnover",
+      "audio": "56-13-steal-13-turnover.webm",
+      "expectedTranscript": "Number thirteen steal number thirteen turnover",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "steal","playerId": "p13"},
+        {"side": "team","type": "turnover","playerId": "p13"}
+      ]
+    },
+    {
+      "id": "real-57-7-miss-3-opp-def-reb",
+      "audio": "57-7-miss-3-opp-def-reb.webm",
+      "expectedTranscript": "Number seven misses three pointer. Opponent defensive rebound.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p7","shotValue": 3,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-58-opp-turnover",
+      "audio": "58-opp-turnover.webm",
+      "expectedTranscript": "Opponent turn over.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "turnover","playerId": null}
+      ]
+    },
+    {
+      "id": "real-59-opp-miss-2-opp-off-reb",
+      "audio": "59-opp-miss-2-opp-off-reb.webm",
+      "expectedTranscript": "Opponent misses two pointer. Opponent offensive rebound.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "offensive"}
+      ]
+    },
+    {
+      "id": "real-60-opp-miss-2-opp-off-reb",
+      "audio": "60-opp-miss-2-opp-off-reb.webm",
+      "expectedTranscript": "Opponent misses two. Opponent offensive rebound.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "offensive"}
+      ]
+    },
+    {
+      "id": "real-61-60-miss-2-opp-foul",
+      "audio": "61-60-miss-2-opp-foul.webm",
+      "expectedTranscript": "Number sixty misses two. Opponent foul.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p60","shotValue": 2,"made": false},
+        {"side": "opponent","type": "foul","playerId": null}
+      ]
+    },
+    {
+      "id": "real-62-60-miss-ft",
+      "audio": "62-60-miss-ft.webm",
+      "expectedTranscript": "Sixty misses free throw.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p60","shotValue": 1,"made": false}
+      ]
+    },
+    {
+      "id": "real-63-60-miss-ft",
+      "audio": "63-60-miss-ft.webm",
+      "expectedTranscript": "Number sixty misses free throw",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p60","shotValue": 1,"made": false}
+      ]
+    },
+    {
+      "id": "real-64-60-miss-ft-opp-def-reb",
+      "audio": "64-60-miss-ft-opp-def-reb.webm",
+      "expectedTranscript": "60 misses free throw. Opponent defensive rebound.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p60","shotValue": 1,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-65-13-turnover",
+      "audio": "65-13-turnover.webm",
+      "expectedTranscript": "Number thirteen turn over.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "turnover","playerId": "p13"}
+      ]
+    },
+    {
+      "id": "real-66-opp-miss-3-60-def-reb",
+      "audio": "66-opp-miss-3-60-def-reb.webm",
+      "expectedTranscript": "Opponent misses three pointer. Number sixty defensive rebound.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "team","type": "rebound","playerId": "p60","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-67-opp-miss-3-opp-off-reb",
+      "audio": "67-opp-miss-3-opp-off-reb.webm",
+      "expectedTranscript": "Opponent misses three pointer. Opponent offensive rebound.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 3,"made": false},
+        {"side": "opponent","type": "rebound","playerId": null,"reboundKind": "offensive"}
+      ]
+    },
+    {
+      "id": "real-68-opp-miss-2-5-off-reb",
+      "audio": "68-opp-miss-2-5-off-reb.webm",
+      "expectedTranscript": "Opponent misses two pointer. The offensive rebound by number five.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false},
+        {"side": "team","type": "rebound","playerId": "p5","reboundKind": "offensive"}
+      ]
+    },
+    {
+      "id": "real-69-70-make-2-trans-5-assist",
+      "audio": "69-70-make-2-trans-5-assist.webm",
+      "expectedTranscript": "Number seventy makes two in transition assist by number five",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p70","shotValue": 2,"made": true,"shotDetails": {"phase": "transition"}},
+        {"side": "team","type": "assist","playerId": "p5"}
+      ]
+    },
+    {
+      "id": "real-70-opp-miss-2-50-def-reb",
+      "audio": "70-opp-miss-2-50-def-reb.webm",
+      "expectedTranscript": "Opponent misses two pointer. Number fifty defensive rebound.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false},
+        {"side": "team","type": "rebound","playerId": "p50","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-71-60-make-2",
+      "audio": "71-60-make-2.webm",
+      "expectedTranscript": "Number sixty makes two pointer.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p60","shotValue": 2,"made": true}
+      ]
+    },
+    {
+      "id": "real-72-opp-miss-2-50-def-reb",
+      "audio": "72-opp-miss-2-50-def-reb.webm",
+      "expectedTranscript": "Opponent misses two pointer. Defensive rebound by fifty.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false},
+        {"side": "team","type": "rebound","playerId": "p50","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-73-50-def-reb",
+      "audio": "73-50-def-reb.webm",
+      "expectedTranscript": "Number fifty defensive rebound.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "rebound","playerId": "p50","reboundKind": "defensive"}
+      ]
+    },
+    {
+      "id": "real-74-5-miss-2-trans-opp-foul",
+      "audio": "74-5-miss-2-trans-opp-foul.webm",
+      "expectedTranscript": "Number five misses two pointer in transition. Opponent foul.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p5","shotValue": 2,"made": false,"shotDetails": {"phase": "transition"}},
+        {"side": "opponent","type": "foul","playerId": null}
+      ]
+    },
+    {
+      "id": "real-75-5-miss-ft",
+      "audio": "75-5-miss-ft.webm",
+      "expectedTranscript": "Number five misses free throw.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p5","shotValue": 1,"made": false}
+      ]
+    },
+    {
+      "id": "real-76-5-miss-ft",
+      "audio": "76-5-miss-ft.webm",
+      "expectedTranscript": "Number five misses free throw.",
+      "currentLineupIds": ["p60","p13","p70","p5","p50"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p5","shotValue": 1,"made": false}
+      ]
+    },
+    {
+      "id": "real-77-opp-timeout",
+      "audio": "77-opp-timeout.webm",
+      "expectedTranscript": "Opponent timeout.",
+      "currentLineupIds": ["p60","p13","p70","p7","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "timeout","playerId": null}
+      ]
+    },
+    {
+      "id": "real-78-opp-miss-2-trans-70-foul",
+      "audio": "78-opp-miss-2-trans-70-foul.webm",
+      "expectedTranscript": "Opponent misses two pointer in transition number seventy foul",
+      "currentLineupIds": ["p60","p13","p70","p7","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 2,"made": false,"shotDetails": {"phase": "transition"}},
+        {"side": "team","type": "foul","playerId": "p70"}
+      ]
+    },
+    {
+      "id": "real-79-opp-miss-ft",
+      "audio": "79-opp-miss-ft.webm",
+      "expectedTranscript": "Opponent misses free throw.",
+      "currentLineupIds": ["p60","p13","p70","p7","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 1,"made": false}
+      ]
+    },
+    {
+      "id": "real-80-opp-make-ft",
+      "audio": "80-opp-make-ft.webm",
+      "expectedTranscript": "Opponent makes free throw.",
+      "currentLineupIds": ["p60","p13","p70","p7","p50"],
+      "expectedEvents": [
+        {"side": "opponent","type": "shot","playerId": null,"shotValue": 1,"made": true}
+      ]
+    },
+    {
+      "id": "real-81-13-make-ft",
+      "audio": "81-13-make-ft.webm",
+      "expectedTranscript": "Thirteen makes free throw.",
+      "currentLineupIds": ["p40","p13","p70","p5","p7"],
+      "expectedEvents": [
+        {"side": "team","type": "shot","playerId": "p13","shotValue": 1,"made": true}
+      ]
     }
   ]
 }
