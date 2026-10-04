@@ -368,6 +368,9 @@ test('print view uses a strong continuous outline for on-court runs', async ({ p
   await page.locator('#generate').click();
   await page.emulateMedia({ media: 'print' });
 
+  await expect(page.locator('#undoSwap')).toBeHidden();
+  await expect(page.locator('#redoSwap')).toBeHidden();
+
   const styles = await page.locator('.timeline-cell.on.run-start').first().evaluate(el => {
     const computed = getComputedStyle(el);
     return {

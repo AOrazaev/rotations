@@ -51,6 +51,11 @@ test('shot details survive correction, reload, backup recovery, filters, and rep
   await page.locator('.event-list-item[data-event-id="e2"] [data-action="edit-event"]').click();
   await page.locator('#editShotDetails [data-shot-details-action="clear-details"]').click();
   await page.locator('#eventEditForm button[type="submit"]').click();
+  await expect.poll(() => page.evaluate(() => {
+    const event = window.__statsApp.eventController
+      .getGame().events.find(item => item.id === 'e2');
+    return Object.hasOwn(event, 'shotDetails');
+  })).toBe(false);
 
   await page.reload();
   await page.evaluate(() => window.__statsApp.ready);

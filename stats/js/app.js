@@ -10,6 +10,8 @@ import {
 import { createGameSetupController } from './game-setup.js';
 import { createEventEntryController } from './event-entry.js';
 import { createReviewController } from './review-controller.js';
+import { createVoiceCaptureController } from './voice-capture.js';
+import { VoiceCompanionClient } from './voice-companion-client.js';
 import {
   buildReviewUrl,
   buildSharedReviewUrl,
@@ -200,6 +202,11 @@ export function createStatsSpikeApp({
       player.play();
       playbackActive = true;
     },
+    pause() {
+      if (!player) throw new Error('The game recording is unavailable for playback.');
+      player.pause();
+      playbackActive = false;
+    },
     destroy() {
       loadSequence += 1;
       if (timer) clearIntervalFn(timer);
@@ -317,11 +324,13 @@ const store = new GameStore({
 let setupController;
 let eventController;
 let reviewController;
+let voiceController;
 
 function openGameWorkspace(game) {
   document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
   videoController.loadVideo(game.video.sourceUrl);
   eventController.setGame(game);
+  voiceController?.refresh();
 }
 
 function removeReviewMutationSurfaces() {
@@ -329,6 +338,7 @@ function removeReviewMutationSurfaces() {
     '#gamePanel',
     '#showGamePanel',
     '#eventEntryPanel',
+    '#voiceSettingsDialog',
     '#eventEditDialog',
     '#coachCommentDialog',
     '#substitutionDialog',
@@ -449,7 +459,20 @@ if (reviewMode) {
         setupController.syncGame(game);
         await setupController.refreshGames();
       }
+      voiceController?.refresh();
     }
+  });
+  const voiceClientFactory = window.__STATS_VOICE_CLIENT_FACTORY__
+    || (options => new VoiceCompanionClient(options));
+  voiceController = createVoiceCaptureController({
+    videoController,
+    getGame: () => eventController.getGame(),
+    commitProposal: proposal => eventController.commitVoiceProposal(proposal),
+    undoProposal: batch => eventController.undoVoiceBatch(batch),
+    onCommandsChanged: commands => eventController.setVoiceCommands(commands),
+    clientFactory: voiceClientFactory,
+    mediaDevices: window.__STATS_MEDIA_DEVICES__ || navigator.mediaDevices,
+    MediaRecorderClass: window.__STATS_MEDIA_RECORDER__ || window.MediaRecorder
   });
   setupController = createGameSetupController({
     store,
@@ -467,11 +490,13 @@ window.__statsApp = {
   videoController,
   setupController,
   eventController,
+  voiceController,
   reviewController,
   store,
   destroy() {
     videoController.destroy();
     eventController?.destroy();
+    voiceController?.destroy();
     reviewController?.destroy();
     store.close();
   }

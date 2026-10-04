@@ -1,0 +1,40 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  background: #080e1b;
+  color: #edf1ff;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { width: min(900px, calc(100% - 32px)); margin: 32px auto; display: grid; gap: 16px; }
+header, .card { padding: 20px; border: 1px solid #26334d; border-radius: 14px; background: #111a2d; }
+h1, h2, p { margin-top: 0; }
+.eyebrow { color: #8ea0ff; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+label { display: grid; gap: 6px; margin: 12px 0; color: #b9c4dd; font-weight: 700; }
+input, textarea, select, button { font: inherit; }
+input, textarea, select { width: 100%; padding: 10px; color: inherit; background: #080e1b; border: 1px solid #34425f; border-radius: 9px; }
+button { padding: 10px 14px; color: #fff; background: #5367e8; border: 0; border-radius: 9px; font-weight: 800; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.status-grid div { display: grid; gap: 4px; padding: 10px; background: #080e1b; border-radius: 9px; }
+.status-grid span { color: #91a0bd; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.status-grid strong { overflow-wrap: anywhere; }
+pre { min-height: 48px; margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; background: #080e1b; border-radius: 9px; }
+audio { width: 100%; margin-top: 12px; }
+.proposal-result { display: grid; gap: 8px; margin-bottom: 16px; }
+.proposal-event, .proposal-warning { padding: 10px 12px; border-radius: 9px; background: #080e1b; }
+.proposal-warning { border-left: 3px solid #f0b35a; }
+.transcript-panel { margin-top: 14px; padding: 12px; border-radius: 9px; background: #080e1b; }
+.transcript-panel strong { color: #91a0bd; font-size: .78rem; text-transform: uppercase; }
+.transcript-panel p { margin: 6px 0 0; }
+.readiness-banner { margin: 10px 0; padding: 12px; border: 1px solid #34425f; border-radius: 9px; background: #080e1b; }
+.readiness-banner.loading { border-color: #8ea0ff; color: #c9d1ff; }
+.readiness-banner.ready { border-color: #47c88a; color: #9ce7be; }
+.readiness-banner.error { border-color: #e06c75; color: #ffb2b8; }
+details summary { margin: 10px 0; color: #b9c4dd; cursor: pointer; font-weight: 700; }
+
+@media (max-width: 640px) {
+  .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

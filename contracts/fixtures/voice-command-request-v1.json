@@ -1,0 +1,29 @@
+{
+  "protocolVersion": 1,
+  "requestId": "fixture-request-1",
+  "capturedSeconds": 763.2,
+  "language": "en",
+  "sideHint": null,
+  "roster": [
+    {
+      "id": "p7",
+      "jersey": "7",
+      "name": "Alex"
+    },
+    {
+      "id": "p13",
+      "jersey": "13",
+      "name": "Denis"
+    }
+  ],
+  "currentLineupIds": ["p7", "p13"],
+  "allowedEventTypes": [
+    "shot",
+    "rebound",
+    "assist",
+    "steal",
+    "block",
+    "turnover",
+    "foul"
+  ]
+}

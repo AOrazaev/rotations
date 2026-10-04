@@ -45,7 +45,10 @@ test('complete MVP workflow survives reload and backup recovery', async ({ page 
   await page.locator('#opponentName').fill('Falcons');
   await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
   await page.locator('#saveGame').click();
+  await expect(page.locator('#gamesStatus')).toContainText('Saved Release gate game');
   await expect(page.locator('#eventLockMessage')).toBeHidden();
+  await expect(page.locator('#currentLineup .player-select-button')).toHaveCount(5);
+  await expect(page.locator('#benchPlayers .player-chip')).toHaveCount(3);
 
   const starters = await page.locator('#currentLineup .player-select-button').evaluateAll(buttons =>
     buttons.map(button => button.dataset.playerId)

@@ -5,6 +5,7 @@
   "description": "Static basketball rotation planner (GitHub Pages). No runtime dependencies — the devDependencies below are test-only tooling and never ship to the site.",
   "scripts": {
     "test": "playwright test",
+    "test:voice-workbench": "playwright test --config voice-companion/playwright.config.js",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed"
   },

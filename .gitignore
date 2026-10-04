@@ -2,3 +2,9 @@ node_modules/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+/voice-companion/.venv/
+/voice-companion/models/
+/voice-companion/diagnostics/
+/voice-companion/validation-results/
+__pycache__/
+*.pyc

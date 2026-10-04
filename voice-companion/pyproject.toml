@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bask-voice-companion"
+version = "0.1.0"
+description = "Local feasibility service for basketball voice commands"
+requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
+
+[project.scripts]
+bask-voice-companion = "voice_companion.server:main"
+bask-voice-evaluate = "voice_companion.evaluate:main"
+bask-voice-evaluate-commands = "voice_companion.evaluate_commands:main"
+bask-voice-validate-checkpoint4 = "voice_companion.validate_checkpoint4:main"
+
+[project.optional-dependencies]
+transcription = [
+  "faster-whisper==1.2.1"
+]
+interpretation = [
+  "huggingface-hub>=0.34,<2",
+  "llama-cpp-python==0.3.35"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

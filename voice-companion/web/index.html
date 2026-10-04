@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bask Voice Companion Workbench</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Standalone workbench</p>
+      <h1>Local voice companion</h1>
+      <p>Exercise local transcription and structured basketball-event proposals before stats integration.</p>
+    </header>
+
+    <section class="card">
+      <h2>Connection</h2>
+      <label>
+        Pairing token (optional in tokenless mode)
+        <input id="token" type="password" autocomplete="off">
+      </label>
+      <div class="actions">
+        <button id="checkConnection" type="button">Check service</button>
+        <button id="warmModels" type="button">Warm models</button>
+        <button id="exportDiagnostics" type="button">Export diagnostics</button>
+      </div>
+      <p id="warmupStatus" class="readiness-banner" role="status">Models have not been warmed from this page.</p>
+      <div class="status-grid" aria-live="polite">
+        <div><span>Service</span><strong id="serviceStatus">Not checked</strong></div>
+        <div><span>Protocol</span><strong id="protocolStatus">Unknown</strong></div>
+        <div><span>Transcription</span><strong id="transcriptionStatus">Unknown</strong></div>
+        <div><span>Interpretation</span><strong id="interpretationStatus">Unavailable</strong></div>
+        <div><span>Recommended profile</span><strong id="hardwareStatus">Unknown</strong></div>
+      </div>
+      <pre id="connectionResult" aria-live="polite">Not checked.</pre>
+      <details>
+        <summary>Warmup details</summary>
+        <pre id="warmupResult" aria-live="polite">Models not warmed.</pre>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Request context</h2>
+      <label>
+        Video timestamp in seconds
+        <input id="videoSeconds" type="number" min="0" step="0.1" value="0">
+      </label>
+      <label>
+        Mock roster JSON
+        <textarea id="roster" rows="7">[
+  {"id":"p7","jersey":"7","name":"Alex"},
+  {"id":"p13","jersey":"13","name":"Denis"}
+]</textarea>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Microphone spike</h2>
+      <p>The timestamp is frozen when recording starts. Audio is sent only after you stop and choose process.</p>
+      <div class="actions">
+        <button id="startRecording" type="button">Start recording</button>
+        <button id="stopRecording" type="button" disabled>Stop</button>
+        <button id="processRecording" class="process-audio" type="button" disabled>Process recording</button>
+        <button id="discardRecording" type="button" disabled>Discard</button>
+      </div>
+      <p id="recordingStatus" role="status">Idle.</p>
+      <audio id="audioPreview" controls hidden></audio>
+      <div class="transcript-panel">
+        <strong>Latest transcript</strong>
+        <p id="transcriptResult">No transcript yet.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Audio-file spike</h2>
+      <input id="audioFile" type="file" accept="audio/*">
+      <div class="actions">
+        <button id="processFile" class="process-audio" type="button">Process file</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Transcript interpretation</h2>
+      <p>Test the command model independently from microphone and transcription behavior.</p>
+      <label>
+        Transcript
+        <textarea id="transcriptInput" rows="3">Seven assist and thirteen makes two in transition</textarea>
+      </label>
+      <label>
+        Fixture
+        <select id="transcriptFixture">
+          <option value="Seven assist and thirteen makes two in transition">Multi-event transition score</option>
+          <option value="Number twenty five misses free throw">Missed free throw</option>
+          <option value="Thirteen defensive rebound">Defensive rebound</option>
+          <option value="He made it">Ambiguous command</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button id="loadFixture" type="button">Load fixture</button>
+        <button id="interpretTranscript" type="button">Interpret transcript</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Proposal</h2>
+      <div class="actions">
+        <button id="cancelProcessing" type="button" disabled>Cancel processing</button>
+      </div>
+      <div id="proposalResult" class="proposal-result" aria-live="polite">No proposal.</div>
+      <h3>Raw response</h3>
+      <pre id="requestResult" aria-live="polite">No request sent.</pre>
+    </section>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

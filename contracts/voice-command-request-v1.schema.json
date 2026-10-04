@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aorazaev.github.io/rotations/contracts/voice-command-request-v1.schema.json",
+  "title": "Voice command request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocolVersion",
+    "requestId",
+    "capturedSeconds",
+    "language",
+    "roster",
+    "currentLineupIds",
+    "allowedEventTypes"
+  ],
+  "properties": {
+    "protocolVersion": {
+      "const": 1
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "capturedSeconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "language": {
+      "type": "string",
+      "enum": ["en"]
+    },
+    "sideHint": {
+      "type": ["string", "null"],
+      "enum": ["team", "opponent", null]
+    },
+    "audioChannelPreference": {
+      "type": "string",
+      "enum": ["auto", "left", "right", "mix"],
+      "default": "auto"
+    },
+    "roster": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "jersey", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "jersey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        }
+      }
+    },
+    "currentLineupIds": {
+      "type": "array",
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "allowedEventTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "shot",
+          "rebound",
+          "assist",
+          "steal",
+          "block",
+          "turnover",
+          "foul"
+        ]
+      }
+    }
+  }
+}
