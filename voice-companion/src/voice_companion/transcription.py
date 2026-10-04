@@ -29,7 +29,8 @@ BASKETBALL_INITIAL_PROMPT = (
     "Player thirteen makes three. Player seven assist. Assist by player sixty. "
     "Player seven steal. "
     "Player seven subs for player thirteen. "
-    "Offensive rebound. Defensive rebound. Turnover. Foul."
+    "Offensive rebound. Defensive rebound. Opponent offensive rebound. "
+    "Opponent defensive rebound. Turnover. Foul."
 )
 
 JERSEY_NUMBER_WORDS = {
@@ -76,6 +77,12 @@ STAT_SUBJECT_PATTERN = re.compile(
     + r")\b(?=\s+(?:make|makes|made|miss|misses|missed|assist|assists|"
       r"steal|steals|block|blocks|rebound|rebounds|offensive|defensive|"
       r"turnover|turnovers|foul|fouls)\b)",
+    re.IGNORECASE,
+)
+SIX_TEAM_SUBJECT_PATTERN = re.compile(
+    r"\bsix\s+team\b(?=\s+(?:make|makes|made|miss|misses|missed|assist|"
+    r"assists|steal|steals|block|blocks|rebound|rebounds|offensive|"
+    r"defensive|turnover|turnovers|foul|fouls)\b)",
     re.IGNORECASE,
 )
 
@@ -128,7 +135,24 @@ def normalize_active_jersey_confusions(
         )
         return replacement
 
-    return STAT_SUBJECT_PATTERN.sub(replace, transcript), warnings
+    normalized = STAT_SUBJECT_PATTERN.sub(replace, transcript)
+    if 60 in active_numbers and not active_numbers.intersection({6, 16}):
+        def replace_six_team(match: re.Match) -> str:
+            replacement = (
+                "Sixty"
+                if match.group(0)[0].isupper()
+                else "sixty"
+            )
+            warnings.append(
+                "Normalized 'six team' to jersey sixty using the active lineup."
+            )
+            return replacement
+
+        normalized = SIX_TEAM_SUBJECT_PATTERN.sub(
+            replace_six_team,
+            normalized,
+        )
+    return normalized, warnings
 
 
 def normalize_basketball_transcript(
@@ -153,6 +177,24 @@ def normalize_basketball_transcript(
 
     normalized = three_throw_pattern.sub(
         replace_three_throw,
+        normalized,
+    )
+    offensively_bound_pattern = re.compile(
+        r"\boffensively\s+bound\b",
+        re.IGNORECASE,
+    )
+
+    def replace_offensively_bound(match: re.Match) -> str:
+        replacement = "Offensive rebound"
+        if match.group(0)[0].islower():
+            replacement = replacement.lower()
+        warnings.append(
+            "Normalized 'offensively bound' to 'offensive rebound'."
+        )
+        return replacement
+
+    normalized = offensively_bound_pattern.sub(
+        replace_offensively_bound,
         normalized,
     )
     roster_by_id = {

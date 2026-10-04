@@ -90,6 +90,40 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         self.assertEqual(non_stat, "Fifteen seconds remaining.")
         self.assertEqual(non_stat_warnings, [])
 
+    def test_normalizes_split_sixty_only_when_unambiguous(self):
+        active_sixty = {
+            "roster": [
+                {"id": "p60", "jersey": "60", "name": "Sixty"},
+            ],
+            "currentLineupIds": ["p60"],
+        }
+        ambiguous = {
+            "roster": [
+                {"id": "p16", "jersey": "16", "name": "Sixteen"},
+                {"id": "p60", "jersey": "60", "name": "Sixty"},
+            ],
+            "currentLineupIds": ["p16", "p60"],
+        }
+
+        transcript, warnings = normalize_basketball_transcript(
+            "Six team misses free throw.",
+            active_sixty,
+        )
+        unchanged, unchanged_warnings = normalize_basketball_transcript(
+            "Six team misses free throw.",
+            ambiguous,
+        )
+
+        self.assertEqual(transcript, "Sixty misses free throw.")
+        self.assertEqual(
+            warnings,
+            [
+                "Normalized 'six team' to jersey sixty using the active lineup."
+            ],
+        )
+        self.assertEqual(unchanged, "Six team misses free throw.")
+        self.assertEqual(unchanged_warnings, [])
+
     def test_normalizes_assessed_by_for_an_active_jersey(self):
         context = {
             "roster": [
@@ -139,6 +173,29 @@ class FasterWhisperTranscriberTest(unittest.TestCase):
         )
         self.assertEqual(pointer, "Opponent makes three pointer.")
         self.assertEqual(pointer_warnings, [])
+
+    def test_normalizes_offensively_bound_to_offensive_rebound(self):
+        transcript, warnings = normalize_basketball_transcript(
+            "Opponent misses two pointer. Opponent offensively bound.",
+            {"roster": [], "currentLineupIds": []},
+        )
+        unrelated, unrelated_warnings = normalize_basketball_transcript(
+            "Opponent is offensively minded.",
+            {"roster": [], "currentLineupIds": []},
+        )
+
+        self.assertEqual(
+            transcript,
+            "Opponent misses two pointer. Opponent offensive rebound.",
+        )
+        self.assertEqual(
+            warnings,
+            [
+                "Normalized 'offensively bound' to 'offensive rebound'."
+            ],
+        )
+        self.assertEqual(unrelated, "Opponent is offensively minded.")
+        self.assertEqual(unrelated_warnings, [])
 
     def test_loads_model_once_and_deletes_temporary_audio(self):
         calls = []
