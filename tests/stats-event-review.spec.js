@@ -96,6 +96,33 @@ test('event descriptions expose immediate one-second timestamp adjustments', asy
   )[0].events[0].videoSeconds)).toBe(42.4);
 });
 
+test('quick timestamp actions follow the event while the tracker panel scrolls', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]', 20);
+  for (let index = 1; index < 18; index += 1) {
+    await page.evaluate(value => { window.__statsFakePlayer.current = value; }, 20 + index);
+    await page.locator('[data-event-type="steal"]').click();
+  }
+  await expect(page.locator('.event-list-item')).toHaveCount(18);
+
+  const description = page.locator('.event-description').first();
+  await description.scrollIntoViewIfNeeded();
+  await description.click();
+  const actions = page.locator('#eventTimestampQuickActions');
+  await expect(actions).toBeVisible();
+
+  const before = await page.evaluate(() => ({
+    anchorTop: document.querySelector('.event-description').getBoundingClientRect().top,
+    actionsTop: document.querySelector('#eventTimestampQuickActions').getBoundingClientRect().top
+  }));
+  await page.locator('.capture-panel').evaluate(element => { element.scrollTop += 20; });
+  await expect.poll(() => page.evaluate(previous => {
+    const anchorTop = document.querySelector('.event-description').getBoundingClientRect().top;
+    const actionsTop = document.querySelector('#eventTimestampQuickActions').getBoundingClientRect().top;
+    return Math.abs((actionsTop - previous.actionsTop) - (anchorTop - previous.anchorTop));
+  }, before)).toBeLessThanOrEqual(1);
+});
+
 test('editing a made shot to missed immediately recalculates and persists stats', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="3"][data-made="true"]');
