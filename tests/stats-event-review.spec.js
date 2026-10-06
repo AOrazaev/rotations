@@ -104,6 +104,41 @@ test('selected timeline events can be shifted together by one second', async ({ 
   )[0].events.map(event => event.videoSeconds))).toEqual([11, 20, 30]);
 });
 
+test('desktop tracker scrolls only timeline events in the capture panel', async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]', 10);
+  for (let index = 1; index < 24; index += 1) {
+    await page.evaluate(value => { window.__statsFakePlayer.current = value; }, 10 + index);
+    await page.locator('[data-event-type="steal"]').click();
+  }
+  await expect(page.locator('.event-list-item')).toHaveCount(24);
+
+  const overflow = await page.locator('.capture-panel, #eventList').evaluateAll(elements =>
+    elements.map(element => ({
+      overflowY: getComputedStyle(element).overflowY,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight
+    }))
+  );
+  expect(overflow[0].overflowY).toBe('hidden');
+  expect(overflow[1].overflowY).toBe('auto');
+  expect(overflow[1].scrollHeight).toBeGreaterThan(overflow[1].clientHeight);
+
+  const before = await page.locator('#eventEntryPanel, #eventLogPanel .section-head').evaluateAll(
+    elements => elements.map(element => element.getBoundingClientRect().top)
+  );
+  await page.locator('#eventList').evaluate(element => {
+    element.scrollTop = element.scrollHeight;
+  });
+  expect(await page.locator('#eventList').evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await page.locator('.capture-panel').evaluate(element => element.scrollTop)).toBe(0);
+  const after = await page.locator('#eventEntryPanel, #eventLogPanel .section-head').evaluateAll(
+    elements => elements.map(element => element.getBoundingClientRect().top)
+  );
+  expect(after).toEqual(before);
+});
+
 test('editing a made shot to missed immediately recalculates and persists stats', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="3"][data-made="true"]');
