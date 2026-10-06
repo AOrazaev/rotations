@@ -72,55 +72,36 @@ test('event timestamp plays with a three-second pre-roll', async ({ page }) => {
   ]);
 });
 
-test('event descriptions expose immediate one-second timestamp adjustments', async ({ page }) => {
+test('selected timeline events can be shifted together by one second', async ({ page }) => {
   await openReview(page);
-  await addTeamEvent(page, '[data-event-type="steal"]');
-
-  const description = page.locator('.event-description');
-  await description.click();
-  const actions = page.locator('#eventTimestampQuickActions');
-  await expect(actions).toBeVisible();
-  await expect(description).toHaveAttribute('aria-expanded', 'true');
-
-  await actions.getByRole('menuitem', { name: 'Move event one second earlier' }).click();
-  await expect(page.locator('.event-time')).toHaveText('0:41.4');
-  await expect(actions).toBeVisible();
-  await expect.poll(() => page.evaluate(async () => (
-    await window.__statsApp.store.listGames()
-  )[0].events[0].videoSeconds)).toBe(41.4);
-
-  await actions.getByRole('menuitem', { name: 'Move event one second later' }).click();
-  await expect(page.locator('.event-time')).toHaveText('0:42.4');
-  await expect.poll(() => page.evaluate(async () => (
-    await window.__statsApp.store.listGames()
-  )[0].events[0].videoSeconds)).toBe(42.4);
-});
-
-test('quick timestamp actions follow the event while the tracker panel scrolls', async ({ page }) => {
-  await openReview(page);
-  await addTeamEvent(page, '[data-event-type="steal"]', 20);
-  for (let index = 1; index < 18; index += 1) {
-    await page.evaluate(value => { window.__statsFakePlayer.current = value; }, 20 + index);
+  await addTeamEvent(page, '[data-event-type="steal"]', 10);
+  for (let index = 1; index < 3; index += 1) {
+    await page.evaluate(value => { window.__statsFakePlayer.current = value; }, 10 + index * 10);
     await page.locator('[data-event-type="steal"]').click();
   }
-  await expect(page.locator('.event-list-item')).toHaveCount(18);
+  await expect(page.locator('.event-list-item')).toHaveCount(3);
 
-  const description = page.locator('.event-description').first();
-  await description.scrollIntoViewIfNeeded();
-  await description.click();
-  const actions = page.locator('#eventTimestampQuickActions');
-  await expect(actions).toBeVisible();
+  const descriptions = page.locator('.event-description');
+  await descriptions.first().click();
+  await descriptions.nth(1).click({ modifiers: ['Control'] });
+  const toolbar = page.locator('#eventSelectionToolbar');
+  await expect(toolbar).toBeVisible();
+  await expect(toolbar.locator('.event-selection-count')).toHaveText('2 events selected');
+  await expect(page.locator('.event-list-item.selected-event')).toHaveCount(2);
 
-  const before = await page.evaluate(() => ({
-    anchorTop: document.querySelector('.event-description').getBoundingClientRect().top,
-    actionsTop: document.querySelector('#eventTimestampQuickActions').getBoundingClientRect().top
-  }));
-  await page.locator('.capture-panel').evaluate(element => { element.scrollTop += 20; });
-  await expect.poll(() => page.evaluate(previous => {
-    const anchorTop = document.querySelector('.event-description').getBoundingClientRect().top;
-    const actionsTop = document.querySelector('#eventTimestampQuickActions').getBoundingClientRect().top;
-    return Math.abs((actionsTop - previous.actionsTop) - (anchorTop - previous.anchorTop));
-  }, before)).toBeLessThanOrEqual(1);
+  await toolbar.getByRole('button', { name: 'Move selected events one second earlier' }).click();
+  await expect(page.locator('.event-time')).toHaveText(['0:29.0', '0:19.0', '0:10.0']);
+  await expect.poll(() => page.evaluate(async () => (
+    await window.__statsApp.store.listGames()
+  )[0].events.map(event => event.videoSeconds))).toEqual([10, 19, 29]);
+
+  await descriptions.first().click();
+  await descriptions.nth(2).click({ modifiers: ['Shift'] });
+  await expect(toolbar.locator('.event-selection-count')).toHaveText('3 events selected');
+  await toolbar.getByRole('button', { name: 'Move selected events one second later' }).click();
+  await expect.poll(() => page.evaluate(async () => (
+    await window.__statsApp.store.listGames()
+  )[0].events.map(event => event.videoSeconds))).toEqual([11, 20, 30]);
 });
 
 test('editing a made shot to missed immediately recalculates and persists stats', async ({ page }) => {
