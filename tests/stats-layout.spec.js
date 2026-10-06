@@ -22,6 +22,8 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   await page.setViewportSize({ width: 1500, height: 900 });
   await openLayout(page);
   await expect(page.locator('#eventLogPanel')).toBeHidden();
+  await page.locator('#addSetupPlayer').click();
+  await page.locator('.setup-name').last().fill('Bench Player');
   await saveGame(page);
   await page.evaluate(() => scrollTo(0, 0));
 
@@ -47,6 +49,21 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   expect(workspaceBoxes[0].width).toBeGreaterThan(workspaceBoxes[1].width);
   expect(workspaceBoxes[0].width).toBeGreaterThanOrEqual(600);
   expect(workspaceBoxes[1].x - (workspaceBoxes[0].x + workspaceBoxes[0].width)).toBeLessThanOrEqual(10);
+
+  await expect(page.locator('#trackerVideoScore')).toBeVisible();
+  await expect(page.locator('#trackerVideoScore')).toContainText('Our team');
+  expect(await page.locator('#eventEntryPanel #teamScore').count()).toBe(0);
+  const scorePosition = await page.locator('#playerFrame, #trackerVideoScore').evaluateAll(elements =>
+    elements.map(element => element.getBoundingClientRect())
+  );
+  expect(scorePosition[1].top).toBeGreaterThanOrEqual(scorePosition[0].bottom);
+
+  const benchDetails = page.locator('#benchPlayersDetails');
+  await expect(benchDetails).not.toHaveAttribute('open', '');
+  await expect(page.locator('#benchPlayerCount')).toHaveText('1');
+  await expect(page.locator('#benchPlayers')).toBeHidden();
+  await benchDetails.locator('summary').click();
+  await expect(page.locator('#benchPlayers')).toBeVisible();
 
   const reviewBoxes = await page.locator('#reviewShell, .capture-panel').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().width)
