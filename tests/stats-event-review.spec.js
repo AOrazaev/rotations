@@ -72,6 +72,30 @@ test('event timestamp plays with a three-second pre-roll', async ({ page }) => {
   ]);
 });
 
+test('event descriptions expose immediate one-second timestamp adjustments', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]');
+
+  const description = page.locator('.event-description');
+  await description.click();
+  const actions = page.locator('#eventTimestampQuickActions');
+  await expect(actions).toBeVisible();
+  await expect(description).toHaveAttribute('aria-expanded', 'true');
+
+  await actions.getByRole('menuitem', { name: 'Move event one second earlier' }).click();
+  await expect(page.locator('.event-time')).toHaveText('0:41.4');
+  await expect(actions).toBeVisible();
+  await expect.poll(() => page.evaluate(async () => (
+    await window.__statsApp.store.listGames()
+  )[0].events[0].videoSeconds)).toBe(41.4);
+
+  await actions.getByRole('menuitem', { name: 'Move event one second later' }).click();
+  await expect(page.locator('.event-time')).toHaveText('0:42.4');
+  await expect.poll(() => page.evaluate(async () => (
+    await window.__statsApp.store.listGames()
+  )[0].events[0].videoSeconds)).toBe(42.4);
+});
+
 test('editing a made shot to missed immediately recalculates and persists stats', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="shot"][data-shot-value="3"][data-made="true"]');

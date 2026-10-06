@@ -480,6 +480,10 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .voice-command-actions button { flex: 0 1 auto; }
 @keyframes voice-spin { to { transform: rotate(360deg); } }
 .event-description { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-description-button { width: 100%; padding: 4px 2px; overflow: hidden; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 7px; box-shadow: none; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.event-description-button:hover, .event-description-button:focus-visible { background: rgba(109, 124, 255, .12); border-color: var(--line); }
+.event-timestamp-quick-actions { position: fixed; z-index: 100; display: flex; gap: 6px; width: max-content; padding: 6px; background: #121a2b; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, .42); }
+.event-timestamp-quick-actions.hidden { display: none; }
 .event-detail-badges { display: block; grid-column: 2 / 3; min-width: 0; margin: -1px 0 1px; padding: 0; color: var(--muted); font-size: .72rem; line-height: 1.4; }
 .event-detail-badges.hidden { display: none; }
 .event-detail-badge { display: inline; white-space: nowrap; }

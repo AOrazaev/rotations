@@ -113,10 +113,14 @@ export function createEventListController({
   const mobileTimelinePreview = documentObject.querySelector('#mobileTimelinePreview');
   const mobileTimelineToggle = documentObject.querySelector('#toggleMobileTimeline');
   const timelineScrollContainer = eventList;
+  const quickTimestampActions = readOnly ? null : documentObject.createElement('div');
+  const quickTimestampEarlier = readOnly ? null : documentObject.createElement('button');
+  const quickTimestampLater = readOnly ? null : documentObject.createElement('button');
 
   let game = null;
   let editingEventId = null;
   let commentEventId = null;
+  let quickTimestampEventId = null;
   let editingSeconds = 0;
   let busy = false;
   let earliestFirst = initialEarliestFirst;
@@ -131,6 +135,128 @@ export function createEventListController({
   let mobileTimelineOpen = false;
   let mobileTimelinePointer = null;
   let suppressMobileTimelineClickUntil = 0;
+
+  if (quickTimestampActions) {
+    quickTimestampActions.id = 'eventTimestampQuickActions';
+    quickTimestampActions.className = 'event-timestamp-quick-actions hidden';
+    quickTimestampActions.setAttribute('role', 'menu');
+    quickTimestampActions.setAttribute('aria-label', 'Adjust event timestamp');
+    quickTimestampEarlier.type = 'button';
+    quickTimestampEarlier.className = 'secondary small';
+    quickTimestampEarlier.setAttribute('role', 'menuitem');
+    quickTimestampEarlier.setAttribute('aria-label', 'Move event one second earlier');
+    quickTimestampEarlier.textContent = '−1s';
+    quickTimestampLater.type = 'button';
+    quickTimestampLater.className = 'secondary small';
+    quickTimestampLater.setAttribute('role', 'menuitem');
+    quickTimestampLater.setAttribute('aria-label', 'Move event one second later');
+    quickTimestampLater.textContent = '+1s';
+    quickTimestampActions.append(quickTimestampEarlier, quickTimestampLater);
+    documentObject.body.appendChild(quickTimestampActions);
+  }
+
+  function closeQuickTimestampActions() {
+    if (!quickTimestampActions) return;
+    quickTimestampActions.classList.add('hidden');
+    quickTimestampActions.style.removeProperty('left');
+    quickTimestampActions.style.removeProperty('top');
+    eventList.querySelectorAll('[data-action="open-time-actions"]').forEach(button => {
+      button.setAttribute('aria-expanded', 'false');
+    });
+    quickTimestampEventId = null;
+  }
+
+  function positionQuickTimestampActions(anchor) {
+    if (!quickTimestampActions || !anchor) return;
+    const windowObject = documentObject.defaultView;
+    quickTimestampActions.classList.remove('hidden');
+    const anchorRect = anchor.getBoundingClientRect();
+    const menuRect = quickTimestampActions.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const left = Math.min(
+      windowObject.innerWidth - menuRect.width - margin,
+      Math.max(margin, anchorRect.left)
+    );
+    let top = anchorRect.bottom + gap;
+    if (top + menuRect.height > windowObject.innerHeight - margin) {
+      top = Math.max(margin, anchorRect.top - menuRect.height - gap);
+    }
+    quickTimestampActions.style.left = `${left}px`;
+    quickTimestampActions.style.top = `${top}px`;
+  }
+
+  function openQuickTimestampActions(eventId, anchor) {
+    if (!quickTimestampActions) return;
+    const reopening = quickTimestampEventId === eventId
+      && !quickTimestampActions.classList.contains('hidden');
+    closeQuickTimestampActions();
+    if (reopening) return;
+    quickTimestampEventId = eventId;
+    anchor.setAttribute('aria-expanded', 'true');
+    const selected = game?.events.find(event => event.id === eventId);
+    quickTimestampEarlier.disabled = !selected || selected.videoSeconds <= 0;
+    positionQuickTimestampActions(anchor);
+    quickTimestampEarlier.focus();
+  }
+
+  function restoreQuickTimestampActions() {
+    if (!quickTimestampEventId || !quickTimestampActions) return;
+    const anchor = eventList.querySelector(
+      `[data-event-id="${CSS.escape(quickTimestampEventId)}"] [data-action="open-time-actions"]`
+    );
+    if (!anchor) {
+      closeQuickTimestampActions();
+      return;
+    }
+    anchor.setAttribute('aria-expanded', 'true');
+    const selected = game?.events.find(event => event.id === quickTimestampEventId);
+    quickTimestampEarlier.disabled = !selected || selected.videoSeconds <= 0;
+    positionQuickTimestampActions(anchor);
+  }
+
+  function handleQuickTimestampDocumentClick(event) {
+    if (!quickTimestampActions || quickTimestampActions.classList.contains('hidden')) return;
+    if (quickTimestampActions.contains(event.target)
+      || event.target.closest?.('[data-action="open-time-actions"]')) return;
+    closeQuickTimestampActions();
+  }
+
+  function handleQuickTimestampKeydown(event) {
+    if (event.key === 'Escape' && !quickTimestampActions?.classList.contains('hidden')) {
+      closeQuickTimestampActions();
+    }
+  }
+
+  async function adjustQuickTimestamp(delta) {
+    if (!game || !quickTimestampEventId || busy) return;
+    const selected = game.events.find(event => event.id === quickTimestampEventId);
+    if (!selected) {
+      closeQuickTimestampActions();
+      return;
+    }
+    const videoSeconds = Math.max(0, selected.videoSeconds + delta);
+    if (videoSeconds === selected.videoSeconds) return;
+    busy = true;
+    quickTimestampEarlier.disabled = true;
+    quickTimestampLater.disabled = true;
+    try {
+      const next = structuredClone(game);
+      const adjusted = next.events.find(event => event.id === quickTimestampEventId);
+      adjusted.videoSeconds = videoSeconds;
+      adjusted.updatedAt = now();
+      next.updatedAt = now();
+      await commit(next);
+      restoreQuickTimestampActions();
+    } catch (error) {
+      onError(error);
+    } finally {
+      busy = false;
+      quickTimestampLater.disabled = false;
+      const current = game?.events.find(event => event.id === quickTimestampEventId);
+      quickTimestampEarlier.disabled = !current || current.videoSeconds <= 0;
+    }
+  }
 
   function createFilterState(source = {}) {
     return {
@@ -920,6 +1046,7 @@ export function createEventListController({
     updateActiveFilterChips();
     updateOrderControl();
     if (!game) {
+      closeQuickTimestampActions();
       emptyEvents.textContent = 'No events recorded.';
       emptyEvents.classList.remove('hidden');
       return;
@@ -974,8 +1101,20 @@ export function createEventListController({
       item.classList.toggle('voice-added-event', highlightedEventIds.has(event.id));
       item.querySelector('.event-time').textContent = formatVideoTime(event.videoSeconds);
       const description = describeEvent(event, playersById, scoreByEventId.get(event.id));
-      item.querySelector('.event-description').textContent = description;
-      item.querySelector('.event-description').title = description;
+      const descriptionElement = item.querySelector('.event-description');
+      descriptionElement.textContent = description;
+      descriptionElement.title = description;
+      if (!readOnly) {
+        const descriptionButton = documentObject.createElement('button');
+        descriptionButton.type = 'button';
+        descriptionButton.className = 'event-description event-description-button';
+        descriptionButton.dataset.action = 'open-time-actions';
+        descriptionButton.setAttribute('aria-haspopup', 'menu');
+        descriptionButton.setAttribute('aria-expanded', 'false');
+        descriptionButton.textContent = description;
+        descriptionButton.title = `${description} · Adjust timestamp`;
+        descriptionElement.replaceWith(descriptionButton);
+      }
       const detailBadges = item.querySelector('.event-detail-badges');
       const badges = getShotDetailBadges(event);
       for (const badge of badges) {
@@ -1007,6 +1146,7 @@ export function createEventListController({
       item.querySelector('[data-action="edit-event"]').disabled = !EDITABLE_TYPES.has(event.type);
       eventList.appendChild(item);
     }
+    restoreQuickTimestampActions();
   }
 
   async function commit(nextGame) {
@@ -1032,7 +1172,9 @@ export function createEventListController({
     const selected = game.events.find(item => item.id === row.dataset.eventId);
     if (!selected) return;
     try {
-      if (button.dataset.action === 'play-event') {
+      if (button.dataset.action === 'open-time-actions') {
+        openQuickTimestampActions(selected.id, button);
+      } else if (button.dataset.action === 'play-event') {
         setPlaybackFollowing(true);
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
@@ -1055,6 +1197,14 @@ export function createEventListController({
       busy = false;
     }
   });
+  quickTimestampEarlier?.addEventListener('click', () => adjustQuickTimestamp(-1));
+  quickTimestampLater?.addEventListener('click', () => adjustQuickTimestamp(1));
+  if (quickTimestampActions) {
+    documentObject.addEventListener('click', handleQuickTimestampDocumentClick);
+    documentObject.addEventListener('keydown', handleQuickTimestampKeydown);
+    documentObject.defaultView.addEventListener('resize', restoreQuickTimestampActions);
+    eventList.addEventListener('scroll', restoreQuickTimestampActions);
+  }
   activeFilters.addEventListener('click', event => {
     const chip = event.target.closest('.filter-chip');
     if (!chip) return;
@@ -1357,6 +1507,13 @@ export function createEventListController({
       });
     },
     destroy() {
+      if (quickTimestampActions) {
+        documentObject.removeEventListener('click', handleQuickTimestampDocumentClick);
+        documentObject.removeEventListener('keydown', handleQuickTimestampKeydown);
+        documentObject.defaultView.removeEventListener('resize', restoreQuickTimestampActions);
+        eventList.removeEventListener('scroll', restoreQuickTimestampActions);
+      }
+      quickTimestampActions?.remove();
       unsubscribeTime();
       shotDetailsEditor?.destroy();
       if (!followPlayback) return;
