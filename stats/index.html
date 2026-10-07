@@ -119,6 +119,19 @@
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
             </div>
+            <div id="trackerVideoScore" class="tracker-video-score hidden" role="status" aria-live="polite" aria-label="Recorded score: Our team 0, Opponent 0">
+              <span class="tracker-score-side tracker-score-team">
+                Our team
+                <small>FG <strong id="teamFieldGoals">0/0</strong></small>
+              </span>
+              <strong class="tracker-score-total">
+                <span id="teamScore">0</span>–<span id="opponentScore">0</span>
+              </strong>
+              <span class="tracker-score-side tracker-score-opponent">
+                Opponent
+                <small>FG <strong id="opponentFieldGoals">0/0</strong></small>
+              </span>
+            </div>
             <div id="reviewVideoScore" class="review-score review-video-score hidden" role="status" aria-live="polite" aria-label="Current score: Our team 0, Opponent 0">
               <span class="review-score-team">Our team</span>
               <strong id="reviewModeScore">0–0</strong>
@@ -282,21 +295,16 @@
               <button id="voiceUndoLatestBatch" class="secondary small hidden" type="button">Undo voice batch</button>
             </div>
             <div id="eventLockMessage" class="locked-message">Save or open a game to load its recording.</div>
-            <div class="scoreboard">
-              <div><span>Our team</span><strong id="teamScore">0</strong></div>
-              <div><span>Opponent</span><strong id="opponentScore">0</strong></div>
-            </div>
             <div class="lineup-panel">
               <div class="lineup-heading">
-                <div>
-                  <h3>Current lineup</h3>
-                  <p>Selecting a player switches event entry to our team.</p>
-                </div>
+                <h3>Current lineup</h3>
                 <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
               </div>
-              <div id="currentLineup" class="player-chips" aria-label="Current lineup"></div>
-              <p class="bench-label">Bench</p>
-              <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
+              <div id="currentLineup" class="player-chips" aria-label="Current lineup" title="Select a player for our team events"></div>
+              <details id="benchPlayersDetails" class="bench-details">
+                <summary>Bench <span id="benchPlayerCount">0</span></summary>
+                <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
+              </details>
             </div>
             <div class="event-side" role="group" aria-label="Event side">
               <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
@@ -339,10 +347,6 @@
               <div id="shotDetailsCapture"></div>
             </section>
             <p id="eventError" class="message error hidden" role="alert"></p>
-            <div class="quick-totals">
-              <span>FG <strong id="teamFieldGoals">0/0</strong></span>
-              <span>Opponent FG <strong id="opponentFieldGoals">0/0</strong></span>
-            </div>
         </section>
 
         <button id="mobileTimelineBackdrop" class="mobile-timeline-backdrop hidden" type="button" aria-label="Close event timeline"></button>

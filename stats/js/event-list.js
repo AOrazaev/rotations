@@ -113,10 +113,17 @@ export function createEventListController({
   const mobileTimelinePreview = documentObject.querySelector('#mobileTimelinePreview');
   const mobileTimelineToggle = documentObject.querySelector('#toggleMobileTimeline');
   const timelineScrollContainer = eventList;
+  const eventSelectionToolbar = readOnly ? null : documentObject.createElement('div');
+  const eventSelectionCount = readOnly ? null : documentObject.createElement('strong');
+  const selectedTimestampEarlier = readOnly ? null : documentObject.createElement('button');
+  const selectedTimestampLater = readOnly ? null : documentObject.createElement('button');
+  const clearEventSelectionButton = readOnly ? null : documentObject.createElement('button');
 
   let game = null;
   let editingEventId = null;
   let commentEventId = null;
+  let selectedEventIds = new Set();
+  let selectionAnchorId = null;
   let editingSeconds = 0;
   let busy = false;
   let earliestFirst = initialEarliestFirst;
@@ -131,6 +138,116 @@ export function createEventListController({
   let mobileTimelineOpen = false;
   let mobileTimelinePointer = null;
   let suppressMobileTimelineClickUntil = 0;
+
+  if (eventSelectionToolbar) {
+    eventSelectionToolbar.id = 'eventSelectionToolbar';
+    eventSelectionToolbar.className = 'event-selection-toolbar hidden';
+    eventSelectionToolbar.setAttribute('role', 'toolbar');
+    eventSelectionToolbar.setAttribute('aria-label', 'Selected event timestamp actions');
+    eventSelectionCount.className = 'event-selection-count';
+    const actions = documentObject.createElement('div');
+    actions.className = 'event-selection-actions';
+    selectedTimestampEarlier.type = 'button';
+    selectedTimestampEarlier.className = 'secondary small';
+    selectedTimestampEarlier.setAttribute('aria-label', 'Move selected events one second earlier');
+    selectedTimestampEarlier.textContent = '−1s';
+    selectedTimestampLater.type = 'button';
+    selectedTimestampLater.className = 'secondary small';
+    selectedTimestampLater.setAttribute('aria-label', 'Move selected events one second later');
+    selectedTimestampLater.textContent = '+1s';
+    clearEventSelectionButton.type = 'button';
+    clearEventSelectionButton.className = 'secondary small';
+    clearEventSelectionButton.textContent = 'Clear';
+    actions.append(
+      selectedTimestampEarlier,
+      selectedTimestampLater,
+      clearEventSelectionButton
+    );
+    eventSelectionToolbar.append(eventSelectionCount, actions);
+    eventList.before(eventSelectionToolbar);
+  }
+
+  function selectedEvents() {
+    if (!game) return [];
+    return game.events.filter(event => selectedEventIds.has(event.id));
+  }
+
+  function updateEventSelectionUI() {
+    if (!eventSelectionToolbar) return;
+    const selected = selectedEvents();
+    eventSelectionToolbar.classList.toggle('hidden', !selected.length);
+    eventSelectionCount.textContent = selected.length === 1
+      ? '1 event selected'
+      : `${selected.length} events selected`;
+    selectedTimestampEarlier.disabled = busy
+      || !selected.length
+      || selected.some(event => event.videoSeconds < 1);
+    selectedTimestampLater.disabled = busy || !selected.length;
+    clearEventSelectionButton.disabled = busy || !selected.length;
+    eventList.querySelectorAll('[data-event-id]').forEach(item => {
+      const isSelected = selectedEventIds.has(item.dataset.eventId);
+      item.classList.toggle('selected-event', isSelected);
+      item.querySelector('[data-action="select-event"]')
+        ?.setAttribute('aria-pressed', String(isSelected));
+    });
+  }
+
+  function clearEventSelection() {
+    selectedEventIds.clear();
+    selectionAnchorId = null;
+    updateEventSelectionUI();
+  }
+
+  function selectEvent(eventId, pointerEvent) {
+    const visibleIds = [...eventList.querySelectorAll('[data-event-id]')]
+      .map(item => item.dataset.eventId);
+    if (pointerEvent.shiftKey && selectionAnchorId && visibleIds.includes(selectionAnchorId)) {
+      const start = visibleIds.indexOf(selectionAnchorId);
+      const end = visibleIds.indexOf(eventId);
+      if (!pointerEvent.ctrlKey && !pointerEvent.metaKey) selectedEventIds.clear();
+      visibleIds
+        .slice(Math.min(start, end), Math.max(start, end) + 1)
+        .forEach(id => selectedEventIds.add(id));
+    } else if (pointerEvent.ctrlKey || pointerEvent.metaKey) {
+      if (selectedEventIds.has(eventId)) {
+        selectedEventIds.delete(eventId);
+        if (selectionAnchorId === eventId) {
+          selectionAnchorId = [...selectedEventIds].at(-1) || null;
+        }
+      } else {
+        selectedEventIds.add(eventId);
+        selectionAnchorId = eventId;
+      }
+    } else {
+      selectedEventIds = new Set([eventId]);
+      selectionAnchorId = eventId;
+    }
+    updateEventSelectionUI();
+  }
+
+  async function adjustSelectedTimestamps(delta) {
+    const selected = selectedEvents();
+    if (!selected.length || busy) return;
+    if (delta < 0 && selected.some(event => event.videoSeconds < Math.abs(delta))) return;
+    busy = true;
+    updateEventSelectionUI();
+    try {
+      const next = structuredClone(game);
+      const timestamp = now();
+      next.events.forEach(event => {
+        if (!selectedEventIds.has(event.id)) return;
+        event.videoSeconds += delta;
+        event.updatedAt = timestamp;
+      });
+      next.updatedAt = timestamp;
+      await commit(next);
+    } catch (error) {
+      onError(error);
+    } finally {
+      busy = false;
+      updateEventSelectionUI();
+    }
+  }
 
   function createFilterState(source = {}) {
     return {
@@ -912,7 +1029,12 @@ export function createEventListController({
   }
 
   function render(nextGame) {
+    const previousGameId = game?.id || null;
     game = nextGame;
+    if (!game || game.id !== previousGameId) {
+      selectedEventIds.clear();
+      selectionAnchorId = null;
+    }
     eventList.innerHTML = '';
     eventSummaries = new Map();
     populateFilterPlayers();
@@ -920,6 +1042,7 @@ export function createEventListController({
     updateActiveFilterChips();
     updateOrderControl();
     if (!game) {
+      updateEventSelectionUI();
       emptyEvents.textContent = 'No events recorded.';
       emptyEvents.classList.remove('hidden');
       return;
@@ -959,6 +1082,15 @@ export function createEventListController({
       }))
     ].sort((a, b) => a.videoSeconds - b.videoSeconds || a.order - b.order);
     if (!earliestFirst) timelineItems.reverse();
+    const visibleEventIds = new Set(
+      timelineItems.filter(item => item.kind === 'event').map(item => item.value.id)
+    );
+    selectedEventIds = new Set(
+      [...selectedEventIds].filter(eventId => visibleEventIds.has(eventId))
+    );
+    if (selectionAnchorId && !selectedEventIds.has(selectionAnchorId)) {
+      selectionAnchorId = [...selectedEventIds].at(-1) || null;
+    }
     emptyEvents.textContent = (game.events.length || voiceCommands.length) && !timelineItems.length
       ? 'No events match the current filters.'
       : 'No events recorded.';
@@ -972,10 +1104,22 @@ export function createEventListController({
       const item = eventTemplate.content.firstElementChild.cloneNode(true);
       item.dataset.eventId = event.id;
       item.classList.toggle('voice-added-event', highlightedEventIds.has(event.id));
+      item.classList.toggle('selected-event', selectedEventIds.has(event.id));
       item.querySelector('.event-time').textContent = formatVideoTime(event.videoSeconds);
       const description = describeEvent(event, playersById, scoreByEventId.get(event.id));
-      item.querySelector('.event-description').textContent = description;
-      item.querySelector('.event-description').title = description;
+      const descriptionElement = item.querySelector('.event-description');
+      descriptionElement.textContent = description;
+      descriptionElement.title = description;
+      if (!readOnly) {
+        const descriptionButton = documentObject.createElement('button');
+        descriptionButton.type = 'button';
+        descriptionButton.className = 'event-description event-description-button';
+        descriptionButton.dataset.action = 'select-event';
+        descriptionButton.setAttribute('aria-pressed', String(selectedEventIds.has(event.id)));
+        descriptionButton.textContent = description;
+        descriptionButton.title = `${description} · Click to select, Ctrl/Cmd-click to toggle, Shift-click for a range`;
+        descriptionElement.replaceWith(descriptionButton);
+      }
       const detailBadges = item.querySelector('.event-detail-badges');
       const badges = getShotDetailBadges(event);
       for (const badge of badges) {
@@ -1007,6 +1151,7 @@ export function createEventListController({
       item.querySelector('[data-action="edit-event"]').disabled = !EDITABLE_TYPES.has(event.type);
       eventList.appendChild(item);
     }
+    updateEventSelectionUI();
   }
 
   async function commit(nextGame) {
@@ -1032,7 +1177,9 @@ export function createEventListController({
     const selected = game.events.find(item => item.id === row.dataset.eventId);
     if (!selected) return;
     try {
-      if (button.dataset.action === 'play-event') {
+      if (button.dataset.action === 'select-event') {
+        selectEvent(selected.id, event);
+      } else if (button.dataset.action === 'play-event') {
         setPlaybackFollowing(true);
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
@@ -1055,6 +1202,15 @@ export function createEventListController({
       busy = false;
     }
   });
+  selectedTimestampEarlier?.addEventListener('click', () => adjustSelectedTimestamps(-1));
+  selectedTimestampLater?.addEventListener('click', () => adjustSelectedTimestamps(1));
+  clearEventSelectionButton?.addEventListener('click', clearEventSelection);
+  function handleEventSelectionKeydown(event) {
+    if (event.key === 'Escape' && selectedEventIds.size) clearEventSelection();
+  }
+  if (eventSelectionToolbar) {
+    documentObject.addEventListener('keydown', handleEventSelectionKeydown);
+  }
   activeFilters.addEventListener('click', event => {
     const chip = event.target.closest('.filter-chip');
     if (!chip) return;
@@ -1357,6 +1513,10 @@ export function createEventListController({
       });
     },
     destroy() {
+      if (eventSelectionToolbar) {
+        documentObject.removeEventListener('keydown', handleEventSelectionKeydown);
+      }
+      eventSelectionToolbar?.remove();
       unsubscribeTime();
       shotDetailsEditor?.destroy();
       if (!followPlayback) return;

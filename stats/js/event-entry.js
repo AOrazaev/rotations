@@ -23,6 +23,7 @@ export function createEventEntryController({
 }) {
   const gameStatus = documentObject.querySelector('#eventGameStatus');
   const lockMessage = documentObject.querySelector('#eventLockMessage');
+  const trackerScoreBlock = documentObject.querySelector('#trackerVideoScore');
   const teamScore = documentObject.querySelector('#teamScore');
   const opponentScore = documentObject.querySelector('#opponentScore');
   const teamFieldGoals = documentObject.querySelector('#teamFieldGoals');
@@ -38,6 +39,8 @@ export function createEventEntryController({
   const eventEntryPanel = documentObject.querySelector('#eventEntryPanel');
   const eventLogPanel = documentObject.querySelector('#eventLogPanel');
   const currentLineup = documentObject.querySelector('#currentLineup');
+  const benchPlayersDetails = documentObject.querySelector('#benchPlayersDetails');
+  const benchPlayerCount = documentObject.querySelector('#benchPlayerCount');
   const benchPlayers = documentObject.querySelector('#benchPlayers');
   const openSubstitutionButton = documentObject.querySelector('#openSubstitution');
   const substitutionDialog = documentObject.querySelector('#substitutionDialog');
@@ -162,6 +165,8 @@ export function createEventEntryController({
       }
       (isActive ? currentLineup : benchPlayers).appendChild(chip);
     }
+    benchPlayerCount.textContent = String(benchPlayers.childElementCount);
+    benchPlayersDetails.classList.toggle('hidden', !benchPlayers.childElementCount);
     updatePlayerSelection();
   }
 
@@ -173,6 +178,8 @@ export function createEventEntryController({
       opponentScore.textContent = '0';
       teamFieldGoals.textContent = '0/0';
       opponentFieldGoals.textContent = '0/0';
+      trackerScoreBlock.classList.add('hidden');
+      trackerScoreBlock.setAttribute('aria-label', 'Recorded score: Our team 0, Opponent 0');
       lockMessage.textContent = 'Save or open a game before recording statistics.';
       lockMessage.classList.remove('hidden');
       eventEntryPanel.classList.add('hidden');
@@ -188,6 +195,7 @@ export function createEventEntryController({
     const analysis = buildGameAnalysis(game);
     eventEntryPanel.classList.remove('hidden');
     eventLogPanel.classList.remove('hidden');
+    trackerScoreBlock.classList.remove('hidden');
     gameStatus.textContent = `${game.title} · ${game.startingLineupIds.length} players on court`;
     teamScore.textContent = String(analysis.report.score.team);
     opponentScore.textContent = String(analysis.report.score.opponent);
@@ -195,6 +203,11 @@ export function createEventEntryController({
     const theirFg = analysis.report.teamComparison.opponent.fieldGoals;
     teamFieldGoals.textContent = `${ourFg.made}/${ourFg.attempted}`;
     opponentFieldGoals.textContent = `${theirFg.made}/${theirFg.attempted}`;
+    const opponentName = game.opponentName?.trim() || 'Opponent';
+    trackerScoreBlock.setAttribute(
+      'aria-label',
+      `Recorded score: Our team ${analysis.report.score.team}, ${opponentName} ${analysis.report.score.opponent}`
+    );
     renderLineup(analysis);
     const videoReady = videoController.isReady();
     lockMessage.textContent = videoReady ? '' : 'This game’s recording is loading or unavailable.';
