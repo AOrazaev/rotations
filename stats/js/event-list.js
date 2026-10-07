@@ -298,7 +298,14 @@ export function createEventListController({
       if (!row) return;
       clearLocatedEventHighlight();
       row.classList.add('located-event');
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const listRect = eventList.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const rowTop = eventList.scrollTop + rowRect.top - listRect.top;
+      const maxScrollTop = Math.max(0, eventList.scrollHeight - eventList.clientHeight);
+      eventList.scrollTo({
+        top: Math.min(maxScrollTop, Math.max(0, rowTop - 10)),
+        behavior: 'smooth'
+      });
       row.querySelector('.event-description')?.focus({ preventScroll: true });
       locatedEventTimer = documentObject.defaultView.setTimeout(() => {
         row.classList.remove('located-event');
