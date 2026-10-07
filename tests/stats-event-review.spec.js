@@ -72,6 +72,51 @@ test('event timestamp plays with a three-second pre-roll', async ({ page }) => {
   ]);
 });
 
+test('locates the closest visible event without changing playback or selection', async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]', 10);
+  await addTeamEvent(page, '[data-event-type="assist"]', 20);
+  await addTeamEvent(page, '[data-event-type="block"]', 40);
+  await page.evaluate(() => {
+    window.__statsFakePlayer.current = 30;
+    window.__statsFakePlayer.calls = [];
+    window.__timelineLocateScroll = null;
+    const eventList = document.querySelector('#eventList');
+    eventList.style.height = '60px';
+    eventList.style.overflowY = 'auto';
+    eventList.scrollTo = options => {
+      window.__timelineLocateScroll = options;
+    };
+  });
+
+  const selected = page.locator('.event-list-item').filter({ hasText: 'block' });
+  await selected.locator('.event-description').click();
+  await page.evaluate(() => { window.__pageScrollBeforeLocate = window.scrollY; });
+  await page.locator('#locateTimelineEvent').evaluate(button => button.click());
+
+  const located = page.locator('.event-list-item').filter({ hasText: 'assist' });
+  await expect(located).toHaveClass(/located-event/);
+  await expect(located.locator('.event-description')).toBeFocused();
+  await expect(selected).toHaveClass(/selected-event/);
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([]);
+  expect(await page.evaluate(() => window.__statsFakePlayer.current)).toBe(30);
+  expect(await page.evaluate(() => window.__timelineLocateScroll.behavior)).toBe('smooth');
+  expect(await page.evaluate(() => window.__timelineLocateScroll.top)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(
+    await page.evaluate(() => window.__pageScrollBeforeLocate)
+  );
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('input[name="filterType"][value="block"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await page.evaluate(() => { window.__timelineLocateScroll = null; });
+  await page.locator('#locateTimelineEvent').evaluate(button => button.click());
+  await expect(page.locator('.event-list-item').filter({ hasText: 'block' })).toHaveClass(/located-event/);
+  expect(await page.evaluate(() => window.__timelineLocateScroll)).not.toBeNull();
+});
+
 test('selected timeline events can be shifted together by one second', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="steal"]', 10);
