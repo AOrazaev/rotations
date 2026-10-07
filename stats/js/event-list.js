@@ -102,6 +102,7 @@ export function createEventListController({
   const orderButton = documentObject.querySelector('#toggleEventOrder');
   const orderDescription = documentObject.querySelector('#eventOrderDescription');
   const followPlaybackButton = documentObject.querySelector('#followTimelinePlayback');
+  const locateEventButton = documentObject.querySelector('#locateTimelineEvent');
   const activeFilters = documentObject.querySelector('#activeEventFilters');
   const filterSummary = documentObject.querySelector('#timelineFilterSummary');
   const copyFilteredReviewLink = documentObject.querySelector('#copyFilteredReviewLink');
@@ -124,6 +125,8 @@ export function createEventListController({
   let commentEventId = null;
   let selectedEventIds = new Set();
   let selectionAnchorId = null;
+  let locatableEventIds = [];
+  let locatedEventTimer = null;
   let editingSeconds = 0;
   let busy = false;
   let earliestFirst = initialEarliestFirst;
@@ -138,6 +141,12 @@ export function createEventListController({
   let mobileTimelineOpen = false;
   let mobileTimelinePointer = null;
   let suppressMobileTimelineClickUntil = 0;
+
+  if (readOnly) {
+    locateEventButton.remove();
+  } else {
+    locateEventButton.classList.remove('hidden');
+  }
 
   if (eventSelectionToolbar) {
     eventSelectionToolbar.id = 'eventSelectionToolbar';
@@ -246,6 +255,57 @@ export function createEventListController({
     } finally {
       busy = false;
       updateEventSelectionUI();
+    }
+  }
+
+  function updateLocateEventButton() {
+    if (readOnly) return;
+    locateEventButton.disabled = !game
+      || !videoController.isReady()
+      || !locatableEventIds.length;
+  }
+
+  function clearLocatedEventHighlight() {
+    if (locatedEventTimer !== null) {
+      documentObject.defaultView.clearTimeout(locatedEventTimer);
+      locatedEventTimer = null;
+    }
+    eventList.querySelector('.located-event')?.classList.remove('located-event');
+  }
+
+  function locateClosestEvent() {
+    if (readOnly || locateEventButton.disabled || !game) return;
+    try {
+      const currentSeconds = videoController.getCurrentSeconds();
+      const eventsById = new Map(game.events.map(event => [event.id, event]));
+      const closest = locatableEventIds
+        .map(eventId => eventsById.get(eventId))
+        .filter(Boolean)
+        .reduce((best, candidate) => {
+          if (!best) return candidate;
+          const bestDistance = Math.abs(best.videoSeconds - currentSeconds);
+          const candidateDistance = Math.abs(candidate.videoSeconds - currentSeconds);
+          if (candidateDistance !== bestDistance) {
+            return candidateDistance < bestDistance ? candidate : best;
+          }
+          if (candidate.videoSeconds !== best.videoSeconds) {
+            return candidate.videoSeconds < best.videoSeconds ? candidate : best;
+          }
+          return candidate.sequence < best.sequence ? candidate : best;
+        }, null);
+      if (!closest) return;
+      const row = eventList.querySelector(`[data-event-id="${CSS.escape(closest.id)}"]`);
+      if (!row) return;
+      clearLocatedEventHighlight();
+      row.classList.add('located-event');
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.querySelector('.event-description')?.focus({ preventScroll: true });
+      locatedEventTimer = documentObject.defaultView.setTimeout(() => {
+        row.classList.remove('located-event');
+        locatedEventTimer = null;
+      }, 1600);
+    } catch (error) {
+      onError(error);
     }
   }
 
@@ -1035,6 +1095,7 @@ export function createEventListController({
       selectedEventIds.clear();
       selectionAnchorId = null;
     }
+    clearLocatedEventHighlight();
     eventList.innerHTML = '';
     eventSummaries = new Map();
     populateFilterPlayers();
@@ -1042,6 +1103,8 @@ export function createEventListController({
     updateActiveFilterChips();
     updateOrderControl();
     if (!game) {
+      locatableEventIds = [];
+      updateLocateEventButton();
       updateEventSelectionUI();
       emptyEvents.textContent = 'No events recorded.';
       emptyEvents.classList.remove('hidden');
@@ -1067,6 +1130,8 @@ export function createEventListController({
     }
     updateMobileTimelinePreview();
     const visibleEvents = orderedEvents.filter(eventMatchesFilters);
+    locatableEventIds = visibleEvents.map(event => event.id);
+    updateLocateEventButton();
     const timelineItems = [
       ...visibleEvents.map(event => ({
         kind: 'event',
@@ -1205,6 +1270,7 @@ export function createEventListController({
   selectedTimestampEarlier?.addEventListener('click', () => adjustSelectedTimestamps(-1));
   selectedTimestampLater?.addEventListener('click', () => adjustSelectedTimestamps(1));
   clearEventSelectionButton?.addEventListener('click', clearEventSelection);
+  if (!readOnly) locateEventButton.addEventListener('click', locateClosestEvent);
   function handleEventSelectionKeydown(event) {
     if (event.key === 'Escape' && selectedEventIds.size) clearEventSelection();
   }
@@ -1513,6 +1579,8 @@ export function createEventListController({
       });
     },
     destroy() {
+      clearLocatedEventHighlight();
+      if (!readOnly) locateEventButton.removeEventListener('click', locateClosestEvent);
       if (eventSelectionToolbar) {
         documentObject.removeEventListener('keydown', handleEventSelectionKeydown);
       }

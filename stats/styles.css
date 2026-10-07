@@ -467,6 +467,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .event-list-item { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 7px; align-items: center; padding: 7px; background: #0f1727; border: 1px solid #202c43; border-radius: 10px; }
 .event-list-item.current-event { background: rgba(109, 124, 255, .13); border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(109, 124, 255, .18); }
 .event-list-item.selected-event { background: rgba(109, 124, 255, .2); border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(109, 124, 255, .22); }
+.event-list-item.located-event { outline: 3px solid #f6c85f; outline-offset: 2px; }
 .event-list-item.voice-added-event { background: rgba(104, 211, 145, .11); border-color: #68d391; box-shadow: 0 0 0 1px rgba(104, 211, 145, .16); }
 .event-list-item.voice-command-item { grid-template-columns: 58px minmax(0, 1fr); align-items: start; background: rgba(109, 124, 255, .07); border-style: dashed; border-color: rgba(139, 151, 255, .5); }
 .event-list-item.voice-command-draft { background: rgba(104, 211, 145, .07); border-color: rgba(104, 211, 145, .65); }

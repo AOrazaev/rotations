@@ -72,6 +72,44 @@ test('event timestamp plays with a three-second pre-roll', async ({ page }) => {
   ]);
 });
 
+test('locates the closest visible event without changing playback or selection', async ({ page }) => {
+  await openReview(page);
+  await addTeamEvent(page, '[data-event-type="steal"]', 10);
+  await addTeamEvent(page, '[data-event-type="assist"]', 20);
+  await addTeamEvent(page, '[data-event-type="block"]', 40);
+  await page.evaluate(() => {
+    window.__statsFakePlayer.current = 30;
+    window.__statsFakePlayer.calls = [];
+    window.__locatedTimelineEvent = null;
+    Element.prototype.scrollIntoView = function scrollIntoView(options) {
+      if (this.matches?.('.event-list-item')) {
+        window.__locatedTimelineEvent = { eventId: this.dataset.eventId, options };
+      }
+    };
+  });
+
+  const selected = page.locator('.event-list-item').filter({ hasText: 'block' });
+  await selected.locator('.event-description').click();
+  await page.locator('#locateTimelineEvent').click();
+
+  const located = page.locator('.event-list-item').filter({ hasText: 'assist' });
+  await expect(located).toHaveClass(/located-event/);
+  await expect(located.locator('.event-description')).toBeFocused();
+  await expect(selected).toHaveClass(/selected-event/);
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([]);
+  expect(await page.evaluate(() => window.__statsFakePlayer.current)).toBe(30);
+  expect(await page.evaluate(() => window.__locatedTimelineEvent.options.block)).toBe('center');
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('input[name="filterType"][value="block"]').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(1);
+  await page.evaluate(() => { window.__locatedTimelineEvent = null; });
+  await page.locator('#locateTimelineEvent').click();
+  await expect(page.locator('.event-list-item').filter({ hasText: 'block' })).toHaveClass(/located-event/);
+  expect(await page.evaluate(() => window.__locatedTimelineEvent)).not.toBeNull();
+});
+
 test('selected timeline events can be shifted together by one second', async ({ page }) => {
   await openReview(page);
   await addTeamEvent(page, '[data-event-type="steal"]', 10);
