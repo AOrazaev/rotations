@@ -298,17 +298,19 @@
             <div class="lineup-panel">
               <div class="lineup-heading">
                 <h3>Current lineup</h3>
-                <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
+                <div class="lineup-actions">
+                  <div class="event-side" role="group" aria-label="Event side">
+                    <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
+                    <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
+                  </div>
+                  <button id="openSubstitution" class="secondary small" type="button">Make substitution</button>
+                </div>
               </div>
               <div id="currentLineup" class="player-chips" aria-label="Current lineup" title="Select a player for our team events"></div>
               <details id="benchPlayersDetails" class="bench-details">
                 <summary>Bench <span id="benchPlayerCount">0</span></summary>
                 <div id="benchPlayers" class="player-chips" aria-label="Bench players"></div>
               </details>
-            </div>
-            <div class="event-side" role="group" aria-label="Event side">
-              <button class="view-tab active" type="button" data-event-side="team" aria-pressed="true">Our team</button>
-              <button class="view-tab" type="button" data-event-side="opponent" aria-pressed="false">Opponent</button>
             </div>
             <div id="eventButtons" class="event-buttons">
               <div class="shot-buttons">

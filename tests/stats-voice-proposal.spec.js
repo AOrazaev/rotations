@@ -390,8 +390,10 @@ test('uses one compact microphone control and keeps drafts out of game storage',
   await waitForConnection(page);
   await expect(page.locator('#voiceSettingsDialog')).not.toHaveAttribute('open', '');
   await expect(page.locator('#voiceRecordToggle')).toBeVisible();
+  await expect(page.locator('.voice-command-status-row')).toBeHidden();
 
   await recordCommand(page);
+  await expect(page.locator('.voice-command-status-row')).toBeVisible();
   await waitForDrafts(page, 1);
   const draft = page.locator('.voice-command-draft');
   await expect(draft.locator('.voice-proposal-event')).toHaveCount(2);
