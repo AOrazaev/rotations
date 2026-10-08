@@ -65,6 +65,18 @@ test('desktop uses games, video and event timeline columns', async ({ page }) =>
   await benchDetails.locator('summary').click();
   await expect(page.locator('#benchPlayers')).toBeVisible();
 
+  await expect(page.locator('.lineup-heading [data-event-side="team"]')).toBeVisible();
+  await expect(page.locator('.lineup-heading [data-event-side="opponent"]')).toBeVisible();
+  const actionRows = await page.locator('#eventButtons > .event-action').evaluateAll(elements =>
+    elements.slice(0, 5).map(element => {
+      const box = element.getBoundingClientRect();
+      return { x: box.x, y: box.y, height: box.height };
+    })
+  );
+  expect(new Set(actionRows.map(box => Math.round(box.y))).size).toBe(1);
+  expect(actionRows.every((box, index) => index === 0 || box.x > actionRows[index - 1].x)).toBe(true);
+  expect(actionRows.every(box => box.height >= 34)).toBe(true);
+
   const reviewBoxes = await page.locator('#reviewShell, .capture-panel').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().width)
   );
@@ -150,4 +162,6 @@ test('mobile stacks games, center workflow and event timeline in order', async (
     elements.map(element => element.getBoundingClientRect().y)
   );
   expect(workspacePositions[0]).toBeLessThan(workspacePositions[1]);
+  await expect(page.locator('.lineup-heading [data-event-side="team"]')).toBeVisible();
+  await expect(page.locator('.lineup-heading [data-event-side="opponent"]')).toBeVisible();
 });

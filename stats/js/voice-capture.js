@@ -63,6 +63,7 @@ export function createVoiceCaptureController({
   const recordLabel = documentObject.querySelector('#voiceRecordLabel');
   const readiness = documentObject.querySelector('#voiceReadiness');
   const commandStatus = documentObject.querySelector('#voiceCommandStatus');
+  const commandStatusRow = commandStatus.closest('.voice-command-status-row');
   const undoLatestBatchButton = documentObject.querySelector('#voiceUndoLatestBatch');
   const microphoneSelect = documentObject.querySelector('#voiceMicrophone');
   const audioProcessingSelect = documentObject.querySelector('#voiceAudioProcessing');
@@ -123,9 +124,15 @@ export function createVoiceCaptureController({
     connectionStatus.className = `message voice-status ${kind}`.trim();
   }
 
-  function setCommandStatus(message, kind = '') {
+  function setCommandStatus(message, kind = '', { routine = false } = {}) {
     commandStatus.textContent = message;
-    commandStatus.className = `message voice-command-status voice-status ${kind}`.trim();
+    commandStatus.className = `message voice-command-status voice-status ${kind} ${
+      routine ? 'routine' : ''
+    }`.trim();
+    commandStatusRow.classList.toggle(
+      'routine-only',
+      routine && undoLatestBatchButton.classList.contains('hidden')
+    );
   }
 
   function setStatusNotice(message, kind = '') {
@@ -338,7 +345,7 @@ export function createVoiceCaptureController({
       } else if (statusNotice) {
         setCommandStatus(statusNotice.message, statusNotice.kind);
       } else {
-        setCommandStatus('Voice companion ready.');
+        setCommandStatus('Voice companion ready.', '', { routine: true });
       }
     }
 
