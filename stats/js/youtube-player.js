@@ -81,8 +81,9 @@ export function loadYouTubeIframeApi(windowObject = window, documentObject = doc
 }
 
 export class YouTubePlayerAdapter {
-  constructor(player) {
+  constructor(player, videoId) {
     this.player = player;
+    this.videoId = videoId;
   }
 
   getCurrentSeconds() {
@@ -92,6 +93,20 @@ export class YouTubePlayerAdapter {
 
   seekTo(seconds) {
     this.player.seekTo(Math.max(0, Number(seconds) || 0), true);
+  }
+
+  seekToPaused(seconds) {
+    const target = Math.max(0, Number(seconds) || 0);
+    const state = this.player.getPlayerState();
+    if ([-1, 5].includes(state) && typeof this.player.cueVideoById === 'function') {
+      this.player.cueVideoById({
+        videoId: this.videoId,
+        startSeconds: target
+      });
+      return;
+    }
+    this.player.seekTo(target, true);
+    this.player.pauseVideo();
   }
 
   play() {
@@ -124,7 +139,7 @@ export async function createYouTubePlayer(element, videoId, { onError } = {}) {
       events: {
         onReady: () => {
           settled = true;
-          resolve(new YouTubePlayerAdapter(player));
+          resolve(new YouTubePlayerAdapter(player, videoId));
         },
         onError: event => {
           const error = new Error(describeYouTubeError(event.data));

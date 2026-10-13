@@ -67,7 +67,8 @@ export function createReportController({
   documentObject = document,
   videoController,
   previewSeconds = 0,
-  playerReview = false
+  playerReview = false,
+  initialFeedbackPlayerId = null
 }) {
   const reportCard = documentObject.querySelector('#reportCard');
   const finalScore = documentObject.querySelector('#reportFinalScore');
@@ -287,6 +288,8 @@ export function createReportController({
     }
     if (game.players.some(player => player.id === previousPlayerId)) {
       feedbackPlayer.value = previousPlayerId;
+    } else if (game.players.some(player => player.id === initialFeedbackPlayerId)) {
+      feedbackPlayer.value = initialFeedbackPlayerId;
     }
 
     feedbackList.innerHTML = '';

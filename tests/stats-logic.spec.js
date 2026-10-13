@@ -15,6 +15,31 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/stats/');
 });
 
+test('fresh paused YouTube seeks cue the requested frame without starting playback', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { YouTubePlayerAdapter } = await import('/stats/js/youtube-player.js');
+    const calls = [];
+    let state = -1;
+    const player = {
+      getPlayerState: () => state,
+      cueVideoById: options => calls.push(['cue', options]),
+      seekTo: (...args) => calls.push(['seek', ...args]),
+      pauseVideo: () => calls.push(['pause'])
+    };
+    const adapter = new YouTubePlayerAdapter(player, 'M7lc1UVf-VE');
+    adapter.seekToPaused(42.5);
+    state = 2;
+    adapter.seekToPaused(55);
+    return calls;
+  });
+
+  expect(result).toEqual([
+    ['cue', { videoId: 'M7lc1UVf-VE', startSeconds: 42.5 }],
+    ['seek', 55, true],
+    ['pause']
+  ]);
+});
+
 test('representative game produces the exact hand-calculated report', async ({ page }) => {
   const { game, expected } = await loadFixture(page);
   const report = await page.evaluate(async gameData => {

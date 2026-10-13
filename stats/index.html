@@ -23,6 +23,7 @@
         <p id="reviewModeLabel" class="eyebrow">Read-only review</p>
         <h2 id="reviewModeTitle"></h2>
         <p id="reviewModeOpponent" class="subtitle"></p>
+        <p id="sharedPlayerFeedbackSummary" class="shared-player-feedback-summary hidden"></p>
       </div>
       <div class="review-header-actions">
         <a class="nav-link" href="./">Exit review</a>
@@ -95,7 +96,7 @@
           <section class="card video-card">
             <div class="section-head">
               <div>
-                <h2>Recording</h2>
+                 <h2 id="videoCardTitle">Recording</h2>
                 <p>Current position: <strong id="currentTime">0:00.0</strong></p>
               </div>
               <div class="recording-controls">
@@ -116,6 +117,30 @@
               <button id="retryVideo" class="secondary small hidden" type="button">Retry video</button>
             </div>
             <p id="videoError" class="message error hidden" role="alert"></p>
+            <section id="sharedFeedbackPanel" class="shared-feedback-panel hidden" aria-labelledby="sharedFeedbackEventDescription">
+              <div id="sharedFeedbackMomentNavigation" class="shared-feedback-moment-navigation" aria-label="Player feedback moment navigation">
+                <button id="previousSharedFeedbackMoment" class="secondary small" type="button">Previous</button>
+                <strong id="sharedFeedbackMomentPosition" aria-live="polite">No feedback moments</strong>
+                <button id="nextSharedFeedbackMoment" class="secondary small" type="button">Next</button>
+              </div>
+              <article id="sharedFeedbackMomentCard" class="shared-feedback-moment-card">
+                <blockquote id="sharedFeedbackComment" class="coach-comment"></blockquote>
+                <div class="shared-feedback-event-row">
+                  <div class="shared-feedback-event-context">
+                    <h3 id="sharedFeedbackEventDescription">Feedback moment</h3>
+                    <p id="sharedFeedbackEventDetails" class="event-detail-badges hidden"></p>
+                  </div>
+                  <div class="shared-feedback-play-actions">
+                    <button id="playSharedFeedbackLeadIn" class="secondary small" type="button" aria-label="Play feedback moment from five seconds earlier" title="Play feedback moment from five seconds earlier">▶ Play</button>
+                  </div>
+                </div>
+                <div class="shared-feedback-metadata">
+                  <span id="sharedFeedbackReason" class="feedback-reason-badge"></span>
+                  <span aria-hidden="true">·</span>
+                  <time id="sharedFeedbackEventTime"></time>
+                </div>
+              </article>
+            </section>
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
             </div>
@@ -143,6 +168,7 @@
               <span><kbd>←</kbd> −3s</span>
               <span><kbd>→</kbd> +3s</span>
             </p>
+            <a id="viewFullGameReview" class="nav-link shared-feedback-full-game hidden" href="./">View full game</a>
             <button
               id="videoResizeHandle"
               class="video-resize-handle"

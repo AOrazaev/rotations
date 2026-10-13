@@ -1,11 +1,16 @@
-import { createEventListController } from './event-list.js';
+import { createEventListController, describeEvent } from './event-list.js';
 import { buildGameAnalysis } from './event-reducer.js';
 import { createReportController } from './report-view.js';
+import { commentMentionsPlayer } from './comment-mentions.js';
+import { getShotDetailBadges } from './shot-details.js';
+import { formatVideoTime } from './youtube-player.js';
 
 export function createReviewController({
   documentObject = document,
   videoController,
   initialTimelineFilters = null,
+  feedbackPlayerId = null,
+  onPlayerFeedbackStateChanged = () => {},
   onTimelineFiltersChanged = () => {}
 }) {
   const eventLogPanel = documentObject.querySelector('#eventLogPanel');
@@ -24,6 +29,100 @@ export function createReviewController({
   const reviewScoreBlock = documentObject.querySelector('#reviewVideoScore');
   const reviewScore = documentObject.querySelector('#reviewModeScore');
   const reviewScoreOpponent = documentObject.querySelector('#reviewScoreOpponent');
+  const playerFrame = documentObject.querySelector('#playerFrame');
+  const videoStatus = documentObject.querySelector('#videoStatus');
+  const feedbackPanel = documentObject.querySelector('#sharedFeedbackPanel');
+  const previousFeedbackMoment = documentObject.querySelector('#previousSharedFeedbackMoment');
+  const nextFeedbackMoment = documentObject.querySelector('#nextSharedFeedbackMoment');
+  const feedbackMomentPosition = documentObject.querySelector('#sharedFeedbackMomentPosition');
+  const playFeedbackLeadIn = documentObject.querySelector('#playSharedFeedbackLeadIn');
+  const feedbackReasonBadge = documentObject.querySelector('#sharedFeedbackReason');
+  const feedbackEventTime = documentObject.querySelector('#sharedFeedbackEventTime');
+  const feedbackEventDescription = documentObject.querySelector('#sharedFeedbackEventDescription');
+  const feedbackEventDetails = documentObject.querySelector('#sharedFeedbackEventDetails');
+  const feedbackComment = documentObject.querySelector('#sharedFeedbackComment');
+  let game = null;
+  let analysis = null;
+  let playbackSeconds = 0;
+  let feedbackEvents = [];
+  let feedbackMomentIndex = 0;
+  let videoReady = videoController.isReady();
+  let activeSection = feedbackPlayerId ? 'feedback' : 'team';
+
+  function feedbackReason(event, player, filters) {
+    if ([event.playerId, event.playerInId, event.playerOutId].includes(player.id)) {
+      return 'direct';
+    }
+    if (commentMentionsPlayer(event.coachComment, player)) return 'mention';
+    if (filters.teamMention) return 'team';
+    return null;
+  }
+
+  function renderFocusedFeedbackMoment() {
+    const active = Boolean(feedbackPlayerId && feedbackEvents.length);
+    feedbackPanel.classList.toggle('hidden', !active);
+    previousFeedbackMoment.disabled = !active || !videoReady || feedbackMomentIndex <= 0;
+    nextFeedbackMoment.disabled = !active || !videoReady || feedbackMomentIndex >= feedbackEvents.length - 1;
+    playFeedbackLeadIn.disabled = !active || !videoReady;
+    feedbackMomentPosition.textContent = active
+      ? `${feedbackMomentIndex + 1} of ${feedbackEvents.length}`
+      : 'No feedback moments';
+    if (!active) return;
+
+    const event = feedbackEvents[feedbackMomentIndex];
+    const player = game.players.find(item => item.id === feedbackPlayerId);
+    const playersById = Object.fromEntries(game.players.map(item => [item.id, item]));
+    const reason = feedbackReason(event, player, eventListController.getFilters());
+    const reasonLabels = {
+      direct: 'Your play',
+      mention: `Mentioned @${player.number}`,
+      team: 'Team feedback'
+    };
+    feedbackReasonBadge.dataset.feedbackReason = reason;
+    feedbackReasonBadge.textContent = reasonLabels[reason] || 'Feedback';
+    feedbackEventTime.textContent = formatVideoTime(event.videoSeconds);
+    feedbackEventDescription.textContent = describeEvent(event, playersById);
+    const detailLabels = getShotDetailBadges(event).map(badge => badge.label);
+    feedbackEventDetails.textContent = detailLabels.join(' · ');
+    feedbackEventDetails.classList.toggle('hidden', !detailLabels.length);
+    feedbackComment.textContent = String(event.coachComment || '').trim();
+    feedbackComment.classList.toggle('hidden', !feedbackComment.textContent);
+  }
+
+  function handleVisibleEventsChanged(events, filters) {
+    const player = game?.players.find(item => item.id === feedbackPlayerId);
+    const active = Boolean(
+      player
+      && filters.players.length === 1
+      && filters.players[0] === feedbackPlayerId
+    );
+    feedbackEvents = active ? events : [];
+    feedbackMomentIndex = Math.min(
+      feedbackMomentIndex,
+      Math.max(0, feedbackEvents.length - 1)
+    );
+    const reasons = active
+      ? feedbackEvents.map(event => feedbackReason(event, player, filters))
+      : [];
+    onPlayerFeedbackStateChanged({
+      active,
+      player: player ? structuredClone(player) : null,
+      total: feedbackEvents.length,
+      direct: reasons.filter(reason => reason === 'direct').length,
+      mentions: reasons.filter(reason => reason === 'mention').length,
+      team: reasons.filter(reason => reason === 'team').length
+    });
+    if (!active && activeSection === 'feedback') activeSection = 'team';
+    renderFocusedFeedbackMoment();
+  }
+
+  function selectFeedbackEvent(eventId) {
+    const index = feedbackEvents.findIndex(event => event.id === eventId);
+    if (index < 0) return;
+    feedbackMomentIndex = index;
+    renderFocusedFeedbackMoment();
+  }
+
   const eventListController = createEventListController({
     documentObject,
     videoController,
@@ -31,18 +130,18 @@ export function createReviewController({
     initialEarliestFirst: true,
     followPlayback: true,
     initialFilters: initialTimelineFilters,
+    feedbackPlayerId,
+    onVisibleEventsChanged: handleVisibleEventsChanged,
+    onEventPlayed: event => selectFeedbackEvent(event.id),
     onFiltersChanged: onTimelineFiltersChanged
   });
   const reportController = createReportController({
     documentObject,
     videoController,
     previewSeconds: 3,
-    playerReview: true
+    playerReview: true,
+    initialFeedbackPlayerId: feedbackPlayerId
   });
-  let game = null;
-  let analysis = null;
-  let playbackSeconds = 0;
-  let activeSection = 'team';
 
   undoButton.remove();
   eventTimelineInstruction.textContent = 'Play recorded events.';
@@ -121,7 +220,72 @@ export function createReviewController({
 
   const unsubscribeTime = videoController.subscribeTime(seconds => {
     playbackSeconds = seconds;
+    if (feedbackEvents.length) {
+      const targetSeconds = seconds + 3;
+      let nearestIndex = 0;
+      for (let index = 1; index < feedbackEvents.length; index += 1) {
+        if (
+          Math.abs(feedbackEvents[index].videoSeconds - targetSeconds)
+          < Math.abs(feedbackEvents[nearestIndex].videoSeconds - targetSeconds)
+        ) {
+          nearestIndex = index;
+        }
+      }
+      feedbackMomentIndex = nearestIndex;
+      renderFocusedFeedbackMoment();
+    }
     updatePlaybackScore();
+  });
+
+  function moveFeedbackMoment(offset) {
+    if (!feedbackEvents.length || !videoReady) return;
+    const nextIndex = Math.min(
+      feedbackEvents.length - 1,
+      Math.max(0, feedbackMomentIndex + offset)
+    );
+    if (nextIndex === feedbackMomentIndex && offset !== 0) return;
+    feedbackMomentIndex = nextIndex;
+    const event = feedbackEvents[nextIndex];
+    renderFocusedFeedbackMoment();
+    videoController.seekToPaused(Math.max(0, event.videoSeconds - 5));
+    eventListController.revealEvent(event.id);
+  }
+
+  function playFeedbackMoment(previewSeconds) {
+    if (!feedbackEvents.length || !videoReady) return;
+    if (documentObject.defaultView.matchMedia(
+      '(max-width: 760px), (max-height: 760px)'
+    ).matches) {
+      const fullscreenTarget = playerFrame.querySelector('iframe') || playerFrame;
+      const requestFullscreen = fullscreenTarget.requestFullscreen
+        || fullscreenTarget.webkitRequestFullscreen;
+      if (!requestFullscreen) {
+        videoStatus.textContent = 'Video is playing. Full screen is unavailable in this browser.';
+      } else {
+        try {
+          const fullscreenRequest = requestFullscreen.call(fullscreenTarget);
+          fullscreenRequest?.catch(() => {
+            videoStatus.textContent = 'Video is playing. Full screen could not be opened.';
+          });
+        } catch {
+          videoStatus.textContent = 'Video is playing. Full screen could not be opened.';
+        }
+      }
+    }
+    const event = feedbackEvents[feedbackMomentIndex];
+    videoController.seekTo(Math.max(0, event.videoSeconds - previewSeconds));
+    videoController.play();
+  }
+
+  const handlePreviousFeedbackMoment = () => moveFeedbackMoment(-1);
+  const handleNextFeedbackMoment = () => moveFeedbackMoment(1);
+  const handlePlayFeedbackLeadIn = () => playFeedbackMoment(5);
+  previousFeedbackMoment.addEventListener('click', handlePreviousFeedbackMoment);
+  nextFeedbackMoment.addEventListener('click', handleNextFeedbackMoment);
+  playFeedbackLeadIn.addEventListener('click', handlePlayFeedbackLeadIn);
+  const unsubscribeReady = videoController.subscribeReady(ready => {
+    videoReady = ready;
+    renderFocusedFeedbackMoment();
   });
 
   function render() {
@@ -153,6 +317,10 @@ export function createReviewController({
     destroy() {
       navigation.removeEventListener('click', handleNavigationClick);
       navigation.removeEventListener('keydown', handleNavigationKeydown);
+      previousFeedbackMoment.removeEventListener('click', handlePreviousFeedbackMoment);
+      nextFeedbackMoment.removeEventListener('click', handleNextFeedbackMoment);
+      playFeedbackLeadIn.removeEventListener('click', handlePlayFeedbackLeadIn);
+      unsubscribeReady();
       unsubscribeTime();
       eventListController.destroy();
     }

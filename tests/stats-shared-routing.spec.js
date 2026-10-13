@@ -1,17 +1,21 @@
 const { test, expect } = require('@playwright/test');
 
-async function installSharedTestEnvironment(page) {
-  await page.addInitScript(() => {
+async function installSharedTestEnvironment(page, { delayPlayer = false } = {}) {
+  await page.addInitScript(({ delayPlayer }) => {
     window.__statsFakePlayer = {
       current: 0,
       calls: [],
       getCurrentSeconds() { return this.current; },
       seekTo(seconds) { this.current = seconds; this.calls.push(['seek', seconds]); },
       play() { this.calls.push(['play']); },
-      pause() {},
+      pause() { this.calls.push(['pause']); },
       destroy() {}
     };
-    window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
+    window.__STATS_PLAYER_FACTORY__ = delayPlayer
+      ? () => new Promise(resolve => {
+        window.__resolveStatsFakePlayer = () => resolve(window.__statsFakePlayer);
+      })
+      : async () => window.__statsFakePlayer;
     window.__sharedIndexedDbWrites = 0;
     window.__sharedClipboardWrites = [];
     Object.defineProperty(navigator, 'clipboard', {
@@ -27,7 +31,7 @@ async function installSharedTestEnvironment(page) {
         return original.apply(this, args);
       };
     }
-  });
+  }, { delayPlayer });
 }
 
 test('shared route parser accepts safe names and rejects paths or file extensions', async ({ page }) => {
@@ -238,6 +242,210 @@ test('shared player filters include jersey mentions without including team menti
   expect(visibleEventIds).toContain(mentionedOnlyEvent.id);
   expect(visibleEventIds.some(eventId => teamOnlyEventIds.includes(eventId))).toBe(false);
   expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
+});
+
+test('single-player shared links open a personalized navigable feedback view', async ({ page, request }) => {
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await installSharedTestEnvironment(page);
+  const publishedBackup = await request.get('/games/game-20260927.json').then(response => response.json());
+  const game = publishedBackup.game;
+  const player = game.players.find(item => item.number === '13');
+  const mentions = event => [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+    .map(match => match[1].toLowerCase());
+  const directlyInvolvesPlayer = event => [
+    event.playerId,
+    event.playerInId,
+    event.playerOutId
+  ].includes(player.id);
+  const feedbackEvents = game.events
+    .filter(event =>
+      String(event.coachComment || '').trim()
+      && (
+        directlyInvolvesPlayer(event)
+        || mentions(event).includes(String(player.number).toLowerCase())
+      )
+    )
+    .sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
+  const mentionedOnlyEvent = feedbackEvents.find(event => !directlyInvolvesPlayer(event));
+  expect(feedbackEvents.length).toBeGreaterThan(1);
+  expect(mentionedOnlyEvent).toBeTruthy();
+
+  await page.goto(
+    `/stats/?mode=shared&game=game-20260927`
+    + `&tl-player=${encodeURIComponent(player.id)}&tl-comment=with`
+  );
+  await page.evaluate(() => window.__statsApp.ready);
+
+  await expect(page.locator('#reviewModeHeader')).toBeHidden();
+  await expect(page.locator('#videoCardTitle')).toHaveText(
+    `Feedback for #${player.number} ${player.name} · vs ${game.opponentName}`
+  );
+  await expect(page.locator('#viewFullGameReview')).toHaveAttribute(
+    'href',
+    '/stats/?mode=shared&game=game-20260927'
+  );
+  await expect(page.locator('#viewFullGameReview')).toBeVisible();
+  await expect(page.locator('#reviewModeHeader .nav-link', { hasText: 'Exit review' })).toBeHidden();
+  await expect(page.locator('#eventLogPanel')).toBeHidden();
+  await expect(page.locator('#reviewNavigation')).toBeHidden();
+  await expect(page.locator('#reportCard')).toBeHidden();
+  await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
+  await expect(page.locator('#sharedFeedbackEventTime')).toHaveText(/\d+:\d{2}\.\d/);
+  await expect(page.locator('#sharedFeedbackComment')).toHaveText(feedbackEvents[0].coachComment);
+  const focusedLayout = await page.evaluate(() => Object.fromEntries(
+    Object.entries({
+      panel: '#sharedFeedbackPanel',
+      video: '#playerFrame',
+      fullGame: '#viewFullGameReview',
+      shell: '#reviewShell',
+      column: '.center-panel'
+    }).map(([key, selector]) => {
+      const box = document.querySelector(selector).getBoundingClientRect();
+      return [key, { top: box.top, bottom: box.bottom, left: box.left, width: box.width }];
+    })
+  ));
+  expect(focusedLayout.panel.bottom).toBeLessThanOrEqual(focusedLayout.video.top);
+  expect(focusedLayout.fullGame.top).toBeGreaterThanOrEqual(focusedLayout.video.bottom);
+  const shellCenter = focusedLayout.shell.left + focusedLayout.shell.width / 2;
+  const columnCenter = focusedLayout.column.left + focusedLayout.column.width / 2;
+  expect(Math.abs(shellCenter - columnCenter)).toBeLessThan(2);
+
+  const mentionedOnlyIndex = feedbackEvents.findIndex(event => event.id === mentionedOnlyEvent.id);
+  expect(mentionedOnlyIndex).toBeGreaterThan(0);
+  await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+  await page.locator('#nextSharedFeedbackMoment').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+    ['seek', Math.max(0, feedbackEvents[1].videoSeconds - 5)],
+    ['pause']
+  ]);
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`2 of ${feedbackEvents.length}`);
+  await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+  await page.locator('#previousSharedFeedbackMoment').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+    ['seek', Math.max(0, feedbackEvents[0].videoSeconds - 5)],
+    ['pause']
+  ]);
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
+
+  for (let index = 0; index < mentionedOnlyIndex; index += 1) {
+    await page.locator('#nextSharedFeedbackMoment').click();
+  }
+  await expect(page.locator('#sharedFeedbackReason')).toHaveText(`Mentioned @${player.number}`);
+  await expect(page.locator('#sharedFeedbackComment')).toHaveText(mentionedOnlyEvent.coachComment);
+  const feedbackCardLayout = await page.locator('#sharedFeedbackMomentCard').evaluate(card => {
+    const cardBox = card.getBoundingClientRect();
+    const commentBox = card.querySelector('#sharedFeedbackComment').getBoundingClientRect();
+    const eventBox = card.querySelector('.shared-feedback-event-row').getBoundingClientRect();
+    const metadataBox = card.querySelector('.shared-feedback-metadata').getBoundingClientRect();
+    const commentStyle = getComputedStyle(card.querySelector('#sharedFeedbackComment'));
+    const eventStyle = getComputedStyle(card.querySelector('#sharedFeedbackEventDescription'));
+    const metadataStyle = getComputedStyle(card.querySelector('.shared-feedback-metadata'));
+    return {
+      columns: getComputedStyle(card).gridTemplateColumns.split(' ').length,
+      cardWidth: cardBox.width,
+      commentWidth: commentBox.width,
+      commentTop: commentBox.top,
+      eventTop: eventBox.top,
+      metadataTop: metadataBox.top,
+      commentFontSize: Number.parseFloat(commentStyle.fontSize),
+      eventFontSize: Number.parseFloat(eventStyle.fontSize),
+      metadataFontSize: Number.parseFloat(metadataStyle.fontSize)
+    };
+  });
+  expect(feedbackCardLayout.columns).toBe(1);
+  expect(feedbackCardLayout.commentWidth).toBeGreaterThan(feedbackCardLayout.cardWidth * 0.9);
+  expect(feedbackCardLayout.commentTop).toBeLessThan(feedbackCardLayout.eventTop);
+  expect(feedbackCardLayout.eventTop).toBeLessThan(feedbackCardLayout.metadataTop);
+  expect(feedbackCardLayout.commentFontSize).toBeGreaterThan(feedbackCardLayout.eventFontSize);
+  expect(feedbackCardLayout.eventFontSize).toBeGreaterThan(feedbackCardLayout.metadataFontSize);
+
+  await expect(page.locator('#replaySharedFeedbackMoment')).toHaveCount(0);
+  await expect(page.locator('#playSharedFeedbackLeadIn')).toHaveText('▶ Play');
+  await page.evaluate(() => {
+    window.__statsFakePlayer.calls = [];
+    window.__fullscreenRequests = 0;
+    document.querySelector('#playerFrame').requestFullscreen = () => {
+      window.__fullscreenRequests += 1;
+      return Promise.resolve();
+    };
+  });
+  await page.locator('#playSharedFeedbackLeadIn').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+    ['seek', Math.max(0, mentionedOnlyEvent.videoSeconds - 5)],
+    ['play']
+  ]);
+  expect(await page.evaluate(() => window.__fullscreenRequests)).toBe(0);
+
+  await page.locator('#viewFullGameReview').click();
+  await page.waitForURL('**/stats/?mode=shared&game=game-20260927');
+  await page.evaluate(() => window.__statsApp.ready);
+  await expect(page.locator('#reviewModeLabel')).toHaveText('Shared read-only review');
+  await expect(page.locator('#reviewModeTitle')).toHaveText(game.title);
+  await expect(page.locator('#reviewModeHeader')).toBeVisible();
+  await expect(page.locator('#videoCardTitle')).toHaveText('Recording');
+  await expect(page.locator('#sharedPlayerFeedbackSummary')).toBeHidden();
+  await expect(page.locator('#sharedFeedbackPanel')).toBeHidden();
+  await expect(page.locator('#eventLogPanel')).toBeVisible();
+  await expect(page.locator('#reviewNavigation')).toBeVisible();
+});
+
+test('focused feedback controls wait for the recording player to initialize', async ({ page }) => {
+  await installSharedTestEnvironment(page, { delayPlayer: true });
+  await page.goto(
+    '/stats/?mode=shared&game=game-20260927'
+    + '&tl-player=b919d79b-4d8e-4505-a70b-8a4e139cd660&tl-comment=with'
+  );
+  await page.evaluate(() => window.__statsApp.ready);
+
+  await expect(page.locator('#previousSharedFeedbackMoment')).toBeDisabled();
+  await expect(page.locator('#nextSharedFeedbackMoment')).toBeDisabled();
+  await expect(page.locator('#playSharedFeedbackLeadIn')).toBeDisabled();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([]);
+
+  await page.evaluate(() => window.__resolveStatsFakePlayer());
+
+  await expect(page.locator('#nextSharedFeedbackMoment')).toBeEnabled();
+  await expect(page.locator('#playSharedFeedbackLeadIn')).toBeEnabled();
+});
+
+test('single-player shared feedback replaces the mobile timeline sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 900 });
+  await installSharedTestEnvironment(page);
+  await page.goto(
+    '/stats/?mode=shared&game=game-20260927'
+    + '&tl-player=b919d79b-4d8e-4505-a70b-8a4e139cd660&tl-comment=with'
+  );
+  await page.evaluate(() => window.__statsApp.ready);
+
+  await expect(page.locator('#eventLogPanel')).toBeHidden();
+  await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
+  await expect(page.locator('#sharedFeedbackComment')).toBeVisible();
+  await page.evaluate(() => {
+    window.__statsFakePlayer.calls = [];
+    window.__fullscreenRequests = 0;
+    document.querySelector('#playerFrame').requestFullscreen = () => {
+      window.__fullscreenRequests += 1;
+      return Promise.resolve();
+    };
+  });
+  await page.locator('#playSharedFeedbackLeadIn').click();
+  const playback = await page.evaluate(() => ({
+    fullscreenRequests: window.__fullscreenRequests,
+    playerCalls: window.__statsFakePlayer.calls
+  }));
+  expect(playback.fullscreenRequests).toBe(1);
+  expect(playback.playerCalls).toHaveLength(2);
+  expect(playback.playerCalls[0][0]).toBe('seek');
+  expect(playback.playerCalls[1]).toEqual(['play']);
+
+  await page.setViewportSize({ width: 900, height: 600 });
+  await page.evaluate(() => {
+    window.__statsFakePlayer.calls = [];
+    window.__fullscreenRequests = 0;
+  });
+  await page.locator('#playSharedFeedbackLeadIn').click();
+  expect(await page.evaluate(() => window.__fullscreenRequests)).toBe(1);
 });
 
 test('shared routes show explicit missing, unsafe, unavailable, and invalid backup errors', async ({ page }) => {
