@@ -68,9 +68,11 @@ export function createStatsSpikeApp({
   }
 
   function createPlayerMount() {
+    const focusedFeedbackPlay = playerFrame.querySelector('#playFocusedFeedbackVideo');
     const element = documentObject.createElement('div');
     element.id = 'youtubePlayer';
     playerFrame.replaceChildren(element);
+    if (focusedFeedbackPlay) playerFrame.append(focusedFeedbackPlay);
     return element;
   }
 

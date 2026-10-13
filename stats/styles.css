@@ -51,6 +51,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .shared-player-feedback-mode #reviewNavigation,
 .shared-player-feedback-mode #reportCard { display: none; }
 .shared-player-feedback-mode #videoStatus { display: none; }
+.shared-player-feedback-mode #videoCurrentPosition { display: none; }
 .shared-player-feedback-mode .video-card > .section-head .playback-actions { display: none; }
 .shared-player-feedback-mode .workspace > .video-card { position: static; }
 .shared-feedback-panel { display: grid; gap: 7px; margin-top: 10px; padding: 10px; background: rgba(109, 124, 255, .04); border: 1px solid rgba(109, 124, 255, .28); border-radius: 12px; }
@@ -334,6 +335,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
   border-radius: 14px;
 }
 .player-frame iframe, #youtubePlayer { width: 100%; height: 100%; }
+.focused-feedback-video-play { position: absolute; z-index: 2; inset: 0; display: grid; place-items: center; width: 100%; height: 100%; padding: 0; background: transparent; border: 0; border-radius: 14px; box-shadow: none; }
+.focused-feedback-video-play span { display: grid; place-items: center; width: 58px; height: 58px; padding-left: 4px; color: #fff; background: rgba(8, 14, 27, .78); border: 1px solid rgba(255, 255, 255, .72); border-radius: 50%; box-shadow: 0 8px 24px rgba(0, 0, 0, .38); font-size: 1.35rem; }
+.focused-feedback-video-play:hover span, .focused-feedback-video-play:focus-visible span { background: rgba(109, 124, 255, .9); }
 .video-shortcuts { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 9px 0 0; color: var(--muted); font-size: .75rem; }
 .video-shortcuts span { white-space: nowrap; }
 .video-shortcuts kbd { padding: 2px 5px; color: var(--text); background: #0a1220; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-weight: 700; }

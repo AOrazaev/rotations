@@ -292,6 +292,7 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#playVideo')).toBeHidden();
   await expect(page.locator('#pauseVideo')).toBeHidden();
   await expect(page.locator('#videoStatus')).toBeHidden();
+  await expect(page.locator('#videoCurrentPosition')).toBeHidden();
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
   await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
   await expect(page.locator('#sharedFeedbackEventTime')).toHaveText(/\d+:\d{2}\.\d/);
@@ -408,6 +409,7 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#playVideo')).toBeVisible();
   await expect(page.locator('#pauseVideo')).toBeVisible();
   await expect(page.locator('#videoStatus')).toBeVisible();
+  await expect(page.locator('#videoCurrentPosition')).toBeVisible();
 });
 
 test('focused feedback controls wait for the recording player to initialize', async ({ page }) => {
@@ -445,6 +447,13 @@ test('single-player shared feedback replaces the mobile timeline sheet', async (
   await expect(page.locator('#eventLogPanel')).toBeHidden();
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
   await expect(page.locator('#sharedFeedbackComment')).toBeVisible();
+  await expect(page.locator('#playFocusedFeedbackVideo')).toBeVisible();
+  await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
+  await page.locator('#playFocusedFeedbackVideo').click();
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+    ['play']
+  ]);
+  await expect(page.locator('#playFocusedFeedbackVideo')).toBeHidden();
   await page.evaluate(() => {
     window.__statsFakePlayer.calls = [];
     window.__fullscreenRequests = 0;
@@ -468,6 +477,7 @@ test('single-player shared feedback replaces the mobile timeline sheet', async (
     document.dispatchEvent(new Event('fullscreenchange'));
   });
   expect(await page.evaluate(() => window.__statsFakePlayer.calls.at(-1))).toEqual(['pause']);
+  await expect(page.locator('#playFocusedFeedbackVideo')).toBeVisible();
 
   await page.setViewportSize({ width: 900, height: 600 });
   await page.evaluate(() => {

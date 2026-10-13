@@ -97,7 +97,7 @@
             <div class="section-head">
               <div>
                  <h2 id="videoCardTitle">Recording</h2>
-                <p>Current position: <strong id="currentTime">0:00.0</strong></p>
+                <p id="videoCurrentPosition">Current position: <strong id="currentTime">0:00.0</strong></p>
               </div>
               <div class="recording-controls">
                 <div class="playback-actions">
@@ -143,6 +143,9 @@
             </section>
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
+              <button id="playFocusedFeedbackVideo" class="focused-feedback-video-play hidden" type="button" aria-label="Play feedback video">
+                <span aria-hidden="true">▶</span>
+              </button>
             </div>
             <div id="trackerVideoScore" class="tracker-video-score hidden" role="status" aria-live="polite" aria-label="Recorded score: Our team 0, Opponent 0">
               <span class="tracker-score-side tracker-score-team">

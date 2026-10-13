@@ -30,6 +30,7 @@ export function createReviewController({
   const reviewScore = documentObject.querySelector('#reviewModeScore');
   const reviewScoreOpponent = documentObject.querySelector('#reviewScoreOpponent');
   const playerFrame = documentObject.querySelector('#playerFrame');
+  const playFocusedFeedbackVideo = documentObject.querySelector('#playFocusedFeedbackVideo');
   const videoStatus = documentObject.querySelector('#videoStatus');
   const feedbackPanel = documentObject.querySelector('#sharedFeedbackPanel');
   const previousFeedbackMoment = documentObject.querySelector('#previousSharedFeedbackMoment');
@@ -92,6 +93,16 @@ export function createReviewController({
     feedbackComment.classList.toggle('hidden', !feedbackComment.textContent);
   }
 
+  function setFocusedVideoPlayVisible(visible) {
+    const mobile = documentObject.defaultView.matchMedia(
+      '(max-width: 760px), (max-height: 760px)'
+    ).matches;
+    playFocusedFeedbackVideo.classList.toggle(
+      'hidden',
+      !visible || !mobile || !feedbackPlayerId
+    );
+  }
+
   function positionInitialFeedbackMoment() {
     if (initialFeedbackPositioned || !videoReady || !feedbackEvents.length) return;
     initialFeedbackPositioned = true;
@@ -99,6 +110,7 @@ export function createReviewController({
     const event = feedbackEvents[0];
     renderFocusedFeedbackMoment();
     videoController.seekToPaused(Math.max(0, event.videoSeconds - 5));
+    setFocusedVideoPlayVisible(true);
   }
 
   function handleVisibleEventsChanged(events, filters) {
@@ -261,11 +273,13 @@ export function createReviewController({
     const event = feedbackEvents[nextIndex];
     renderFocusedFeedbackMoment();
     videoController.seekToPaused(Math.max(0, event.videoSeconds - 5));
+    setFocusedVideoPlayVisible(true);
     eventListController.revealEvent(event.id);
   }
 
   function playFeedbackMoment(previewSeconds) {
     if (!feedbackEvents.length || !videoReady) return;
+    setFocusedVideoPlayVisible(false);
     if (documentObject.defaultView.matchMedia(
       '(max-width: 760px), (max-height: 760px)'
     ).matches) {
@@ -301,6 +315,12 @@ export function createReviewController({
     videoController.play();
   }
 
+  function handleFocusedVideoPlay() {
+    if (!videoReady) return;
+    setFocusedVideoPlayVisible(false);
+    videoController.play();
+  }
+
   function handleFeedbackFullscreenChange() {
     if (!feedbackFullscreenActive) return;
     const fullscreenElement = documentObject.fullscreenElement
@@ -308,7 +328,10 @@ export function createReviewController({
     if (fullscreenElement === feedbackFullscreenTarget) return;
     feedbackFullscreenActive = false;
     feedbackFullscreenTarget = null;
-    if (videoReady) videoController.pause();
+    if (videoReady) {
+      videoController.pause();
+      setFocusedVideoPlayVisible(true);
+    }
   }
 
   const handlePreviousFeedbackMoment = () => moveFeedbackMoment(-1);
@@ -317,11 +340,15 @@ export function createReviewController({
   previousFeedbackMoment.addEventListener('click', handlePreviousFeedbackMoment);
   nextFeedbackMoment.addEventListener('click', handleNextFeedbackMoment);
   playFeedbackLeadIn.addEventListener('click', handlePlayFeedbackLeadIn);
+  playFocusedFeedbackVideo.addEventListener('click', handleFocusedVideoPlay);
   documentObject.addEventListener('fullscreenchange', handleFeedbackFullscreenChange);
   documentObject.addEventListener('webkitfullscreenchange', handleFeedbackFullscreenChange);
   const unsubscribeReady = videoController.subscribeReady(ready => {
     videoReady = ready;
-    if (!ready) initialFeedbackPositioned = false;
+    if (!ready) {
+      initialFeedbackPositioned = false;
+      setFocusedVideoPlayVisible(false);
+    }
     renderFocusedFeedbackMoment();
     positionInitialFeedbackMoment();
   });
@@ -359,6 +386,7 @@ export function createReviewController({
       previousFeedbackMoment.removeEventListener('click', handlePreviousFeedbackMoment);
       nextFeedbackMoment.removeEventListener('click', handleNextFeedbackMoment);
       playFeedbackLeadIn.removeEventListener('click', handlePlayFeedbackLeadIn);
+      playFocusedFeedbackVideo.removeEventListener('click', handleFocusedVideoPlay);
       documentObject.removeEventListener('fullscreenchange', handleFeedbackFullscreenChange);
       documentObject.removeEventListener('webkitfullscreenchange', handleFeedbackFullscreenChange);
       unsubscribeReady();
