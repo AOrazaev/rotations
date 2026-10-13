@@ -14,6 +14,7 @@ import { createVoiceCaptureController } from './voice-capture.js';
 import { VoiceCompanionClient } from './voice-companion-client.js';
 import {
   buildReviewUrl,
+  buildSharedFeedbackUrl,
   buildSharedReviewUrl,
   parseStatsRoute
 } from './review-route.js';
@@ -341,7 +342,7 @@ let setupController;
 let eventController;
 let reviewController;
 let voiceController;
-const sharedFeedbackPlayerId = sharedMode
+let sharedFeedbackPlayerId = sharedMode
   && route.timelineFilters?.comment === 'with'
   && route.timelineFilters?.players?.length === 1
   ? route.timelineFilters.players[0]
@@ -410,7 +411,31 @@ function showReviewRouteState(title, message) {
   reviewRouteState.classList.remove('hidden');
 }
 
+function usesShortFeedbackFilters(timelineFilters) {
+  if (!route.shortFeedback || !sharedFeedbackPlayerId || !timelineFilters) return false;
+  return timelineFilters.comment === 'with'
+    && timelineFilters.players?.length === 1
+    && timelineFilters.players[0] === sharedFeedbackPlayerId
+    && !timelineFilters.teamMention
+    && [
+      'sides',
+      'types',
+      'shotZones',
+      'shotPressures',
+      'shotPhases',
+      'shotContexts',
+      'shotCreations'
+    ].every(key => !timelineFilters[key]?.length);
+}
+
 function buildCurrentReviewUrl(timelineFilters = route.timelineFilters || null) {
+  if (sharedMode && usesShortFeedbackFilters(timelineFilters)) {
+    return buildSharedFeedbackUrl(
+      route.snapshotName,
+      route.feedbackNumber,
+      location.pathname
+    );
+  }
   return sharedMode
     ? buildSharedReviewUrl(route.snapshotName, location.pathname, timelineFilters)
     : buildReviewUrl(route.gameId, location.pathname, timelineFilters);
@@ -441,6 +466,10 @@ async function initializeReviewMode() {
         ? 'The published game name in this shared review link is invalid.'
         : 'The game identifier in this review link is invalid.'
     );
+    return;
+  }
+  if (route.status === 'invalid-feedback') {
+    showReviewRouteState('Invalid feedback link', 'The player number in this feedback link is invalid.');
     return;
   }
 
@@ -480,9 +509,37 @@ async function initializeReviewMode() {
     }
   }
 
-  const canonicalUrl = sharedMode
-    ? buildSharedReviewUrl(route.snapshotName, location.pathname, route.timelineFilters)
-    : buildReviewUrl(game.id, location.pathname, route.timelineFilters);
+  if (route.shortFeedback) {
+    const matchingPlayers = game.players.filter(player =>
+      String(player.number || '').toLowerCase() === route.feedbackNumber.toLowerCase()
+    );
+    if (matchingPlayers.length === 0) {
+      showReviewRouteState('404', '');
+      return;
+    }
+    if (matchingPlayers.length > 1) {
+      showReviewRouteState(
+        'Duplicate jersey number',
+        `More than one player in this game uses #${route.feedbackNumber}.`
+      );
+      return;
+    }
+    sharedFeedbackPlayerId = matchingPlayers[0].id;
+    route.timelineFilters = {
+      players: [sharedFeedbackPlayerId],
+      comment: 'with'
+    };
+  }
+
+  reviewController = createReviewController({
+    videoController,
+    initialTimelineFilters: route.timelineFilters,
+    feedbackPlayerId: sharedFeedbackPlayerId,
+    onPlayerFeedbackStateChanged: updateSharedPlayerFeedbackState,
+    onTimelineFiltersChanged: syncReviewUrl
+  });
+
+  const canonicalUrl = buildCurrentReviewUrl(route.timelineFilters);
   if (`${location.pathname}${location.search}` !== canonicalUrl) {
     history.replaceState({}, '', canonicalUrl);
   }
@@ -498,13 +555,6 @@ async function initializeReviewMode() {
 
 let ready;
 if (reviewMode) {
-  reviewController = createReviewController({
-    videoController,
-    initialTimelineFilters: route.timelineFilters,
-    feedbackPlayerId: sharedFeedbackPlayerId,
-    onPlayerFeedbackStateChanged: updateSharedPlayerFeedbackState,
-    onTimelineFiltersChanged: syncReviewUrl
-  });
   removeReviewMutationSurfaces();
   ready = initializeReviewMode();
 } else {
@@ -548,7 +598,9 @@ window.__statsApp = {
   setupController,
   eventController,
   voiceController,
-  reviewController,
+  get reviewController() {
+    return reviewController;
+  },
   store,
   destroy() {
     videoController.destroy();

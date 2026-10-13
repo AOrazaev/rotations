@@ -37,9 +37,15 @@ async function installSharedTestEnvironment(page, { delayPlayer = false } = {}) 
 test('shared route parser accepts safe names and rejects paths or file extensions', async ({ page }) => {
   await page.goto('/stats/');
   const result = await page.evaluate(async () => {
-    const { buildSharedReviewUrl, parseStatsRoute } = await import('/stats/js/review-route.js');
+    const {
+      buildSharedFeedbackUrl,
+      buildSharedReviewUrl,
+      parseStatsRoute
+    } = await import('/stats/js/review-route.js');
     return {
       valid: parseStatsRoute('?mode=shared&game=game-20260927'),
+      shortFeedback: parseStatsRoute('?game=game-20260927&feedback=13'),
+      invalidFeedback: parseStatsRoute('?game=game-20260927&feedback=%2013'),
       missing: parseStatsRoute('?mode=shared'),
       traversal: parseStatsRoute('?mode=shared&game=..%2Fsecret'),
       extension: parseStatsRoute('?mode=shared&game=game.json'),
@@ -49,6 +55,7 @@ test('shared route parser accepts safe names and rejects paths or file extension
         + '&tl-type=shot&tl-type=invalid&tl-pressure=open&tl-comment=with'
       ),
       built: buildSharedReviewUrl('game-20260927', '/rotations/stats/'),
+      builtFeedback: buildSharedFeedbackUrl('game-20260927', '13', '/rotations/stats/'),
       builtFiltered: buildSharedReviewUrl('game-20260927', '/rotations/stats/', {
         players: ['p1'],
         types: ['shot'],
@@ -60,6 +67,20 @@ test('shared route parser accepts safe names and rejects paths or file extension
 
   expect(result).toEqual({
     valid: { mode: 'shared', status: 'ready', snapshotName: 'game-20260927' },
+    shortFeedback: {
+      mode: 'shared',
+      status: 'ready',
+      snapshotName: 'game-20260927',
+      feedbackNumber: '13',
+      shortFeedback: true
+    },
+    invalidFeedback: {
+      mode: 'shared',
+      status: 'invalid-feedback',
+      snapshotName: 'game-20260927',
+      feedbackNumber: null,
+      shortFeedback: true
+    },
     missing: { mode: 'shared', status: 'missing-game', snapshotName: null },
     traversal: { mode: 'shared', status: 'invalid-game', snapshotName: null },
     extension: { mode: 'shared', status: 'invalid-game', snapshotName: null },
@@ -76,9 +97,37 @@ test('shared route parser accepts safe names and rejects paths or file extension
       }
     },
     built: '/rotations/stats/?mode=shared&game=game-20260927',
+    builtFeedback: '/rotations/stats/?game=game-20260927&feedback=13',
     builtFiltered: '/rotations/stats/?mode=shared&game=game-20260927'
       + '&tl-type=shot&tl-pressure=open&tl-player=p1&tl-comment=with'
   });
+});
+
+test('short feedback links resolve jersey numbers and remain short across reloads', async ({ page, request }) => {
+  await installSharedTestEnvironment(page);
+  const publishedBackup = await request.get('/games/game-20260927.json').then(response => response.json());
+  const player = publishedBackup.game.players.find(item => item.number === '13');
+  expect(player).toBeTruthy();
+
+  await page.goto('/stats/?game=game-20260927&feedback=13&ignored=value');
+  await page.evaluate(() => window.__statsApp.ready);
+
+  expect(new URL(page.url()).search).toBe('?game=game-20260927&feedback=13');
+  await expect(page.locator('#videoCardTitle')).toHaveText(
+    `Feedback for #13 ${player.name} · vs ${publishedBackup.game.opponentName}`
+  );
+  await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
+  await expect(page.locator('#focusedPlayerReportCard')).toBeVisible();
+  await expect(page.locator('#viewFullGameReview')).toHaveAttribute(
+    'href',
+    '/stats/?mode=shared&game=game-20260927'
+  );
+  expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
+
+  await page.reload();
+  await page.evaluate(() => window.__statsApp.ready);
+  expect(new URL(page.url()).search).toBe('?game=game-20260927&feedback=13');
+  await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
 });
 
 test('published game opens as a reload-safe zero-write shared Review link', async ({ page, request }) => {
@@ -531,7 +580,7 @@ test('single-player shared feedback replaces the mobile timeline sheet', async (
   expect(await page.evaluate(() => window.__fullscreenRequests)).toBe(1);
 });
 
-test('shared routes show explicit missing, unsafe, unavailable, and invalid backup errors', async ({ page }) => {
+test('shared routes show explicit missing, unsafe, unavailable, and invalid backup errors', async ({ page, request }) => {
   await installSharedTestEnvironment(page);
 
   await page.goto('/stats/?mode=shared');
@@ -547,6 +596,30 @@ test('shared routes show explicit missing, unsafe, unavailable, and invalid back
   await page.evaluate(() => window.__statsApp.ready);
   await expect(page.locator('#reviewRouteTitle')).toHaveText('Shared game not found');
   await expect(page.locator('#reviewRouteMessage')).toContainText('file was not found');
+
+  await page.goto('/stats/?game=game-20260927&feedback=999');
+  await page.evaluate(() => window.__statsApp.ready);
+  await expect(page.locator('#reviewRouteTitle')).toHaveText('404');
+  await expect(page.locator('#reviewRouteMessage')).toBeEmpty();
+  await expect(page.locator('#statsShell')).toBeHidden();
+
+  const duplicateBackup = await request.get('/games/game-20260927.json').then(response => response.json());
+  const numberedPlayer = duplicateBackup.game.players.find(player => player.number);
+  const duplicatePlayer = duplicateBackup.game.players.find(player => player.id !== numberedPlayer.id);
+  duplicatePlayer.number = numberedPlayer.number;
+  await page.route('**/games/duplicate-feedback.json', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(duplicateBackup)
+  }));
+  await page.goto(
+    `/stats/?game=duplicate-feedback&feedback=${encodeURIComponent(numberedPlayer.number)}`
+  );
+  await page.evaluate(() => window.__statsApp.ready);
+  await expect(page.locator('#reviewRouteTitle')).toHaveText('Duplicate jersey number');
+  await expect(page.locator('#reviewRouteMessage'))
+    .toHaveText(`More than one player in this game uses #${numberedPlayer.number}.`);
+  await expect(page.locator('#statsShell')).toBeHidden();
 
   await page.route('**/games/malformed.json', route => route.fulfill({
     status: 200,
