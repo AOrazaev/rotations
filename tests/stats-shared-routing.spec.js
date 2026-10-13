@@ -289,6 +289,9 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#eventLogPanel')).toBeHidden();
   await expect(page.locator('#reviewNavigation')).toBeHidden();
   await expect(page.locator('#reportCard')).toBeHidden();
+  await expect(page.locator('#playVideo')).toBeHidden();
+  await expect(page.locator('#pauseVideo')).toBeHidden();
+  await expect(page.locator('#videoStatus')).toBeHidden();
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
   await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
   await expect(page.locator('#sharedFeedbackEventTime')).toHaveText(/\d+:\d{2}\.\d/);
@@ -368,12 +371,19 @@ test('single-player shared links open a personalized navigable feedback view', a
   expect(feedbackCardLayout.eventFontSize).toBeGreaterThan(feedbackCardLayout.metadataFontSize);
 
   await expect(page.locator('#replaySharedFeedbackMoment')).toHaveCount(0);
-  await expect(page.locator('#playSharedFeedbackLeadIn')).toHaveText('▶ Play');
+  await expect(page.locator('#playSharedFeedbackLeadIn')).toHaveText('▶ Play moment');
   await page.evaluate(() => {
     window.__statsFakePlayer.calls = [];
     window.__fullscreenRequests = 0;
-    document.querySelector('#playerFrame').requestFullscreen = () => {
+    window.__fullscreenElement = null;
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => window.__fullscreenElement
+    });
+    document.querySelector('#playerFrame').requestFullscreen = function () {
       window.__fullscreenRequests += 1;
+      window.__fullscreenElement = this;
+      document.dispatchEvent(new Event('fullscreenchange'));
       return Promise.resolve();
     };
   });
@@ -395,6 +405,9 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#sharedFeedbackPanel')).toBeHidden();
   await expect(page.locator('#eventLogPanel')).toBeVisible();
   await expect(page.locator('#reviewNavigation')).toBeVisible();
+  await expect(page.locator('#playVideo')).toBeVisible();
+  await expect(page.locator('#pauseVideo')).toBeVisible();
+  await expect(page.locator('#videoStatus')).toBeVisible();
 });
 
 test('focused feedback controls wait for the recording player to initialize', async ({ page }) => {
@@ -449,6 +462,12 @@ test('single-player shared feedback replaces the mobile timeline sheet', async (
   expect(playback.playerCalls).toHaveLength(2);
   expect(playback.playerCalls[0][0]).toBe('seek');
   expect(playback.playerCalls[1]).toEqual(['play']);
+
+  await page.evaluate(() => {
+    window.__fullscreenElement = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  });
+  expect(await page.evaluate(() => window.__statsFakePlayer.calls.at(-1))).toEqual(['pause']);
 
   await page.setViewportSize({ width: 900, height: 600 });
   await page.evaluate(() => {

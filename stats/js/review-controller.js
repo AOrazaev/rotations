@@ -48,6 +48,8 @@ export function createReviewController({
   let feedbackMomentIndex = 0;
   let videoReady = videoController.isReady();
   let initialFeedbackPositioned = false;
+  let feedbackFullscreenTarget = null;
+  let feedbackFullscreenActive = false;
   let activeSection = feedbackPlayerId ? 'feedback' : 'team';
 
   function feedbackReason(event, player, filters) {
@@ -273,12 +275,23 @@ export function createReviewController({
       if (!requestFullscreen) {
         videoStatus.textContent = 'Video is playing. Full screen is unavailable in this browser.';
       } else {
+        feedbackFullscreenTarget = fullscreenTarget;
         try {
           const fullscreenRequest = requestFullscreen.call(fullscreenTarget);
-          fullscreenRequest?.catch(() => {
-            videoStatus.textContent = 'Video is playing. Full screen could not be opened.';
-          });
+          if (fullscreenRequest?.then) {
+            fullscreenRequest
+              .then(() => {
+                feedbackFullscreenActive = true;
+              })
+              .catch(() => {
+                feedbackFullscreenTarget = null;
+                videoStatus.textContent = 'Video is playing. Full screen could not be opened.';
+              });
+          } else {
+            feedbackFullscreenActive = true;
+          }
         } catch {
+          feedbackFullscreenTarget = null;
           videoStatus.textContent = 'Video is playing. Full screen could not be opened.';
         }
       }
@@ -288,12 +301,24 @@ export function createReviewController({
     videoController.play();
   }
 
+  function handleFeedbackFullscreenChange() {
+    if (!feedbackFullscreenActive) return;
+    const fullscreenElement = documentObject.fullscreenElement
+      || documentObject.webkitFullscreenElement;
+    if (fullscreenElement === feedbackFullscreenTarget) return;
+    feedbackFullscreenActive = false;
+    feedbackFullscreenTarget = null;
+    if (videoReady) videoController.pause();
+  }
+
   const handlePreviousFeedbackMoment = () => moveFeedbackMoment(-1);
   const handleNextFeedbackMoment = () => moveFeedbackMoment(1);
   const handlePlayFeedbackLeadIn = () => playFeedbackMoment(5);
   previousFeedbackMoment.addEventListener('click', handlePreviousFeedbackMoment);
   nextFeedbackMoment.addEventListener('click', handleNextFeedbackMoment);
   playFeedbackLeadIn.addEventListener('click', handlePlayFeedbackLeadIn);
+  documentObject.addEventListener('fullscreenchange', handleFeedbackFullscreenChange);
+  documentObject.addEventListener('webkitfullscreenchange', handleFeedbackFullscreenChange);
   const unsubscribeReady = videoController.subscribeReady(ready => {
     videoReady = ready;
     if (!ready) initialFeedbackPositioned = false;
@@ -334,6 +359,8 @@ export function createReviewController({
       previousFeedbackMoment.removeEventListener('click', handlePreviousFeedbackMoment);
       nextFeedbackMoment.removeEventListener('click', handleNextFeedbackMoment);
       playFeedbackLeadIn.removeEventListener('click', handlePlayFeedbackLeadIn);
+      documentObject.removeEventListener('fullscreenchange', handleFeedbackFullscreenChange);
+      documentObject.removeEventListener('webkitfullscreenchange', handleFeedbackFullscreenChange);
       unsubscribeReady();
       unsubscribeTime();
       eventListController.destroy();

@@ -50,6 +50,8 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .shared-player-feedback-mode .capture-panel,
 .shared-player-feedback-mode #reviewNavigation,
 .shared-player-feedback-mode #reportCard { display: none; }
+.shared-player-feedback-mode #videoStatus { display: none; }
+.shared-player-feedback-mode .video-card > .section-head .playback-actions { display: none; }
 .shared-player-feedback-mode .workspace > .video-card { position: static; }
 .shared-feedback-panel { display: grid; gap: 7px; margin-top: 10px; padding: 10px; background: rgba(109, 124, 255, .04); border: 1px solid rgba(109, 124, 255, .28); border-radius: 12px; }
 .shared-feedback-panel.hidden { display: none; }
