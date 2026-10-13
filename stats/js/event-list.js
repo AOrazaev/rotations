@@ -1155,6 +1155,10 @@ export function createEventListController({
       selectionAnchorId = null;
     }
     clearLocatedEventHighlight();
+    for (const details of eventList.querySelectorAll('.voice-command-details[open]')) {
+      const commandId = details.closest('[data-voice-command-id]')?.dataset.voiceCommandId;
+      if (commandId) expandedVoiceCommandIds.add(commandId);
+    }
     eventList.innerHTML = '';
     eventSummaries = new Map();
     populateFilterPlayers();
