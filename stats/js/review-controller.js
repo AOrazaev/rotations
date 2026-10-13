@@ -33,9 +33,11 @@ export function createReviewController({
   const playFocusedFeedbackVideo = documentObject.querySelector('#playFocusedFeedbackVideo');
   const videoStatus = documentObject.querySelector('#videoStatus');
   const feedbackPanel = documentObject.querySelector('#sharedFeedbackPanel');
+  const feedbackMomentCard = documentObject.querySelector('#sharedFeedbackMomentCard');
   const previousFeedbackMoment = documentObject.querySelector('#previousSharedFeedbackMoment');
   const nextFeedbackMoment = documentObject.querySelector('#nextSharedFeedbackMoment');
   const feedbackMomentPosition = documentObject.querySelector('#sharedFeedbackMomentPosition');
+  const showFeedbackPlayerShots = documentObject.querySelector('#showSharedFeedbackPlayerShots');
   const playFeedbackLeadIn = documentObject.querySelector('#playSharedFeedbackLeadIn');
   const feedbackReasonBadge = documentObject.querySelector('#sharedFeedbackReason');
   const feedbackEventTime = documentObject.querySelector('#sharedFeedbackEventTime');
@@ -45,10 +47,14 @@ export function createReviewController({
   let game = null;
   let analysis = null;
   let playbackSeconds = 0;
+  let baseFeedbackEvents = [];
   let feedbackEvents = [];
   let feedbackMomentIndex = 0;
+  let feedbackActive = false;
+  let includePlayerShots = false;
   let videoReady = videoController.isReady();
   let initialFeedbackPositioned = false;
+  let feedbackPausePending = false;
   let feedbackFullscreenTarget = null;
   let feedbackFullscreenActive = false;
   let activeSection = feedbackPlayerId ? 'feedback' : 'team';
@@ -63,15 +69,16 @@ export function createReviewController({
   }
 
   function renderFocusedFeedbackMoment() {
-    const active = Boolean(feedbackPlayerId && feedbackEvents.length);
-    feedbackPanel.classList.toggle('hidden', !active);
-    previousFeedbackMoment.disabled = !active || !videoReady || feedbackMomentIndex <= 0;
-    nextFeedbackMoment.disabled = !active || !videoReady || feedbackMomentIndex >= feedbackEvents.length - 1;
-    playFeedbackLeadIn.disabled = !active || !videoReady;
-    feedbackMomentPosition.textContent = active
+    const hasMoments = feedbackEvents.length > 0;
+    feedbackPanel.classList.toggle('hidden', !feedbackActive);
+    feedbackMomentCard.classList.toggle('hidden', !hasMoments);
+    previousFeedbackMoment.disabled = !hasMoments || !videoReady || feedbackMomentIndex <= 0;
+    nextFeedbackMoment.disabled = !hasMoments || !videoReady || feedbackMomentIndex >= feedbackEvents.length - 1;
+    playFeedbackLeadIn.disabled = !hasMoments || !videoReady;
+    feedbackMomentPosition.textContent = hasMoments
       ? `${feedbackMomentIndex + 1} of ${feedbackEvents.length}`
       : 'No feedback moments';
-    if (!active) return;
+    if (!hasMoments) return;
 
     const event = feedbackEvents[feedbackMomentIndex];
     const player = game.players.find(item => item.id === feedbackPlayerId);
@@ -109,6 +116,7 @@ export function createReviewController({
     feedbackMomentIndex = 0;
     const event = feedbackEvents[0];
     renderFocusedFeedbackMoment();
+    feedbackPausePending = true;
     videoController.seekToPaused(Math.max(0, event.videoSeconds - 5));
     setFocusedVideoPlayVisible(true);
   }
@@ -120,11 +128,38 @@ export function createReviewController({
       && filters.players.length === 1
       && filters.players[0] === feedbackPlayerId
     );
-    feedbackEvents = active ? events : [];
-    feedbackMomentIndex = Math.min(
-      feedbackMomentIndex,
-      Math.max(0, feedbackEvents.length - 1)
-    );
+    const currentEvent = feedbackEvents[feedbackMomentIndex];
+    feedbackActive = active;
+    baseFeedbackEvents = active ? events : [];
+    const mergedEvents = includePlayerShots && player
+      ? [
+        ...baseFeedbackEvents,
+        ...game.events.filter(event =>
+          event.type === 'shot'
+          && event.side === 'team'
+          && event.playerId === player.id
+        )
+      ]
+      : baseFeedbackEvents;
+    feedbackEvents = [...new Map(mergedEvents.map(event => [event.id, event])).values()]
+      .sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
+    const currentIndex = currentEvent
+      ? feedbackEvents.findIndex(event => event.id === currentEvent.id)
+      : -1;
+    if (currentIndex >= 0) {
+      feedbackMomentIndex = currentIndex;
+    } else if (currentEvent && feedbackEvents.length) {
+      feedbackMomentIndex = feedbackEvents.reduce((nearestIndex, event, index) =>
+        Math.abs(event.videoSeconds - currentEvent.videoSeconds)
+          < Math.abs(feedbackEvents[nearestIndex].videoSeconds - currentEvent.videoSeconds)
+          ? index
+          : nearestIndex, 0);
+    } else {
+      feedbackMomentIndex = Math.min(
+        feedbackMomentIndex,
+        Math.max(0, feedbackEvents.length - 1)
+      );
+    }
     const reasons = active
       ? feedbackEvents.map(event => feedbackReason(event, player, filters))
       : [];
@@ -245,7 +280,10 @@ export function createReviewController({
 
   const unsubscribeTime = videoController.subscribeTime(seconds => {
     playbackSeconds = seconds;
-    if (feedbackEvents.length) {
+    const videoPlaying = videoController.isPlaying();
+    if (feedbackPausePending) {
+      if (!videoPlaying) feedbackPausePending = false;
+    } else if (feedbackEvents.length && videoPlaying) {
       const targetSeconds = seconds + 3;
       let nearestIndex = 0;
       for (let index = 1; index < feedbackEvents.length; index += 1) {
@@ -272,6 +310,7 @@ export function createReviewController({
     feedbackMomentIndex = nextIndex;
     const event = feedbackEvents[nextIndex];
     renderFocusedFeedbackMoment();
+    feedbackPausePending = true;
     videoController.seekToPaused(Math.max(0, event.videoSeconds - 5));
     setFocusedVideoPlayVisible(true);
     eventListController.revealEvent(event.id);
@@ -337,9 +376,14 @@ export function createReviewController({
   const handlePreviousFeedbackMoment = () => moveFeedbackMoment(-1);
   const handleNextFeedbackMoment = () => moveFeedbackMoment(1);
   const handlePlayFeedbackLeadIn = () => playFeedbackMoment(5);
+  const handleShowFeedbackPlayerShots = () => {
+    includePlayerShots = showFeedbackPlayerShots.checked;
+    handleVisibleEventsChanged(baseFeedbackEvents, eventListController.getFilters());
+  };
   previousFeedbackMoment.addEventListener('click', handlePreviousFeedbackMoment);
   nextFeedbackMoment.addEventListener('click', handleNextFeedbackMoment);
   playFeedbackLeadIn.addEventListener('click', handlePlayFeedbackLeadIn);
+  showFeedbackPlayerShots.addEventListener('change', handleShowFeedbackPlayerShots);
   playFocusedFeedbackVideo.addEventListener('click', handleFocusedVideoPlay);
   documentObject.addEventListener('fullscreenchange', handleFeedbackFullscreenChange);
   documentObject.addEventListener('webkitfullscreenchange', handleFeedbackFullscreenChange);
@@ -375,6 +419,8 @@ export function createReviewController({
   return {
     setGame(nextGame) {
       game = structuredClone(nextGame);
+      includePlayerShots = false;
+      showFeedbackPlayerShots.checked = false;
       initialFeedbackPositioned = false;
       render();
     },
@@ -386,6 +432,7 @@ export function createReviewController({
       previousFeedbackMoment.removeEventListener('click', handlePreviousFeedbackMoment);
       nextFeedbackMoment.removeEventListener('click', handleNextFeedbackMoment);
       playFeedbackLeadIn.removeEventListener('click', handlePlayFeedbackLeadIn);
+      showFeedbackPlayerShots.removeEventListener('change', handleShowFeedbackPlayerShots);
       playFocusedFeedbackVideo.removeEventListener('click', handleFocusedVideoPlay);
       documentObject.removeEventListener('fullscreenchange', handleFeedbackFullscreenChange);
       documentObject.removeEventListener('webkitfullscreenchange', handleFeedbackFullscreenChange);

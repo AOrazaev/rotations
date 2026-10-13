@@ -122,6 +122,10 @@
                 <button id="previousSharedFeedbackMoment" class="secondary small" type="button">Previous</button>
                 <strong id="sharedFeedbackMomentPosition" aria-live="polite">No feedback moments</strong>
                 <button id="nextSharedFeedbackMoment" class="secondary small" type="button">Next</button>
+                <label class="shared-feedback-shots-toggle">
+                  <input id="showSharedFeedbackPlayerShots" type="checkbox" />
+                  <span>Show my shots</span>
+                </label>
               </div>
               <article id="sharedFeedbackMomentCard" class="shared-feedback-moment-card">
                 <blockquote id="sharedFeedbackComment" class="coach-comment"></blockquote>
@@ -129,15 +133,15 @@
                   <div class="shared-feedback-event-context">
                     <h3 id="sharedFeedbackEventDescription">Feedback moment</h3>
                     <p id="sharedFeedbackEventDetails" class="event-detail-badges hidden"></p>
+                    <div class="shared-feedback-metadata">
+                      <span id="sharedFeedbackReason" class="feedback-reason-badge"></span>
+                      <span aria-hidden="true">·</span>
+                      <time id="sharedFeedbackEventTime"></time>
+                    </div>
                   </div>
                   <div class="shared-feedback-play-actions">
                     <button id="playSharedFeedbackLeadIn" class="secondary small" type="button" aria-label="Play feedback moment from five seconds earlier" title="Play feedback moment from five seconds earlier">▶ Play moment</button>
                   </div>
-                </div>
-                <div class="shared-feedback-metadata">
-                  <span id="sharedFeedbackReason" class="feedback-reason-badge"></span>
-                  <span aria-hidden="true">·</span>
-                  <time id="sharedFeedbackEventTime"></time>
                 </div>
               </article>
             </section>

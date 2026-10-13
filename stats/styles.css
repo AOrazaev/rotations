@@ -58,14 +58,16 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .review-mode.shared-player-feedback-mode .workspace > .video-card { position: static; }
 .shared-feedback-panel { display: grid; gap: 7px; margin-top: 10px; padding: 10px; background: rgba(109, 124, 255, .04); border: 1px solid rgba(109, 124, 255, .28); border-radius: 12px; }
 .shared-feedback-panel.hidden { display: none; }
-.shared-feedback-moment-navigation { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.shared-feedback-moment-navigation { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr); align-items: center; gap: 8px; }
 .shared-feedback-moment-navigation strong { min-width: 62px; color: var(--muted); font-size: .78rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
 .shared-feedback-moment-navigation .secondary { padding: 5px 9px; color: var(--muted); background: transparent; border-color: #2a3850; font-size: .75rem; }
+.shared-feedback-shots-toggle { display: inline-flex; align-items: center; justify-self: end; gap: 6px; color: var(--muted); font-size: .75rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.shared-feedback-shots-toggle input { margin: 0; accent-color: var(--accent2); }
 .shared-feedback-moment-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 10px; background: #0d1524; border: 1px solid #202c43; border-radius: 10px; }
 .shared-feedback-event-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .shared-feedback-event-context { display: grid; gap: 2px; min-width: 0; }
-.shared-feedback-play-actions { display: flex; gap: 6px; }
-.shared-feedback-play-actions .secondary { padding: 6px 9px; font-size: .78rem; }
+.shared-feedback-play-actions { display: flex; align-self: stretch; gap: 6px; }
+.shared-feedback-play-actions .secondary { height: 100%; padding: 6px 9px; font-size: .78rem; }
 .shared-feedback-metadata { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .72rem; line-height: 1.2; }
 .shared-feedback-metadata .feedback-reason-badge { padding: 0; color: inherit; background: transparent; border: 0; font-weight: 600; }
 .shared-feedback-metadata .feedback-reason-badge[data-feedback-reason] { color: inherit; background: transparent; border-color: transparent; }

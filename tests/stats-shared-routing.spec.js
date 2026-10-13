@@ -5,10 +5,25 @@ async function installSharedTestEnvironment(page, { delayPlayer = false } = {}) 
     window.__statsFakePlayer = {
       current: 0,
       calls: [],
+      playing: false,
+      deferPausedSeek: false,
       getCurrentSeconds() { return this.current; },
       seekTo(seconds) { this.current = seconds; this.calls.push(['seek', seconds]); },
-      play() { this.calls.push(['play']); },
-      pause() { this.calls.push(['pause']); },
+      seekToPaused(seconds) {
+        this.calls.push(['seek', seconds], ['pause']);
+        if (this.deferPausedSeek) {
+          setTimeout(() => {
+            this.current = seconds;
+            this.playing = false;
+          }, 50);
+          return;
+        }
+        this.current = seconds;
+        this.playing = false;
+      },
+      play() { this.playing = true; this.calls.push(['play']); },
+      isPlaying() { return this.playing; },
+      pause() { this.playing = false; this.calls.push(['pause']); },
       destroy() {}
     };
     window.__STATS_PLAYER_FACTORY__ = delayPlayer
@@ -316,15 +331,41 @@ test('single-player shared links open a personalized navigable feedback view', a
     )
     .sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
   const mentionedOnlyEvent = feedbackEvents.find(event => !directlyInvolvesPlayer(event));
-  const playerShots = game.events.filter(event =>
+  const allPlayerShots = game.events.filter(event =>
     event.side === 'team'
     && event.type === 'shot'
-    && [2, 3].includes(event.shotValue)
     && event.playerId === player.id
   );
+  const playerShots = allPlayerShots.filter(event => [2, 3].includes(event.shotValue));
   const plottedPlayerShots = playerShots.filter(event => event.shotDetails?.location);
+  const expandedFeedbackEvents = [...new Map(
+    [...feedbackEvents, ...allPlayerShots].map(event => [event.id, event])
+  ).values()].sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
+  const initialExpandedIndex = expandedFeedbackEvents.findIndex(event =>
+    event.id === feedbackEvents[0].id
+  );
+  const feedbackEventIds = new Set(feedbackEvents.map(event => event.id));
+  const shotOnlyEvent = expandedFeedbackEvents.find(event => !feedbackEventIds.has(event.id));
+  const shotOnlyIndex = expandedFeedbackEvents.findIndex(event => event.id === shotOnlyEvent?.id);
+  const nearestFeedbackIndex = feedbackEvents.reduce((nearestIndex, event, index) =>
+    Math.abs(event.videoSeconds - shotOnlyEvent.videoSeconds)
+      < Math.abs(feedbackEvents[nearestIndex].videoSeconds - shotOnlyEvent.videoSeconds)
+      ? index
+      : nearestIndex, 0);
+  const expectedShotDescription = `${player.name} ${shotOnlyEvent.made ? 'made' : 'missed'} `
+    + `${shotOnlyEvent.shotValue === 1 ? 'FT' : `${shotOnlyEvent.shotValue}PT`}`;
+  const formatVideoTime = seconds => {
+    const value = Math.max(0, Number(seconds));
+    const wholeMinutes = Math.floor(value / 60);
+    const hours = Math.floor(wholeMinutes / 60);
+    const minutes = hours ? wholeMinutes % 60 : wholeMinutes;
+    const secs = (value % 60).toFixed(1).padStart(4, '0');
+    return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}` : `${minutes}:${secs}`;
+  };
   expect(feedbackEvents.length).toBeGreaterThan(1);
   expect(mentionedOnlyEvent).toBeTruthy();
+  expect(expandedFeedbackEvents.length).toBeGreaterThan(feedbackEvents.length);
+  expect(shotOnlyEvent).toBeTruthy();
 
   await page.goto(
     `/stats/?mode=shared&game=game-20260927`
@@ -352,6 +393,21 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#videoResizeHandle')).toBeHidden();
   await expect(page.locator('.video-size-actions')).toBeHidden();
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
+  await expect(page.locator('#showSharedFeedbackPlayerShots')).not.toBeChecked();
+  const focusedUrl = page.url();
+  await page.locator('#showSharedFeedbackPlayerShots').check();
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(
+    `${initialExpandedIndex + 1} of ${expandedFeedbackEvents.length}`
+  );
+  expect(page.url()).toBe(focusedUrl);
+  const navigationLayout = await page.evaluate(() => {
+    const next = document.querySelector('#nextSharedFeedbackMoment').getBoundingClientRect();
+    const toggle = document.querySelector('.shared-feedback-shots-toggle').getBoundingClientRect();
+    return { nextRight: next.right, toggleLeft: toggle.left };
+  });
+  expect(navigationLayout.toggleLeft).toBeGreaterThanOrEqual(navigationLayout.nextRight);
+  await page.locator('#showSharedFeedbackPlayerShots').uncheck();
   await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
   await expect(page.locator('#sharedFeedbackEventTime')).toHaveText(/\d+:\d{2}\.\d/);
   await expect(page.locator('#sharedFeedbackComment')).toHaveText(feedbackEvents[0].coachComment);
@@ -411,6 +467,36 @@ test('single-player shared links open a personalized navigable feedback view', a
   const columnCenter = focusedLayout.column.left + focusedLayout.column.width / 2;
   expect(Math.abs(shellCenter - columnCenter)).toBeLessThan(2);
 
+  await page.locator('#showSharedFeedbackPlayerShots').check();
+  const shotOnlyOffset = shotOnlyIndex - initialExpandedIndex;
+  const shotOnlyNavigation = shotOnlyOffset > 0
+    ? page.locator('#nextSharedFeedbackMoment')
+    : page.locator('#previousSharedFeedbackMoment');
+  for (let index = 0; index < Math.abs(shotOnlyOffset); index += 1) {
+    await shotOnlyNavigation.click();
+  }
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(
+    `${shotOnlyIndex + 1} of ${expandedFeedbackEvents.length}`
+  );
+  await expect(page.locator('#sharedFeedbackEventDescription')).toHaveText(expectedShotDescription);
+  await expect(page.locator('#sharedFeedbackEventTime')).toHaveText(
+    formatVideoTime(shotOnlyEvent.videoSeconds)
+  );
+  await expect(page.locator('#sharedFeedbackReason')).toHaveText('Your play');
+  await expect(page.locator('#sharedFeedbackComment')).toBeHidden();
+
+  await page.locator('#showSharedFeedbackPlayerShots').uncheck();
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(
+    `${nearestFeedbackIndex + 1} of ${feedbackEvents.length}`
+  );
+  await expect(page.locator('#sharedFeedbackComment')).toHaveText(
+    feedbackEvents[nearestFeedbackIndex].coachComment
+  );
+  for (let index = nearestFeedbackIndex; index > 0; index -= 1) {
+    await page.locator('#previousSharedFeedbackMoment').click();
+  }
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
+
   const mentionedOnlyIndex = feedbackEvents.findIndex(event => event.id === mentionedOnlyEvent.id);
   expect(mentionedOnlyIndex).toBeGreaterThan(0);
   await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
@@ -437,6 +523,7 @@ test('single-player shared links open a personalized navigable feedback view', a
     const cardBox = card.getBoundingClientRect();
     const commentBox = card.querySelector('#sharedFeedbackComment').getBoundingClientRect();
     const eventBox = card.querySelector('.shared-feedback-event-row').getBoundingClientRect();
+    const playButtonBox = card.querySelector('#playSharedFeedbackLeadIn').getBoundingClientRect();
     const metadataBox = card.querySelector('.shared-feedback-metadata').getBoundingClientRect();
     const commentStyle = getComputedStyle(card.querySelector('#sharedFeedbackComment'));
     const eventStyle = getComputedStyle(card.querySelector('#sharedFeedbackEventDescription'));
@@ -447,7 +534,11 @@ test('single-player shared links open a personalized navigable feedback view', a
       commentWidth: commentBox.width,
       commentTop: commentBox.top,
       eventTop: eventBox.top,
+      eventHeight: eventBox.height,
+      playButtonHeight: playButtonBox.height,
+      playButtonBottom: playButtonBox.bottom,
       metadataTop: metadataBox.top,
+      metadataBottom: metadataBox.bottom,
       commentFontSize: Number.parseFloat(commentStyle.fontSize),
       eventFontSize: Number.parseFloat(eventStyle.fontSize),
       metadataFontSize: Number.parseFloat(metadataStyle.fontSize)
@@ -457,6 +548,8 @@ test('single-player shared links open a personalized navigable feedback view', a
   expect(feedbackCardLayout.commentWidth).toBeGreaterThan(feedbackCardLayout.cardWidth * 0.9);
   expect(feedbackCardLayout.commentTop).toBeLessThan(feedbackCardLayout.eventTop);
   expect(feedbackCardLayout.eventTop).toBeLessThan(feedbackCardLayout.metadataTop);
+  expect(Math.abs(feedbackCardLayout.playButtonHeight - feedbackCardLayout.eventHeight)).toBeLessThan(1);
+  expect(feedbackCardLayout.playButtonBottom).toBeGreaterThanOrEqual(feedbackCardLayout.metadataBottom);
   expect(feedbackCardLayout.commentFontSize).toBeGreaterThan(feedbackCardLayout.eventFontSize);
   expect(feedbackCardLayout.eventFontSize).toBeGreaterThan(feedbackCardLayout.metadataFontSize);
 
@@ -525,6 +618,45 @@ test('focused feedback controls wait for the recording player to initialize', as
   const initialCalls = await page.evaluate(() => window.__statsFakePlayer.calls);
   expect(initialCalls[0][0]).toBe('seek');
   expect(initialCalls[1]).toEqual(['pause']);
+});
+
+test('previous feedback updates immediately while playback is stopping', async ({ page, request }) => {
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await installSharedTestEnvironment(page);
+  const publishedBackup = await request.get('/games/game-20260927.json').then(response => response.json());
+  const game = publishedBackup.game;
+  const player = game.players.find(item => item.number === '13');
+  const feedbackEvents = game.events
+    .filter(event =>
+      String(event.coachComment || '').trim()
+      && (
+        [event.playerId, event.playerInId, event.playerOutId].includes(player.id)
+        || [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+          .some(match => match[1].toLowerCase() === String(player.number).toLowerCase())
+      )
+    )
+    .sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
+
+  await page.goto(
+    `/stats/?mode=shared&game=game-20260927`
+    + `&tl-player=${encodeURIComponent(player.id)}&tl-comment=with`
+  );
+  await page.evaluate(() => window.__statsApp.ready);
+  await page.locator('#nextSharedFeedbackMoment').click();
+  await page.locator('#nextSharedFeedbackMoment').click();
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`3 of ${feedbackEvents.length}`);
+
+  await page.evaluate(() => {
+    window.__statsFakePlayer.deferPausedSeek = true;
+  });
+  await page.locator('#playSharedFeedbackLeadIn').click();
+  await page.locator('#previousSharedFeedbackMoment').click();
+
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`2 of ${feedbackEvents.length}`);
+  await expect(page.locator('#sharedFeedbackComment')).toHaveText(feedbackEvents[1].coachComment);
+  await page.waitForTimeout(300);
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`2 of ${feedbackEvents.length}`);
+  await expect(page.locator('#sharedFeedbackComment')).toHaveText(feedbackEvents[1].coachComment);
 });
 
 test('single-player shared feedback replaces the mobile timeline sheet', async ({ page }) => {
