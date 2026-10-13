@@ -47,6 +47,7 @@ export function createReviewController({
   let feedbackEvents = [];
   let feedbackMomentIndex = 0;
   let videoReady = videoController.isReady();
+  let initialFeedbackPositioned = false;
   let activeSection = feedbackPlayerId ? 'feedback' : 'team';
 
   function feedbackReason(event, player, filters) {
@@ -89,6 +90,15 @@ export function createReviewController({
     feedbackComment.classList.toggle('hidden', !feedbackComment.textContent);
   }
 
+  function positionInitialFeedbackMoment() {
+    if (initialFeedbackPositioned || !videoReady || !feedbackEvents.length) return;
+    initialFeedbackPositioned = true;
+    feedbackMomentIndex = 0;
+    const event = feedbackEvents[0];
+    renderFocusedFeedbackMoment();
+    videoController.seekToPaused(Math.max(0, event.videoSeconds - 5));
+  }
+
   function handleVisibleEventsChanged(events, filters) {
     const player = game?.players.find(item => item.id === feedbackPlayerId);
     const active = Boolean(
@@ -114,6 +124,7 @@ export function createReviewController({
     });
     if (!active && activeSection === 'feedback') activeSection = 'team';
     renderFocusedFeedbackMoment();
+    positionInitialFeedbackMoment();
   }
 
   function selectFeedbackEvent(eventId) {
@@ -285,7 +296,9 @@ export function createReviewController({
   playFeedbackLeadIn.addEventListener('click', handlePlayFeedbackLeadIn);
   const unsubscribeReady = videoController.subscribeReady(ready => {
     videoReady = ready;
+    if (!ready) initialFeedbackPositioned = false;
     renderFocusedFeedbackMoment();
+    positionInitialFeedbackMoment();
   });
 
   function render() {
@@ -310,6 +323,7 @@ export function createReviewController({
   return {
     setGame(nextGame) {
       game = structuredClone(nextGame);
+      initialFeedbackPositioned = false;
       render();
     },
     getGame: () => game ? structuredClone(game) : null,

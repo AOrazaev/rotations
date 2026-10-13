@@ -293,6 +293,13 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
   await expect(page.locator('#sharedFeedbackEventTime')).toHaveText(/\d+:\d{2}\.\d/);
   await expect(page.locator('#sharedFeedbackComment')).toHaveText(feedbackEvents[0].coachComment);
+  await expect.poll(() => page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
+    ['seek', Math.max(0, feedbackEvents[0].videoSeconds - 5)],
+    ['pause']
+  ]);
+  expect(await page.evaluate(() => window.__statsFakePlayer.current)).toBe(
+    Math.max(0, feedbackEvents[0].videoSeconds - 5)
+  );
   const focusedLayout = await page.evaluate(() => Object.fromEntries(
     Object.entries({
       panel: '#sharedFeedbackPanel',
@@ -407,6 +414,10 @@ test('focused feedback controls wait for the recording player to initialize', as
 
   await expect(page.locator('#nextSharedFeedbackMoment')).toBeEnabled();
   await expect(page.locator('#playSharedFeedbackLeadIn')).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => window.__statsFakePlayer.calls.length)).toBe(2);
+  const initialCalls = await page.evaluate(() => window.__statsFakePlayer.calls);
+  expect(initialCalls[0][0]).toBe('seek');
+  expect(initialCalls[1]).toEqual(['pause']);
 });
 
 test('single-player shared feedback replaces the mobile timeline sheet', async ({ page }) => {
