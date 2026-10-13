@@ -267,6 +267,13 @@ test('single-player shared links open a personalized navigable feedback view', a
     )
     .sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
   const mentionedOnlyEvent = feedbackEvents.find(event => !directlyInvolvesPlayer(event));
+  const playerShots = game.events.filter(event =>
+    event.side === 'team'
+    && event.type === 'shot'
+    && [2, 3].includes(event.shotValue)
+    && event.playerId === player.id
+  );
+  const plottedPlayerShots = playerShots.filter(event => event.shotDetails?.location);
   expect(feedbackEvents.length).toBeGreaterThan(1);
   expect(mentionedOnlyEvent).toBeTruthy();
 
@@ -293,10 +300,27 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#pauseVideo')).toBeHidden();
   await expect(page.locator('#videoStatus')).toBeHidden();
   await expect(page.locator('#videoCurrentPosition')).toBeHidden();
+  await expect(page.locator('#videoResizeHandle')).toBeHidden();
+  await expect(page.locator('.video-size-actions')).toBeHidden();
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
   await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
   await expect(page.locator('#sharedFeedbackEventTime')).toHaveText(/\d+:\d{2}\.\d/);
   await expect(page.locator('#sharedFeedbackComment')).toHaveText(feedbackEvents[0].coachComment);
+  await expect(page.locator('#focusedPlayerReportCard')).toBeVisible();
+  await expect(page.locator('#focusedPlayerReportTitle')).toHaveText(
+    `#${player.number} ${player.name} stats`
+  );
+  const expectedPlayerStats = await page.evaluate(async playerId => {
+    const gameBackup = await fetch('/games/game-20260927.json').then(response => response.json());
+    const { buildGameAnalysis } = await import('/stats/js/event-reducer.js');
+    return buildGameAnalysis(gameBackup.game).report.players[playerId];
+  }, player.id);
+  await expect(page.locator('#focusedPlayerStats [data-player-stat="points"] dd'))
+    .toHaveText(String(expectedPlayerStats.points));
+  await expect(page.locator('#focusedPlayerShotSummary'))
+    .toContainText(`${playerShots.filter(event => event.made).length}/${playerShots.length} FG`);
+  await expect(page.locator('#focusedPlayerShotChartPlot .shot-chart-marker'))
+    .toHaveCount(plottedPlayerShots.length);
   await expect.poll(() => page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
     ['seek', Math.max(0, feedbackEvents[0].videoSeconds - 5)],
     ['pause']
@@ -309,6 +333,8 @@ test('single-player shared links open a personalized navigable feedback view', a
       panel: '#sharedFeedbackPanel',
       video: '#playerFrame',
       fullGame: '#viewFullGameReview',
+      playerReport: '#focusedPlayerReportCard',
+      videoCard: '.video-card',
       shell: '#reviewShell',
       column: '.center-panel'
     }).map(([key, selector]) => {
@@ -318,6 +344,7 @@ test('single-player shared links open a personalized navigable feedback view', a
   ));
   expect(focusedLayout.panel.bottom).toBeLessThanOrEqual(focusedLayout.video.top);
   expect(focusedLayout.fullGame.top).toBeGreaterThanOrEqual(focusedLayout.video.bottom);
+  expect(focusedLayout.playerReport.top).toBeGreaterThanOrEqual(focusedLayout.videoCard.bottom);
   const shellCenter = focusedLayout.shell.left + focusedLayout.shell.width / 2;
   const columnCenter = focusedLayout.column.left + focusedLayout.column.width / 2;
   expect(Math.abs(shellCenter - columnCenter)).toBeLessThan(2);
@@ -404,12 +431,15 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#videoCardTitle')).toHaveText('Recording');
   await expect(page.locator('#sharedPlayerFeedbackSummary')).toBeHidden();
   await expect(page.locator('#sharedFeedbackPanel')).toBeHidden();
+  await expect(page.locator('#focusedPlayerReportCard')).toBeHidden();
   await expect(page.locator('#eventLogPanel')).toBeVisible();
   await expect(page.locator('#reviewNavigation')).toBeVisible();
   await expect(page.locator('#playVideo')).toBeVisible();
   await expect(page.locator('#pauseVideo')).toBeVisible();
   await expect(page.locator('#videoStatus')).toBeVisible();
   await expect(page.locator('#videoCurrentPosition')).toBeVisible();
+  await expect(page.locator('#videoResizeHandle')).toBeVisible();
+  await expect(page.locator('.video-size-actions')).toBeVisible();
 });
 
 test('focused feedback controls wait for the recording player to initialize', async ({ page }) => {
@@ -447,6 +477,19 @@ test('single-player shared feedback replaces the mobile timeline sheet', async (
   await expect(page.locator('#eventLogPanel')).toBeHidden();
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
   await expect(page.locator('#sharedFeedbackComment')).toBeVisible();
+  await expect(page.locator('#focusedPlayerReportCard')).toBeVisible();
+  const playerReportLayout = await page.evaluate(() => {
+    const card = document.querySelector('#focusedPlayerReportCard').getBoundingClientRect();
+    const chart = document.querySelector('#focusedPlayerShotChart').getBoundingClientRect();
+    return {
+      cardWidth: card.width,
+      chartWidth: chart.width,
+      pageWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth
+    };
+  });
+  expect(playerReportLayout.chartWidth).toBeLessThanOrEqual(playerReportLayout.cardWidth);
+  expect(playerReportLayout.pageWidth).toBeLessThanOrEqual(playerReportLayout.viewportWidth);
   await expect(page.locator('#playFocusedFeedbackVideo')).toBeVisible();
   await page.evaluate(() => { window.__statsFakePlayer.calls = []; });
   await page.locator('#playFocusedFeedbackVideo').click();

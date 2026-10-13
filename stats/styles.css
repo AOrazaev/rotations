@@ -52,8 +52,10 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .shared-player-feedback-mode #reportCard { display: none; }
 .shared-player-feedback-mode #videoStatus { display: none; }
 .shared-player-feedback-mode #videoCurrentPosition { display: none; }
+.shared-player-feedback-mode #videoResizeHandle { display: none; }
+.shared-player-feedback-mode .video-size-actions { display: none; }
 .shared-player-feedback-mode .video-card > .section-head .playback-actions { display: none; }
-.shared-player-feedback-mode .workspace > .video-card { position: static; }
+.review-mode.shared-player-feedback-mode .workspace > .video-card { position: static; }
 .shared-feedback-panel { display: grid; gap: 7px; margin-top: 10px; padding: 10px; background: rgba(109, 124, 255, .04); border: 1px solid rgba(109, 124, 255, .28); border-radius: 12px; }
 .shared-feedback-panel.hidden { display: none; }
 .shared-feedback-moment-navigation { display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -72,6 +74,12 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .shared-feedback-moment-card .event-detail-badges { display: block; grid-column: 1; margin: 0; color: #8794a9; font-size: .68rem; }
 .shared-feedback-moment-card .coach-comment { margin: 0; padding: 13px 14px; color: #fff; background: rgba(109, 124, 255, .14); border: 1px solid rgba(139, 151, 255, .32); border-left: 4px solid var(--accent2); border-radius: 10px; font-size: 1rem; font-weight: 600; line-height: 1.5; }
 .shared-feedback-full-game { display: block; width: fit-content; margin: 10px auto 0; }
+.focused-player-report-card { display: grid; gap: 16px; }
+.focused-player-report-card .player-review-summary { margin-bottom: 0; }
+.focused-player-shot-report { min-width: 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.focused-player-shot-report .section-head { margin-bottom: 8px; }
+.focused-player-shot-report .shot-report-summary { margin-bottom: 8px; }
+.focused-player-shot-report .shot-chart { width: min(100%, 560px); }
 .review-video-score span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-score-team { text-align: right; }
 .review-score-opponent { text-align: left; }

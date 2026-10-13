@@ -185,6 +185,32 @@
             ></button>
           </section>
 
+          <section id="focusedPlayerReportCard" class="card focused-player-report-card hidden" aria-labelledby="focusedPlayerReportTitle">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Game summary</p>
+                <h2 id="focusedPlayerReportTitle">Player stats</h2>
+              </div>
+            </div>
+            <dl id="focusedPlayerStats" class="player-review-summary"></dl>
+            <section class="focused-player-shot-report" aria-labelledby="focusedPlayerShotTitle">
+              <div class="section-head">
+                <div>
+                  <h3 id="focusedPlayerShotTitle">Shot chart</h3>
+                  <p id="focusedPlayerShotSummary" class="shot-report-summary"></p>
+                </div>
+              </div>
+              <div class="shot-chart-legend" aria-hidden="true">
+                <span class="made">Made</span>
+                <span class="missed">Missed</span>
+              </div>
+              <div id="focusedPlayerShotChart" class="shot-chart">
+                <div id="focusedPlayerShotChartPlot" class="shot-chart-plot"></div>
+              </div>
+              <p id="focusedPlayerEmptyShotChart" class="empty-state compact hidden">No shots have a recorded location.</p>
+            </section>
+          </section>
+
         </section>
       </div>
 
