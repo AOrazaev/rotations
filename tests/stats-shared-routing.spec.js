@@ -359,17 +359,30 @@ test('single-player shared links open a personalized navigable feedback view', a
   await expect(page.locator('#focusedPlayerReportTitle')).toHaveText(
     `#${player.number} ${player.name} stats`
   );
-  const expectedPlayerStats = await page.evaluate(async playerId => {
+  const expectedPlayerReport = await page.evaluate(async playerId => {
     const gameBackup = await fetch('/games/game-20260927.json').then(response => response.json());
     const { buildGameAnalysis } = await import('/stats/js/event-reducer.js');
-    return buildGameAnalysis(gameBackup.game).report.players[playerId];
+    const { buildShotReport } = await import('/stats/js/shot-report.js');
+    return {
+      stats: buildGameAnalysis(gameBackup.game).report.players[playerId],
+      shots: buildShotReport(gameBackup.game, { scope: `player:${playerId}` })
+    };
   }, player.id);
   await expect(page.locator('#focusedPlayerStats [data-player-stat="points"] dd'))
-    .toHaveText(String(expectedPlayerStats.points));
+    .toHaveText(String(expectedPlayerReport.stats.points));
   await expect(page.locator('#focusedPlayerShotSummary'))
     .toContainText(`${playerShots.filter(event => event.made).length}/${playerShots.length} FG`);
   await expect(page.locator('#focusedPlayerShotChartPlot .shot-chart-marker'))
     .toHaveCount(plottedPlayerShots.length);
+  await expect(page.locator('#focusedPlayerShotZonePlot [data-shot-zone]')).toHaveCount(9);
+  const attemptedZone = expectedPlayerReport.shots.dimensions.zone.find(zone => zone.attempted);
+  const attemptedZonePercentage = Number(attemptedZone.percentage.toFixed(1));
+  await expect(page.locator(
+    `#focusedPlayerShotZonePlot [data-shot-zone="${attemptedZone.key}"]`
+  )).toContainText(
+    `${attemptedZone.made}/${attemptedZone.attempted} · ${attemptedZonePercentage}%`
+  );
+  await expect(page.locator('#focusedPlayerShotZonePlot button')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__statsFakePlayer.calls)).toEqual([
     ['seek', Math.max(0, feedbackEvents[0].videoSeconds - 5)],
     ['pause']
@@ -530,14 +543,17 @@ test('single-player shared feedback replaces the mobile timeline sheet', async (
   const playerReportLayout = await page.evaluate(() => {
     const card = document.querySelector('#focusedPlayerReportCard').getBoundingClientRect();
     const chart = document.querySelector('#focusedPlayerShotChart').getBoundingClientRect();
+    const zoneChart = document.querySelector('#focusedPlayerShotZonePlot').getBoundingClientRect();
     return {
       cardWidth: card.width,
       chartWidth: chart.width,
+      zoneChartWidth: zoneChart.width,
       pageWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth
     };
   });
   expect(playerReportLayout.chartWidth).toBeLessThanOrEqual(playerReportLayout.cardWidth);
+  expect(playerReportLayout.zoneChartWidth).toBeLessThanOrEqual(playerReportLayout.cardWidth);
   expect(playerReportLayout.pageWidth).toBeLessThanOrEqual(playerReportLayout.viewportWidth);
   await expect(page.locator('#playFocusedFeedbackVideo')).toBeVisible();
   await page.evaluate(() => { window.__statsFakePlayer.calls = []; });

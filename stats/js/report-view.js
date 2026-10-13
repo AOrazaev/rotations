@@ -116,6 +116,8 @@ export function createReportController({
   const focusedPlayerShotChart = documentObject.querySelector('#focusedPlayerShotChart');
   const focusedPlayerShotChartPlot = documentObject.querySelector('#focusedPlayerShotChartPlot');
   const focusedPlayerEmptyShotChart = documentObject.querySelector('#focusedPlayerEmptyShotChart');
+  const focusedPlayerShotZonePlot = documentObject.querySelector('#focusedPlayerShotZonePlot');
+  const focusedPlayerShotZoneNoLocation = documentObject.querySelector('#focusedPlayerShotZoneNoLocation');
 
   let game = null;
   let analysis = null;
@@ -718,9 +720,13 @@ export function createReportController({
     return `${row.made}/${row.attempted} · ${formatPercentage(row.percentage)}`;
   }
 
-  function renderShotZones(report) {
-    shotZonePlot.innerHTML = '';
-    shotZoneNoLocation.innerHTML = '';
+  function renderShotZones(report, {
+    plot = shotZonePlot,
+    noLocationHost = shotZoneNoLocation,
+    interactive = true
+  } = {}) {
+    plot.innerHTML = '';
+    noLocationHost.innerHTML = '';
     const court = createShotCourtDiagram(documentObject, {
       class: 'shot-chart-court',
       'aria-hidden': 'true',
@@ -811,7 +817,7 @@ export function createReportController({
     }
     court.prepend(defs);
     court.insertBefore(regions, court.children[2]);
-    shotZonePlot.appendChild(court);
+    plot.appendChild(court);
 
     const labelPositions = {
       restricted_area: [50, 12],
@@ -826,35 +832,41 @@ export function createReportController({
     };
     for (const [key, [left, top]] of Object.entries(labelPositions)) {
       const row = rows.get(key);
-      const button = documentObject.createElement('button');
-      button.type = 'button';
-      button.className = `shot-zone-label ${zoneEfficiencyClass(row)}`;
-      button.dataset.shotZone = key;
-      if (row?.eventIds.length) button.dataset.sourceEventIds = row.eventIds.join(',');
-      button.disabled = !row?.attempted;
-      button.style.left = `${left}%`;
-      button.style.top = `${top}%`;
+      const label = documentObject.createElement(interactive ? 'button' : 'div');
+      if (interactive) label.type = 'button';
+      label.className = `shot-zone-label ${zoneEfficiencyClass(row)}`;
+      label.dataset.shotZone = key;
+      if (interactive && row?.eventIds.length) {
+        label.dataset.sourceEventIds = row.eventIds.join(',');
+      }
+      if (interactive) label.disabled = !row?.attempted;
+      label.style.left = `${left}%`;
+      label.style.top = `${top}%`;
       const name = SHOT_REPORT_DIMENSIONS[0].labels[key];
-      button.innerHTML = `<strong>${name}</strong><span>${zoneLabel(row)}</span>`;
-      button.setAttribute(
+      label.innerHTML = `<strong>${name}</strong><span>${zoneLabel(row)}</span>`;
+      label.setAttribute(
         'aria-label',
         row?.attempted
-          ? `${name}: ${row.made} made of ${row.attempted}, ${formatPercentage(row.percentage)}, ${row.pointsPerAttempt.toFixed(2)} points per attempt. Show source plays.`
+          ? `${name}: ${row.made} made of ${row.attempted}, ${formatPercentage(row.percentage)}, ${row.pointsPerAttempt.toFixed(2)} points per attempt.${interactive ? ' Show source plays.' : ''}`
           : `${name}: no attempts.`
       );
-      shotZonePlot.appendChild(button);
+      plot.appendChild(label);
     }
 
     const noLocation = rows.get('__untagged__');
-    const noLocationButton = documentObject.createElement('button');
-    noLocationButton.type = 'button';
-    noLocationButton.className = 'secondary small';
-    noLocationButton.disabled = !noLocation?.attempted;
-    if (noLocation?.eventIds.length) {
-      noLocationButton.dataset.sourceEventIds = noLocation.eventIds.join(',');
+    const noLocationValue = documentObject.createElement(interactive ? 'button' : 'span');
+    if (interactive) {
+      noLocationValue.type = 'button';
+      noLocationValue.className = 'secondary small';
+      noLocationValue.disabled = !noLocation?.attempted;
+      if (noLocation?.eventIds.length) {
+        noLocationValue.dataset.sourceEventIds = noLocation.eventIds.join(',');
+      }
+    } else {
+      noLocationValue.className = 'focused-zone-no-location';
     }
-    noLocationButton.textContent = `No location: ${zoneLabel(noLocation)}`;
-    shotZoneNoLocation.appendChild(noLocationButton);
+    noLocationValue.textContent = `No location: ${zoneLabel(noLocation)}`;
+    noLocationHost.appendChild(noLocationValue);
   }
 
   function renderShotSplits(report) {
@@ -920,6 +932,8 @@ export function createReportController({
     if (!playerReview || !player) {
       focusedPlayerStats.innerHTML = '';
       focusedPlayerShotChartPlot.innerHTML = '';
+      focusedPlayerShotZonePlot.innerHTML = '';
+      focusedPlayerShotZoneNoLocation.innerHTML = '';
       return;
     }
 
@@ -935,6 +949,11 @@ export function createReportController({
       chart: focusedPlayerShotChart,
       plot: focusedPlayerShotChartPlot,
       empty: focusedPlayerEmptyShotChart
+    });
+    renderShotZones(shotReport, {
+      plot: focusedPlayerShotZonePlot,
+      noLocationHost: focusedPlayerShotZoneNoLocation,
+      interactive: false
     });
   }
 
@@ -1020,6 +1039,8 @@ export function createReportController({
         focusedPlayerReportCard.classList.add('hidden');
         focusedPlayerStats.innerHTML = '';
         focusedPlayerShotChartPlot.innerHTML = '';
+        focusedPlayerShotZonePlot.innerHTML = '';
+        focusedPlayerShotZoneNoLocation.innerHTML = '';
         return;
       }
       const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));

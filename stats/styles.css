@@ -79,7 +79,9 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .focused-player-shot-report { min-width: 0; padding-top: 14px; border-top: 1px solid var(--line); }
 .focused-player-shot-report .section-head { margin-bottom: 8px; }
 .focused-player-shot-report .shot-report-summary { margin-bottom: 8px; }
-.focused-player-shot-report .shot-chart { width: min(100%, 560px); }
+.focused-player-shot-visuals .shot-chart { width: min(100%, 560px); }
+.focused-player-shot-visuals .shot-zone-label { cursor: default; }
+.focused-zone-no-location { color: var(--muted); font-size: .78rem; font-weight: 700; }
 .review-video-score span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-score-team { text-align: right; }
 .review-score-opponent { text-align: left; }

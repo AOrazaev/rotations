@@ -196,18 +196,35 @@
             <section class="focused-player-shot-report" aria-labelledby="focusedPlayerShotTitle">
               <div class="section-head">
                 <div>
-                  <h3 id="focusedPlayerShotTitle">Shot chart</h3>
+                  <h3 id="focusedPlayerShotTitle">Shooting</h3>
                   <p id="focusedPlayerShotSummary" class="shot-report-summary"></p>
                 </div>
               </div>
-              <div class="shot-chart-legend" aria-hidden="true">
-                <span class="made">Made</span>
-                <span class="missed">Missed</span>
+              <div class="shot-report-visuals focused-player-shot-visuals">
+                <section class="shot-report-visual">
+                  <h4>Shot locations</h4>
+                  <div class="shot-chart-legend" aria-hidden="true">
+                    <span class="made">Made</span>
+                    <span class="missed">Missed</span>
+                  </div>
+                  <div id="focusedPlayerShotChart" class="shot-chart">
+                    <div id="focusedPlayerShotChartPlot" class="shot-chart-plot"></div>
+                  </div>
+                  <p id="focusedPlayerEmptyShotChart" class="empty-state compact hidden">No shots have a recorded location.</p>
+                </section>
+                <section class="shot-report-visual">
+                  <h4>Zone percentages</h4>
+                  <div class="shot-zone-legend" aria-label="Zone color legend">
+                    <span class="low">Below 0.80 PPA</span>
+                    <span class="medium">0.80–1.09 PPA</span>
+                    <span class="high">1.10+ PPA</span>
+                  </div>
+                  <div class="shot-chart">
+                    <div id="focusedPlayerShotZonePlot" class="shot-chart-plot"></div>
+                  </div>
+                  <div id="focusedPlayerShotZoneNoLocation" class="shot-zone-no-location"></div>
+                </section>
               </div>
-              <div id="focusedPlayerShotChart" class="shot-chart">
-                <div id="focusedPlayerShotChartPlot" class="shot-chart-plot"></div>
-              </div>
-              <p id="focusedPlayerEmptyShotChart" class="empty-state compact hidden">No shots have a recorded location.</p>
             </section>
           </section>
 
