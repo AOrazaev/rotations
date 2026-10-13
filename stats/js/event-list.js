@@ -2,6 +2,10 @@ import {
   getLineupAtEventPosition,
   orderGameEvents
 } from './game-model.js';
+import {
+  commentMentionsPlayer,
+  commentMentionsTeam
+} from './comment-mentions.js';
 import { editableEventTypes } from './voice-proposal.js';
 import { createShotDetailsEditor } from './shot-details-editor.js';
 import { getConfidentExpectedShotValue } from './shot-geometry.js';
@@ -671,10 +675,13 @@ export function createEventListController({
     if (filters.players.size || filters.teamMention) {
       const eventPlayerIds = [event.playerId, event.playerInId, event.playerOutId].filter(Boolean);
       const matchesPlayer = eventPlayerIds.some(playerId => filters.players.has(playerId));
+      const mentionsPlayer = game.players.some(player =>
+        filters.players.has(player.id)
+        && commentMentionsPlayer(event.coachComment, player)
+      );
       const mentionsTeam = filters.teamMention
-        && [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
-          .some(match => match[1].toLowerCase() === 'team');
-      if (!matchesPlayer && !mentionsTeam) return false;
+        && commentMentionsTeam(event.coachComment);
+      if (!matchesPlayer && !mentionsPlayer && !mentionsTeam) return false;
     }
     const hasComment = Boolean(String(event.coachComment || '').trim());
     if (filters.comment === 'with' && !hasComment) return false;

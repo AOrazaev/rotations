@@ -1,4 +1,8 @@
 import { describeEvent } from './event-list.js';
+import {
+  commentMentionsPlayer,
+  commentMentionsTeam
+} from './comment-mentions.js';
 import { createShotCourtDiagram } from './shot-court.js';
 import {
   SHOT_REPORT_ANY,
@@ -173,13 +177,6 @@ export function createReportController({
     feedbackStatus.classList.toggle('error', isError);
   }
 
-  function commentMentionsPlayer(comment, player) {
-    const mentions = [...String(comment || '').matchAll(/@([A-Za-z0-9]+)/g)]
-      .map(match => match[1].toLowerCase());
-    return mentions.includes('team')
-      || Boolean(player.number && mentions.includes(String(player.number).toLowerCase()));
-  }
-
   function feedbackEvents(player) {
     return analysis.orderedEventIds
       .map(eventId => game.events.find(event => event.id === eventId))
@@ -190,6 +187,7 @@ export function createReportController({
           || event.playerInId === player.id
           || event.playerOutId === player.id
           || commentMentionsPlayer(event.coachComment, player)
+          || commentMentionsTeam(event.coachComment)
         ));
   }
 

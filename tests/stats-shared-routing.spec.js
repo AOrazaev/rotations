@@ -140,7 +140,17 @@ test('shared timeline filters survive reload, update the URL, and copy as a link
   expect(playerShot).toBeTruthy();
   const player = publishedBackup.game.players.find(item => item.id === playerShot.playerId);
   const expectedPlayerShots = publishedBackup.game.events.filter(event =>
-    event.type === 'shot' && event.playerId === player.id
+    event.type === 'shot'
+    && (
+      event.playerId === player.id
+      || event.playerInId === player.id
+      || event.playerOutId === player.id
+      || Boolean(
+        player.number
+        && [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+          .some(match => match[1].toLowerCase() === String(player.number).toLowerCase())
+      )
+    )
   );
   const allShots = publishedBackup.game.events.filter(event => event.type === 'shot');
   const playerLabel = player.number ? `#${player.number} ${player.name}` : player.name;
@@ -180,6 +190,53 @@ test('shared timeline filters survive reload, update the URL, and copy as a link
   await page.locator('#copyFilteredReviewLink').click();
   await expect(page.locator('#copyFilteredReviewStatus')).toHaveText('Filtered link copied.');
   expect(await page.evaluate(() => window.__sharedClipboardWrites)).toEqual([page.url()]);
+  expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
+});
+
+test('shared player filters include jersey mentions without including team mentions', async ({ page, request }) => {
+  await installSharedTestEnvironment(page);
+  const publishedBackup = await request.get('/games/game-20260927.json').then(response => response.json());
+  const player = publishedBackup.game.players.find(item => item.number === '13');
+  expect(player).toBeTruthy();
+
+  const mentions = event => [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+    .map(match => match[1].toLowerCase());
+  const directlyInvolvesPlayer = event => [
+    event.playerId,
+    event.playerInId,
+    event.playerOutId
+  ].includes(player.id);
+  const expectedEventIds = publishedBackup.game.events
+    .filter(event =>
+      directlyInvolvesPlayer(event)
+      || mentions(event).includes(String(player.number).toLowerCase())
+    )
+    .map(event => event.id);
+  const mentionedOnlyEvent = publishedBackup.game.events.find(event =>
+    !directlyInvolvesPlayer(event)
+    && mentions(event).includes(String(player.number).toLowerCase())
+  );
+  const teamOnlyEventIds = publishedBackup.game.events
+    .filter(event =>
+      !directlyInvolvesPlayer(event)
+      && !mentions(event).includes(String(player.number).toLowerCase())
+      && mentions(event).includes('team')
+    )
+    .map(event => event.id);
+  expect(mentionedOnlyEvent).toBeTruthy();
+  expect(teamOnlyEventIds.length).toBeGreaterThan(0);
+
+  await page.goto(
+    `/stats/?mode=shared&game=game-20260927&tl-player=${encodeURIComponent(player.id)}`
+  );
+  await page.evaluate(() => window.__statsApp.ready);
+
+  const visibleEventIds = await page.locator('.event-list-item').evaluateAll(items =>
+    items.map(item => item.dataset.eventId)
+  );
+  expect([...visibleEventIds].sort()).toEqual([...expectedEventIds].sort());
+  expect(visibleEventIds).toContain(mentionedOnlyEvent.id);
+  expect(visibleEventIds.some(eventId => teamOnlyEventIds.includes(eventId))).toBe(false);
   expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
 });
 
