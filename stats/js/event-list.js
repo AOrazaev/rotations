@@ -2,6 +2,10 @@ import {
   getLineupAtEventPosition,
   orderGameEvents
 } from './game-model.js';
+import {
+  commentMentionsPlayer,
+  commentMentionsTeam
+} from './comment-mentions.js';
 import { editableEventTypes } from './voice-proposal.js';
 import { createShotDetailsEditor } from './shot-details-editor.js';
 import { getConfidentExpectedShotValue } from './shot-geometry.js';
@@ -36,6 +40,7 @@ export function describeEvent(event, playersById, score = null) {
     const scoreLabel = event.made && score ? ` - ${score.team}:${score.opponent}` : '';
     return `${subject} ${event.made ? 'made' : 'missed'} ${shot}${scoreLabel}`;
   }
+
   if (event.type === 'rebound') return `${subject} ${event.reboundKind} rebound`;
   if (event.type === 'substitution') {
     return `${playersById[event.playerInId]?.name || 'Player'} in for ${playersById[event.playerOutId]?.name || 'player'}`;
@@ -54,7 +59,10 @@ export function createEventListController({
   initialEarliestFirst = false,
   followPlayback = false,
   initialFilters = null,
+  feedbackPlayerId = null,
   onFiltersChanged = () => {},
+  onVisibleEventsChanged = () => {},
+  onEventPlayed = () => {},
   now = () => new Date().toISOString(),
   confirmFn = message => confirm(message),
   onError = () => {}
@@ -271,6 +279,25 @@ export function createEventListController({
       locatedEventTimer = null;
     }
     eventList.querySelector('.located-event')?.classList.remove('located-event');
+  }
+
+  function revealEvent(eventId) {
+    const row = eventList.querySelector(`[data-event-id="${CSS.escape(eventId)}"]`);
+    if (!row) return;
+    clearLocatedEventHighlight();
+    row.classList.add('located-event');
+    const listRect = eventList.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const rowTop = eventList.scrollTop + rowRect.top - listRect.top;
+    const maxScrollTop = Math.max(0, eventList.scrollHeight - eventList.clientHeight);
+    eventList.scrollTo({
+      top: Math.min(maxScrollTop, Math.max(0, rowTop - 10)),
+      behavior: 'smooth'
+    });
+    locatedEventTimer = documentObject.defaultView.setTimeout(() => {
+      row.classList.remove('located-event');
+      locatedEventTimer = null;
+    }, 1600);
   }
 
   function locateClosestEvent() {
@@ -671,10 +698,13 @@ export function createEventListController({
     if (filters.players.size || filters.teamMention) {
       const eventPlayerIds = [event.playerId, event.playerInId, event.playerOutId].filter(Boolean);
       const matchesPlayer = eventPlayerIds.some(playerId => filters.players.has(playerId));
+      const mentionsPlayer = game.players.some(player =>
+        filters.players.has(player.id)
+        && commentMentionsPlayer(event.coachComment, player)
+      );
       const mentionsTeam = filters.teamMention
-        && [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
-          .some(match => match[1].toLowerCase() === 'team');
-      if (!matchesPlayer && !mentionsTeam) return false;
+        && commentMentionsTeam(event.coachComment);
+      if (!matchesPlayer && !mentionsPlayer && !mentionsTeam) return false;
     }
     const hasComment = Boolean(String(event.coachComment || '').trim());
     if (filters.comment === 'with' && !hasComment) return false;
@@ -698,6 +728,28 @@ export function createEventListController({
       if (!matchesValue(filters.shotCreations, facets.creation)) return false;
     }
     return true;
+  }
+
+  function feedbackReason(event) {
+    if (
+      !feedbackPlayerId
+      || filters.players.size !== 1
+      || !filters.players.has(feedbackPlayerId)
+    ) {
+      return null;
+    }
+    const player = game?.players.find(item => item.id === feedbackPlayerId);
+    if (!player) return null;
+    if ([event.playerId, event.playerInId, event.playerOutId].includes(player.id)) {
+      return { kind: 'direct', label: 'Your play' };
+    }
+    if (commentMentionsPlayer(event.coachComment, player)) {
+      return { kind: 'mention', label: `Mentioned @${player.number}` };
+    }
+    if (filters.teamMention && commentMentionsTeam(event.coachComment)) {
+      return { kind: 'team', label: 'Team feedback' };
+    }
+    return null;
   }
 
   function addPlayerOption(select, player) {
@@ -1103,6 +1155,10 @@ export function createEventListController({
       selectionAnchorId = null;
     }
     clearLocatedEventHighlight();
+    for (const details of eventList.querySelectorAll('.voice-command-details[open]')) {
+      const commandId = details.closest('[data-voice-command-id]')?.dataset.voiceCommandId;
+      if (commandId) expandedVoiceCommandIds.add(commandId);
+    }
     eventList.innerHTML = '';
     eventSummaries = new Map();
     populateFilterPlayers();
@@ -1138,6 +1194,7 @@ export function createEventListController({
     updateMobileTimelinePreview();
     const visibleEvents = orderedEvents.filter(eventMatchesFilters);
     locatableEventIds = visibleEvents.map(event => event.id);
+    onVisibleEventsChanged(structuredClone(visibleEvents), getFilterState());
     updateLocateEventButton();
     const timelineItems = [
       ...visibleEvents.map(event => ({
@@ -1194,6 +1251,14 @@ export function createEventListController({
       }
       const detailBadges = item.querySelector('.event-detail-badges');
       const badges = getShotDetailBadges(event);
+      const reason = feedbackReason(event);
+      if (reason) {
+        const reasonBadge = documentObject.createElement('span');
+        reasonBadge.className = 'feedback-reason-badge';
+        reasonBadge.dataset.feedbackReason = reason.kind;
+        reasonBadge.textContent = reason.label;
+        detailBadges.appendChild(reasonBadge);
+      }
       for (const badge of badges) {
         if (detailBadges.childElementCount) {
           detailBadges.append(documentObject.createTextNode(' · '));
@@ -1205,7 +1270,7 @@ export function createEventListController({
         badgeItem.textContent = badge.label;
         detailBadges.appendChild(badgeItem);
       }
-      detailBadges.classList.toggle('hidden', !badges.length);
+      detailBadges.classList.toggle('hidden', !reason && !badges.length);
       const comment = String(event.coachComment || '').trim();
       const commentBlock = item.querySelector('.coach-comment');
       item.classList.toggle('has-comment', !!comment);
@@ -1253,6 +1318,7 @@ export function createEventListController({
         selectEvent(selected.id, event);
       } else if (button.dataset.action === 'play-event') {
         setPlaybackFollowing(true);
+        onEventPlayed(structuredClone(selected));
         videoController.seekTo(Math.max(0, selected.videoSeconds - PREVIEW_SECONDS));
         videoController.play();
       } else if (readOnly) {
@@ -1565,6 +1631,7 @@ export function createEventListController({
   return {
     render,
     getFilters: getFilterState,
+    revealEvent,
     setVoiceCommands(commands) {
       voiceCommands = structuredClone(commands);
       const commandIds = new Set(voiceCommands.map(command => command.id));

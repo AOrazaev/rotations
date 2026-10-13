@@ -33,6 +33,10 @@ function isSafeTimelinePlayerId(value) {
     && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
+function isSafeFeedbackNumber(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9]{1,32}$/.test(value);
+}
+
 function parseTimelineFilters(params) {
   const filters = {};
   for (const [property, parameter, allowed] of TIMELINE_FILTER_DEFINITIONS) {
@@ -71,6 +75,32 @@ function appendTimelineFilters(params, filters) {
 export function parseStatsRoute(search = '') {
   const params = new URLSearchParams(search);
   const mode = params.get('mode');
+  if (mode === null && params.has('feedback')) {
+    if (!params.has('game')) {
+      return { mode: 'shared', status: 'missing-game', snapshotName: null };
+    }
+    const snapshotName = params.get('game');
+    if (!isSafeSharedGameName(snapshotName)) {
+      return { mode: 'shared', status: 'invalid-game', snapshotName: null };
+    }
+    const feedbackNumber = params.get('feedback');
+    if (!isSafeFeedbackNumber(feedbackNumber)) {
+      return {
+        mode: 'shared',
+        status: 'invalid-feedback',
+        snapshotName,
+        feedbackNumber: null,
+        shortFeedback: true
+      };
+    }
+    return {
+      mode: 'shared',
+      status: 'ready',
+      snapshotName,
+      feedbackNumber,
+      shortFeedback: true
+    };
+  }
   if (mode === 'shared') {
     if (!params.has('game')) {
       return { mode: 'shared', status: 'missing-game', snapshotName: null };
@@ -116,5 +146,17 @@ export function buildSharedReviewUrl(snapshotName, pathname = '/stats/', timelin
     game: String(snapshotName)
   });
   appendTimelineFilters(params, timelineFilters);
+  return `${pathname}?${params}`;
+}
+
+export function buildSharedFeedbackUrl(
+  snapshotName,
+  feedbackNumber,
+  pathname = '/stats/'
+) {
+  const params = new URLSearchParams({
+    game: String(snapshotName),
+    feedback: String(feedbackNumber)
+  });
   return `${pathname}?${params}`;
 }

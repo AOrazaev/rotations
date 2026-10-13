@@ -14,6 +14,7 @@ import { createVoiceCaptureController } from './voice-capture.js';
 import { VoiceCompanionClient } from './voice-companion-client.js';
 import {
   buildReviewUrl,
+  buildSharedFeedbackUrl,
   buildSharedReviewUrl,
   parseStatsRoute
 } from './review-route.js';
@@ -68,9 +69,11 @@ export function createStatsSpikeApp({
   }
 
   function createPlayerMount() {
+    const focusedFeedbackPlay = playerFrame.querySelector('#playFocusedFeedbackVideo');
     const element = documentObject.createElement('div');
     element.id = 'youtubePlayer';
     playerFrame.replaceChildren(element);
+    if (focusedFeedbackPlay) playerFrame.append(focusedFeedbackPlay);
     return element;
   }
 
@@ -197,6 +200,17 @@ export function createStatsSpikeApp({
       player.seekTo(seconds);
       refreshCurrentTime();
     },
+    seekToPaused(seconds) {
+      if (!player) throw new Error('The game recording is unavailable for seeking.');
+      if (typeof player.seekToPaused === 'function') {
+        player.seekToPaused(seconds);
+      } else {
+        player.seekTo(seconds);
+        player.pause();
+      }
+      playbackActive = false;
+      refreshCurrentTime();
+    },
     play() {
       if (!player) throw new Error('The game recording is unavailable for playback.');
       player.play();
@@ -225,6 +239,9 @@ const reviewModeHeader = document.querySelector('#reviewModeHeader');
 const reviewModeLabel = document.querySelector('#reviewModeLabel');
 const reviewModeTitle = document.querySelector('#reviewModeTitle');
 const reviewModeOpponent = document.querySelector('#reviewModeOpponent');
+const sharedPlayerFeedbackSummary = document.querySelector('#sharedPlayerFeedbackSummary');
+const viewFullGameReview = document.querySelector('#viewFullGameReview');
+const videoCardTitle = document.querySelector('#videoCardTitle');
 const reviewRouteState = document.querySelector('#reviewRouteState');
 const reviewRouteTitle = document.querySelector('#reviewRouteTitle');
 const reviewRouteMessage = document.querySelector('#reviewRouteMessage');
@@ -325,6 +342,45 @@ let setupController;
 let eventController;
 let reviewController;
 let voiceController;
+let sharedFeedbackPlayerId = sharedMode
+  && route.timelineFilters?.comment === 'with'
+  && route.timelineFilters?.players?.length === 1
+  ? route.timelineFilters.players[0]
+  : null;
+
+function pluralize(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function updateSharedPlayerFeedbackState(state = { active: false }) {
+  const game = reviewController?.getGame();
+  document.body.classList.toggle('shared-player-feedback-mode', Boolean(state.active));
+  sharedPlayerFeedbackSummary.classList.toggle('hidden', !state.active);
+  viewFullGameReview.classList.toggle('hidden', !state.active);
+  if (!state.active || !game || !state.player) {
+    videoCardTitle.textContent = 'Recording';
+    reviewModeLabel.textContent = sharedMode ? 'Shared read-only review' : 'Read-only review';
+    reviewModeTitle.textContent = game?.title || '';
+    reviewModeOpponent.textContent = game?.opponentName ? `vs ${game.opponentName}` : 'No opponent';
+    return;
+  }
+  const playerLabel = state.player.number
+    ? `#${state.player.number} ${state.player.name}`
+    : state.player.name;
+  reviewModeLabel.textContent = 'Shared player feedback';
+  reviewModeTitle.textContent = `Feedback for ${playerLabel}`;
+  reviewModeOpponent.textContent = `${game.title}${game.opponentName ? ` · vs ${game.opponentName}` : ''}`;
+  videoCardTitle.textContent = `Feedback for ${playerLabel}${
+    game.opponentName ? ` · vs ${game.opponentName}` : ''
+  }`;
+  const details = [
+    pluralize(state.direct, 'play'),
+    pluralize(state.mentions, 'mention')
+  ];
+  if (state.team) details.push(pluralize(state.team, 'team comment'));
+  sharedPlayerFeedbackSummary.textContent = `${pluralize(state.total, 'feedback moment')} · ${details.join(' · ')}`;
+  viewFullGameReview.href = buildSharedReviewUrl(route.snapshotName, location.pathname);
+}
 
 function openGameWorkspace(game) {
   document.querySelector('#gameVideoUrl').value = game.video.sourceUrl;
@@ -355,7 +411,31 @@ function showReviewRouteState(title, message) {
   reviewRouteState.classList.remove('hidden');
 }
 
+function usesShortFeedbackFilters(timelineFilters) {
+  if (!route.shortFeedback || !sharedFeedbackPlayerId || !timelineFilters) return false;
+  return timelineFilters.comment === 'with'
+    && timelineFilters.players?.length === 1
+    && timelineFilters.players[0] === sharedFeedbackPlayerId
+    && !timelineFilters.teamMention
+    && [
+      'sides',
+      'types',
+      'shotZones',
+      'shotPressures',
+      'shotPhases',
+      'shotContexts',
+      'shotCreations'
+    ].every(key => !timelineFilters[key]?.length);
+}
+
 function buildCurrentReviewUrl(timelineFilters = route.timelineFilters || null) {
+  if (sharedMode && usesShortFeedbackFilters(timelineFilters)) {
+    return buildSharedFeedbackUrl(
+      route.snapshotName,
+      route.feedbackNumber,
+      location.pathname
+    );
+  }
   return sharedMode
     ? buildSharedReviewUrl(route.snapshotName, location.pathname, timelineFilters)
     : buildReviewUrl(route.gameId, location.pathname, timelineFilters);
@@ -386,6 +466,10 @@ async function initializeReviewMode() {
         ? 'The published game name in this shared review link is invalid.'
         : 'The game identifier in this review link is invalid.'
     );
+    return;
+  }
+  if (route.status === 'invalid-feedback') {
+    showReviewRouteState('Invalid feedback link', 'The player number in this feedback link is invalid.');
     return;
   }
 
@@ -425,9 +509,37 @@ async function initializeReviewMode() {
     }
   }
 
-  const canonicalUrl = sharedMode
-    ? buildSharedReviewUrl(route.snapshotName, location.pathname, route.timelineFilters)
-    : buildReviewUrl(game.id, location.pathname, route.timelineFilters);
+  if (route.shortFeedback) {
+    const matchingPlayers = game.players.filter(player =>
+      String(player.number || '').toLowerCase() === route.feedbackNumber.toLowerCase()
+    );
+    if (matchingPlayers.length === 0) {
+      showReviewRouteState('404', '');
+      return;
+    }
+    if (matchingPlayers.length > 1) {
+      showReviewRouteState(
+        'Duplicate jersey number',
+        `More than one player in this game uses #${route.feedbackNumber}.`
+      );
+      return;
+    }
+    sharedFeedbackPlayerId = matchingPlayers[0].id;
+    route.timelineFilters = {
+      players: [sharedFeedbackPlayerId],
+      comment: 'with'
+    };
+  }
+
+  reviewController = createReviewController({
+    videoController,
+    initialTimelineFilters: route.timelineFilters,
+    feedbackPlayerId: sharedFeedbackPlayerId,
+    onPlayerFeedbackStateChanged: updateSharedPlayerFeedbackState,
+    onTimelineFiltersChanged: syncReviewUrl
+  });
+
+  const canonicalUrl = buildCurrentReviewUrl(route.timelineFilters);
   if (`${location.pathname}${location.search}` !== canonicalUrl) {
     history.replaceState({}, '', canonicalUrl);
   }
@@ -443,11 +555,6 @@ async function initializeReviewMode() {
 
 let ready;
 if (reviewMode) {
-  reviewController = createReviewController({
-    videoController,
-    initialTimelineFilters: route.timelineFilters,
-    onTimelineFiltersChanged: syncReviewUrl
-  });
   removeReviewMutationSurfaces();
   ready = initializeReviewMode();
 } else {
@@ -491,7 +598,9 @@ window.__statsApp = {
   setupController,
   eventController,
   voiceController,
-  reviewController,
+  get reviewController() {
+    return reviewController;
+  },
   store,
   destroy() {
     videoController.destroy();

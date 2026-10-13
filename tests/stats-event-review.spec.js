@@ -701,3 +701,50 @@ test('timeline can filter coach comments that mention the whole team', async ({ 
   await expect(page.locator('.coach-comment')).toHaveText('@team Review our defensive spacing.');
   await expect(page.locator('#openEventFilters')).toHaveAttribute('aria-label', 'Filter timeline, 1 active');
 });
+
+test('timeline player filters include jersey mentions but not team mentions', async ({ page }) => {
+  await openReview(page);
+  await page.evaluate(() =>
+    window.__statsApp.setupController.openGame(
+      window.__statsApp.eventController.getGame().id
+    )
+  );
+  await page.locator('.setup-number').first().fill('13');
+  await page.locator('#saveGame').click();
+  await expect(page.locator('#gamesStatus')).toContainText('Saved Review game');
+
+  const playerId = await addTeamEvent(page, '[data-event-type="steal"]', 20);
+  const playerNumber = await page.evaluate(id =>
+    window.__statsApp.eventController.getGame().players.find(player => player.id === id).number
+  , playerId);
+
+  await page.evaluate(() => { window.__statsFakePlayer.current = 30; });
+  await page.locator('#currentLineup .player-select-button').nth(1).click();
+  await page.locator('[data-event-type="assist"]').click();
+  await page.locator('.event-list-item').filter({ hasText: 'assist' })
+    .locator('[data-action="comment-event"]').click();
+  await page.locator('#coachCommentText').fill(`Review the recovery, @${playerNumber}.`);
+  await page.locator('#coachCommentForm button[type="submit"]').click();
+
+  await page.evaluate(() => { window.__statsFakePlayer.current = 40; });
+  await page.locator('[data-event-side="opponent"]').click();
+  await page.locator('[data-event-type="turnover"]').click();
+  await page.locator('.event-list-item').filter({ hasText: 'Opponent turnover' })
+    .locator('[data-action="comment-event"]').click();
+  await page.locator('#coachCommentText').fill('@team Review our spacing.');
+  await page.locator('#coachCommentForm button[type="submit"]').click();
+
+  await page.locator('#openEventFilters').click();
+  await page.locator(`input[name="filterPlayer"][value="${playerId}"]`).check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+
+  await expect(page.locator('.event-list-item')).toHaveCount(2);
+  await expect(page.locator('.event-description', { hasText: 'steal' })).toHaveCount(1);
+  await expect(page.locator('.event-description', { hasText: 'assist' })).toHaveCount(1);
+  await expect(page.locator('.coach-comment', { hasText: '@team' })).toHaveCount(0);
+
+  await page.locator('#openEventFilters').click();
+  await page.locator('#filterTeamMention').check();
+  await page.locator('#eventFilterForm button[type="submit"]').click();
+  await expect(page.locator('.event-list-item')).toHaveCount(3);
+});

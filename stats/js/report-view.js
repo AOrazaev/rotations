@@ -1,4 +1,8 @@
 import { describeEvent } from './event-list.js';
+import {
+  commentMentionsPlayer,
+  commentMentionsTeam
+} from './comment-mentions.js';
 import { createShotCourtDiagram } from './shot-court.js';
 import {
   SHOT_REPORT_ANY,
@@ -63,7 +67,8 @@ export function createReportController({
   documentObject = document,
   videoController,
   previewSeconds = 0,
-  playerReview = false
+  playerReview = false,
+  initialFeedbackPlayerId = null
 }) {
   const reportCard = documentObject.querySelector('#reportCard');
   const finalScore = documentObject.querySelector('#reportFinalScore');
@@ -104,6 +109,15 @@ export function createReportController({
   const copyFeedbackButton = documentObject.querySelector('#copyPlayerFeedback');
   const copyYouTubeFeedbackButton = documentObject.querySelector('#copyYouTubeFeedback');
   const feedbackStatus = documentObject.querySelector('#playerFeedbackStatus');
+  const focusedPlayerReportCard = documentObject.querySelector('#focusedPlayerReportCard');
+  const focusedPlayerReportTitle = documentObject.querySelector('#focusedPlayerReportTitle');
+  const focusedPlayerStats = documentObject.querySelector('#focusedPlayerStats');
+  const focusedPlayerShotSummary = documentObject.querySelector('#focusedPlayerShotSummary');
+  const focusedPlayerShotChart = documentObject.querySelector('#focusedPlayerShotChart');
+  const focusedPlayerShotChartPlot = documentObject.querySelector('#focusedPlayerShotChartPlot');
+  const focusedPlayerEmptyShotChart = documentObject.querySelector('#focusedPlayerEmptyShotChart');
+  const focusedPlayerShotZonePlot = documentObject.querySelector('#focusedPlayerShotZonePlot');
+  const focusedPlayerShotZoneNoLocation = documentObject.querySelector('#focusedPlayerShotZoneNoLocation');
 
   let game = null;
   let analysis = null;
@@ -173,13 +187,6 @@ export function createReportController({
     feedbackStatus.classList.toggle('error', isError);
   }
 
-  function commentMentionsPlayer(comment, player) {
-    const mentions = [...String(comment || '').matchAll(/@([A-Za-z0-9]+)/g)]
-      .map(match => match[1].toLowerCase());
-    return mentions.includes('team')
-      || Boolean(player.number && mentions.includes(String(player.number).toLowerCase()));
-  }
-
   function feedbackEvents(player) {
     return analysis.orderedEventIds
       .map(eventId => game.events.find(event => event.id === eventId))
@@ -190,6 +197,7 @@ export function createReportController({
           || event.playerInId === player.id
           || event.playerOutId === player.id
           || commentMentionsPlayer(event.coachComment, player)
+          || commentMentionsTeam(event.coachComment)
         ));
   }
 
@@ -211,11 +219,8 @@ export function createReportController({
       : `${minutes}:${remainingSeconds}`;
   }
 
-  function renderFeedbackSummary(player) {
-    feedbackSummary.innerHTML = '';
-    feedbackSummary.classList.toggle('hidden', !playerReview || !player);
-    if (!playerReview || !player) return;
-    const stats = analysis.report.players[player.id];
+  function renderPlayerStatSummary(container, stats) {
+    container.innerHTML = '';
     const metrics = [
       ['points', 'Points', stats.points],
       ['fieldGoals', 'FG', `${stats.fieldGoalsMade}/${stats.fieldGoalsAttempted}`],
@@ -240,8 +245,17 @@ export function createReportController({
       const description = documentObject.createElement('dd');
       description.textContent = value;
       item.append(term, description);
-      feedbackSummary.appendChild(item);
+      container.appendChild(item);
     }
+  }
+
+  function renderFeedbackSummary(player) {
+    feedbackSummary.classList.toggle('hidden', !playerReview || !player);
+    if (!playerReview || !player) {
+      feedbackSummary.innerHTML = '';
+      return;
+    }
+    renderPlayerStatSummary(feedbackSummary, analysis.report.players[player.id]);
   }
 
   function updateFeedbackMoment(events, { seek = false } = {}) {
@@ -289,6 +303,8 @@ export function createReportController({
     }
     if (game.players.some(player => player.id === previousPlayerId)) {
       feedbackPlayer.value = previousPlayerId;
+    } else if (game.players.some(player => player.id === initialFeedbackPlayerId)) {
+      feedbackPlayer.value = initialFeedbackPlayerId;
     }
 
     feedbackList.innerHTML = '';
@@ -643,14 +659,18 @@ export function createReportController({
     };
   }
 
-  function renderShotChart(report, playersById) {
-    shotChartPlot.innerHTML = '';
+  function renderShotChart(report, playersById, {
+    chart = shotChart,
+    plot = shotChartPlot,
+    empty = emptyShotChart
+  } = {}) {
+    plot.innerHTML = '';
     const court = createShotCourtDiagram(documentObject, {
       class: 'shot-chart-court',
       'aria-hidden': 'true',
       focusable: 'false'
     });
-    shotChartPlot.appendChild(court);
+    plot.appendChild(court);
     const locationGroups = new Map();
     for (const event of report.plottedEvents) {
       const { x, y } = event.shotDetails.location;
@@ -673,11 +693,11 @@ export function createReportController({
         const label = `${formatVideoTime(event.videoSeconds)}, ${describeEvent(event, playersById)}`;
         button.setAttribute('aria-label', label);
         button.title = label;
-        shotChartPlot.appendChild(button);
+        plot.appendChild(button);
       });
     }
-    shotChart.classList.toggle('hidden', report.plottedEvents.length === 0);
-    emptyShotChart.classList.toggle('hidden', report.plottedEvents.length > 0);
+    chart.classList.toggle('hidden', report.plottedEvents.length === 0);
+    empty.classList.toggle('hidden', report.plottedEvents.length > 0);
   }
 
   function createSvgElement(name, attributes = {}) {
@@ -700,9 +720,13 @@ export function createReportController({
     return `${row.made}/${row.attempted} · ${formatPercentage(row.percentage)}`;
   }
 
-  function renderShotZones(report) {
-    shotZonePlot.innerHTML = '';
-    shotZoneNoLocation.innerHTML = '';
+  function renderShotZones(report, {
+    plot = shotZonePlot,
+    noLocationHost = shotZoneNoLocation,
+    interactive = true
+  } = {}) {
+    plot.innerHTML = '';
+    noLocationHost.innerHTML = '';
     const court = createShotCourtDiagram(documentObject, {
       class: 'shot-chart-court',
       'aria-hidden': 'true',
@@ -793,7 +817,7 @@ export function createReportController({
     }
     court.prepend(defs);
     court.insertBefore(regions, court.children[2]);
-    shotZonePlot.appendChild(court);
+    plot.appendChild(court);
 
     const labelPositions = {
       restricted_area: [50, 12],
@@ -808,35 +832,41 @@ export function createReportController({
     };
     for (const [key, [left, top]] of Object.entries(labelPositions)) {
       const row = rows.get(key);
-      const button = documentObject.createElement('button');
-      button.type = 'button';
-      button.className = `shot-zone-label ${zoneEfficiencyClass(row)}`;
-      button.dataset.shotZone = key;
-      if (row?.eventIds.length) button.dataset.sourceEventIds = row.eventIds.join(',');
-      button.disabled = !row?.attempted;
-      button.style.left = `${left}%`;
-      button.style.top = `${top}%`;
+      const label = documentObject.createElement(interactive ? 'button' : 'div');
+      if (interactive) label.type = 'button';
+      label.className = `shot-zone-label ${zoneEfficiencyClass(row)}`;
+      label.dataset.shotZone = key;
+      if (interactive && row?.eventIds.length) {
+        label.dataset.sourceEventIds = row.eventIds.join(',');
+      }
+      if (interactive) label.disabled = !row?.attempted;
+      label.style.left = `${left}%`;
+      label.style.top = `${top}%`;
       const name = SHOT_REPORT_DIMENSIONS[0].labels[key];
-      button.innerHTML = `<strong>${name}</strong><span>${zoneLabel(row)}</span>`;
-      button.setAttribute(
+      label.innerHTML = `<strong>${name}</strong><span>${zoneLabel(row)}</span>`;
+      label.setAttribute(
         'aria-label',
         row?.attempted
-          ? `${name}: ${row.made} made of ${row.attempted}, ${formatPercentage(row.percentage)}, ${row.pointsPerAttempt.toFixed(2)} points per attempt. Show source plays.`
+          ? `${name}: ${row.made} made of ${row.attempted}, ${formatPercentage(row.percentage)}, ${row.pointsPerAttempt.toFixed(2)} points per attempt.${interactive ? ' Show source plays.' : ''}`
           : `${name}: no attempts.`
       );
-      shotZonePlot.appendChild(button);
+      plot.appendChild(label);
     }
 
     const noLocation = rows.get('__untagged__');
-    const noLocationButton = documentObject.createElement('button');
-    noLocationButton.type = 'button';
-    noLocationButton.className = 'secondary small';
-    noLocationButton.disabled = !noLocation?.attempted;
-    if (noLocation?.eventIds.length) {
-      noLocationButton.dataset.sourceEventIds = noLocation.eventIds.join(',');
+    const noLocationValue = documentObject.createElement(interactive ? 'button' : 'span');
+    if (interactive) {
+      noLocationValue.type = 'button';
+      noLocationValue.className = 'secondary small';
+      noLocationValue.disabled = !noLocation?.attempted;
+      if (noLocation?.eventIds.length) {
+        noLocationValue.dataset.sourceEventIds = noLocation.eventIds.join(',');
+      }
+    } else {
+      noLocationValue.className = 'focused-zone-no-location';
     }
-    noLocationButton.textContent = `No location: ${zoneLabel(noLocation)}`;
-    shotZoneNoLocation.appendChild(noLocationButton);
+    noLocationValue.textContent = `No location: ${zoneLabel(noLocation)}`;
+    noLocationHost.appendChild(noLocationValue);
   }
 
   function renderShotSplits(report) {
@@ -877,17 +907,54 @@ export function createReportController({
     }
   }
 
+  function shotReportSummaryText(report) {
+    const percentage = formatPercentage(report.percentage);
+    const missingLocations = report.attempted - report.plottedEvents.length;
+    return `${report.made}/${report.attempted} FG (${percentage}) · `
+      + `${report.pointsPerAttempt == null ? '—' : report.pointsPerAttempt.toFixed(2)} points per attempt · `
+      + `${report.plottedEvents.length} plotted · ${missingLocations} without location`;
+  }
+
   function renderShots() {
     const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
     const report = buildShotReport(game, shotReportFilters());
-    const percentage = formatPercentage(report.percentage);
-    const missingLocations = report.attempted - report.plottedEvents.length;
-    shotReportSummary.textContent = `${report.made}/${report.attempted} FG (${percentage}) · `
-      + `${report.pointsPerAttempt == null ? '—' : report.pointsPerAttempt.toFixed(2)} points per attempt · `
-      + `${report.plottedEvents.length} plotted · ${missingLocations} without location`;
+    shotReportSummary.textContent = shotReportSummaryText(report);
     renderShotChart(report, playersById);
     renderShotZones(report);
     renderShotSplits(report);
+  }
+
+  function renderFocusedPlayerReport() {
+    const player = initialFeedbackPlayerId
+      ? game.players.find(item => item.id === initialFeedbackPlayerId)
+      : null;
+    focusedPlayerReportCard.classList.toggle('hidden', !playerReview || !player);
+    if (!playerReview || !player) {
+      focusedPlayerStats.innerHTML = '';
+      focusedPlayerShotChartPlot.innerHTML = '';
+      focusedPlayerShotZonePlot.innerHTML = '';
+      focusedPlayerShotZoneNoLocation.innerHTML = '';
+      return;
+    }
+
+    const playerLabel = player.number ? `#${player.number} ${player.name}` : player.name;
+    focusedPlayerReportTitle.textContent = `${playerLabel} stats`;
+    renderPlayerStatSummary(focusedPlayerStats, analysis.report.players[player.id]);
+    const playersById = Object.fromEntries(game.players.map(item => [item.id, item]));
+    const shotReport = buildShotReport(game, {
+      scope: `player:${player.id}`
+    });
+    focusedPlayerShotSummary.textContent = shotReportSummaryText(shotReport);
+    renderShotChart(shotReport, playersById, {
+      chart: focusedPlayerShotChart,
+      plot: focusedPlayerShotChartPlot,
+      empty: focusedPlayerEmptyShotChart
+    });
+    renderShotZones(shotReport, {
+      plot: focusedPlayerShotZonePlot,
+      noLocationHost: focusedPlayerShotZoneNoLocation,
+      interactive: false
+    });
   }
 
   function renderSources(eventIds = []) {
@@ -932,6 +999,10 @@ export function createReportController({
     const eventLink = event.target.closest('[data-report-event-id]');
     if (eventLink) seekToEvent(eventLink.dataset.reportEventId);
   });
+  focusedPlayerReportCard.addEventListener('click', event => {
+    const eventLink = event.target.closest('[data-report-event-id]');
+    if (eventLink) seekToEvent(eventLink.dataset.reportEventId);
+  });
   shotReportSection.addEventListener('change', renderShots);
   clearShotReportFilters.addEventListener('click', () => {
     shotReportResult.value = SHOT_REPORT_ANY;
@@ -964,7 +1035,14 @@ export function createReportController({
       analysis = nextAnalysis;
       reportCard.classList.toggle('hidden', !game);
       setError();
-      if (!game || !analysis) return;
+      if (!game || !analysis) {
+        focusedPlayerReportCard.classList.add('hidden');
+        focusedPlayerStats.innerHTML = '';
+        focusedPlayerShotChartPlot.innerHTML = '';
+        focusedPlayerShotZonePlot.innerHTML = '';
+        focusedPlayerShotZoneNoLocation.innerHTML = '';
+        return;
+      }
       const playersById = Object.fromEntries(game.players.map(player => [player.id, player]));
       finalScore.textContent = `${analysis.report.score.team}–${analysis.report.score.opponent}`;
       renderComparison();
@@ -973,6 +1051,7 @@ export function createReportController({
       renderShotPeriodOptions();
       renderShots();
       renderFeedback();
+      renderFocusedPlayerReport();
       renderLineups(playersById);
       renderProgression();
       renderSources();

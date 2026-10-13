@@ -23,6 +23,7 @@
         <p id="reviewModeLabel" class="eyebrow">Read-only review</p>
         <h2 id="reviewModeTitle"></h2>
         <p id="reviewModeOpponent" class="subtitle"></p>
+        <p id="sharedPlayerFeedbackSummary" class="shared-player-feedback-summary hidden"></p>
       </div>
       <div class="review-header-actions">
         <a class="nav-link" href="./">Exit review</a>
@@ -95,8 +96,8 @@
           <section class="card video-card">
             <div class="section-head">
               <div>
-                <h2>Recording</h2>
-                <p>Current position: <strong id="currentTime">0:00.0</strong></p>
+                 <h2 id="videoCardTitle">Recording</h2>
+                <p id="videoCurrentPosition">Current position: <strong id="currentTime">0:00.0</strong></p>
               </div>
               <div class="recording-controls">
                 <div class="playback-actions">
@@ -116,8 +117,39 @@
               <button id="retryVideo" class="secondary small hidden" type="button">Retry video</button>
             </div>
             <p id="videoError" class="message error hidden" role="alert"></p>
+            <section id="sharedFeedbackPanel" class="shared-feedback-panel hidden" aria-labelledby="sharedFeedbackEventDescription">
+              <div id="sharedFeedbackMomentNavigation" class="shared-feedback-moment-navigation" aria-label="Player feedback moment navigation">
+                <button id="previousSharedFeedbackMoment" class="secondary small" type="button">Previous</button>
+                <strong id="sharedFeedbackMomentPosition" aria-live="polite">No feedback moments</strong>
+                <button id="nextSharedFeedbackMoment" class="secondary small" type="button">Next</button>
+                <label class="shared-feedback-shots-toggle">
+                  <input id="showSharedFeedbackPlayerShots" type="checkbox" />
+                  <span>Show my shots</span>
+                </label>
+              </div>
+              <article id="sharedFeedbackMomentCard" class="shared-feedback-moment-card">
+                <blockquote id="sharedFeedbackComment" class="shared-feedback-comment"></blockquote>
+                <div class="shared-feedback-event-row">
+                  <div class="shared-feedback-event-context">
+                    <h3 id="sharedFeedbackEventDescription">Feedback moment</h3>
+                    <p id="sharedFeedbackEventDetails" class="event-detail-badges hidden"></p>
+                    <div class="shared-feedback-metadata">
+                      <span id="sharedFeedbackReason" class="feedback-reason-badge"></span>
+                      <span aria-hidden="true">·</span>
+                      <time id="sharedFeedbackEventTime"></time>
+                    </div>
+                  </div>
+                  <div class="shared-feedback-play-actions">
+                    <button id="playSharedFeedbackLeadIn" class="secondary small" type="button" aria-label="Play feedback moment from five seconds earlier" title="Play feedback moment from five seconds earlier">▶ Play moment</button>
+                  </div>
+                </div>
+              </article>
+            </section>
             <div id="playerFrame" class="player-frame">
               <div id="youtubePlayer"></div>
+              <button id="playFocusedFeedbackVideo" class="focused-feedback-video-play hidden" type="button" aria-label="Play feedback video">
+                <span aria-hidden="true">▶</span>
+              </button>
             </div>
             <div id="trackerVideoScore" class="tracker-video-score hidden" role="status" aria-live="polite" aria-label="Recorded score: Our team 0, Opponent 0">
               <span class="tracker-score-side tracker-score-team">
@@ -143,6 +175,7 @@
               <span><kbd>←</kbd> −3s</span>
               <span><kbd>→</kbd> +3s</span>
             </p>
+            <a id="viewFullGameReview" class="nav-link shared-feedback-full-game hidden" href="./">View full game</a>
             <button
               id="videoResizeHandle"
               class="video-resize-handle"
@@ -154,6 +187,49 @@
               aria-valuenow="70"
               aria-valuetext="70 percent"
             ></button>
+          </section>
+
+          <section id="focusedPlayerReportCard" class="card focused-player-report-card hidden" aria-labelledby="focusedPlayerReportTitle">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Game summary</p>
+                <h2 id="focusedPlayerReportTitle">Player stats</h2>
+              </div>
+            </div>
+            <dl id="focusedPlayerStats" class="player-review-summary"></dl>
+            <section class="focused-player-shot-report" aria-labelledby="focusedPlayerShotTitle">
+              <div class="section-head">
+                <div>
+                  <h3 id="focusedPlayerShotTitle">Shooting</h3>
+                  <p id="focusedPlayerShotSummary" class="shot-report-summary"></p>
+                </div>
+              </div>
+              <div class="shot-report-visuals focused-player-shot-visuals">
+                <section class="shot-report-visual">
+                  <h4>Shot locations</h4>
+                  <div class="shot-chart-legend" aria-hidden="true">
+                    <span class="made">Made</span>
+                    <span class="missed">Missed</span>
+                  </div>
+                  <div id="focusedPlayerShotChart" class="shot-chart">
+                    <div id="focusedPlayerShotChartPlot" class="shot-chart-plot"></div>
+                  </div>
+                  <p id="focusedPlayerEmptyShotChart" class="empty-state compact hidden">No shots have a recorded location.</p>
+                </section>
+                <section class="shot-report-visual">
+                  <h4>Zone percentages</h4>
+                  <div class="shot-zone-legend" aria-label="Zone color legend">
+                    <span class="low">Below 0.80 PPA</span>
+                    <span class="medium">0.80–1.09 PPA</span>
+                    <span class="high">1.10+ PPA</span>
+                  </div>
+                  <div class="shot-chart">
+                    <div id="focusedPlayerShotZonePlot" class="shot-chart-plot"></div>
+                  </div>
+                  <div id="focusedPlayerShotZoneNoLocation" class="shot-zone-no-location"></div>
+                </section>
+              </div>
+            </section>
           </section>
 
         </section>
