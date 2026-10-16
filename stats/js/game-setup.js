@@ -1,4 +1,8 @@
-import { GAME_SCHEMA_VERSION, validateGame } from './game-model.js';
+import {
+  GAME_SCHEMA_VERSION,
+  rebuildLineupSnapshots,
+  validateGame
+} from './game-model.js';
 import { parseYouTubeVideoId } from './youtube-player.js';
 import { consumePlannerHandoff } from './roster-transfer.js';
 import {
@@ -27,6 +31,20 @@ function snapshotPlayer(player) {
   };
 }
 
+function validateUniqueJerseyNumbers(players) {
+  const assignedNumbers = new Map();
+  for (const player of players) {
+    if (!player.number) continue;
+    const existingPlayer = assignedNumbers.get(player.number);
+    if (existingPlayer) {
+      throw new Error(
+        `Jersey number #${player.number} is assigned to both ${existingPlayer.name} and ${player.name}.`
+      );
+    }
+    assignedNumbers.set(player.number, player);
+  }
+}
+
 export function buildGameFromSetup({
   id = crypto.randomUUID(),
   title,
@@ -43,6 +61,8 @@ export function buildGameFromSetup({
   now = new Date().toISOString()
 }) {
   const videoId = parseYouTubeVideoId(videoUrl);
+  const normalizedPlayers = players.map(snapshotPlayer);
+  validateUniqueJerseyNumbers(normalizedPlayers);
   const game = {
     schemaVersion: GAME_SCHEMA_VERSION,
     id,
@@ -58,13 +78,14 @@ export function buildGameFromSetup({
       startSeconds: videoStartSeconds,
       endSeconds: videoEndSeconds,
     },
-    players: players.map(snapshotPlayer),
+    players: normalizedPlayers,
     startingLineupIds: [...startingLineupIds],
     plannedRotation: plannedRotation ? structuredClone(plannedRotation) : null,
     events: structuredClone(events),
   };
-  validateGame(game);
-  return game;
+  const rebuiltGame = rebuildLineupSnapshots(game);
+  validateGame(rebuiltGame);
+  return rebuiltGame;
 }
 
 export function createGameSetupController({
@@ -148,8 +169,19 @@ export function createGameSetupController({
       row.querySelector('.setup-name').value = player.name;
       row.querySelector('.setup-number').value = player.number || '';
       row.querySelector('.setup-starter').checked = draft.startingLineupIds.includes(player.id);
-      row.querySelector('.setup-delete').disabled = draft.players.length <= 5;
-      row.querySelector('.setup-delete').addEventListener('click', () => {
+      const referencedByEvents = draft.events.some(event =>
+        [event.playerId, event.playerInId, event.playerOutId].includes(player.id)
+        || event.lineupIds?.includes(player.id)
+      );
+      const referencedByPlan = draft.plannedRotation?.blocks?.some(block =>
+        block.lineupIds?.includes(player.id) || block.benchIds?.includes(player.id)
+      );
+      const deleteButton = row.querySelector('.setup-delete');
+      deleteButton.disabled = draft.players.length <= 5 || referencedByEvents || referencedByPlan;
+      if (referencedByEvents || referencedByPlan) {
+        deleteButton.title = 'Players referenced by game history or the planned rotation cannot be removed.';
+      }
+      deleteButton.addEventListener('click', () => {
         syncDraftFromForm();
         draft.players.splice(index, 1);
         draft.startingLineupIds = draft.startingLineupIds.filter(id => id !== player.id);
@@ -396,6 +428,11 @@ export function createGameSetupController({
     ready,
     openGame,
     refreshGames: renderGames,
+    focusEditor() {
+      gameEditorDetails.open = true;
+      gameEditorDetails.scrollIntoView({ block: 'start' });
+      setupRoster.querySelector('.setup-number, .setup-name')?.focus();
+    },
     syncGame(game) {
       if (draft?.id !== game.id) return;
       draft.events = structuredClone(game.events);

@@ -351,19 +351,22 @@
                 <h2>Event entry</h2>
                 <p id="eventGameStatus">Save or open a game to record events.</p>
               </div>
-              <div id="voiceCompactControls" class="voice-compact-controls">
-                <span id="voiceReadiness" class="voice-readiness" aria-hidden="true"></span>
-                <button id="voiceRecordToggle" class="primary voice-record-toggle" type="button" aria-label="Start voice recording" title="Start voice recording">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm-6-3a6 6 0 0 0 12 0M12 17v4m-4 0h8" />
-                  </svg>
-                  <span id="voiceRecordLabel">Voice</span>
-                </button>
-                <button id="voiceOpenSettings" class="secondary icon-button" type="button" aria-label="Voice settings" title="Voice settings">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4 2-1-2-4-2 1a8 8 0 0 0-2-1l-1-3h-6L8 7a8 8 0 0 0-2 1L4 7l-2 4 2 1v2l-2 1 2 4 2-1a8 8 0 0 0 2 1l1 3h6l1-3a8 8 0 0 0 2-1l2 1 2-4-2-1v-2Z" />
-                  </svg>
-                </button>
+              <div class="event-entry-header-actions">
+                <button id="editActiveGame" class="secondary small" type="button">Edit roster</button>
+                <div id="voiceCompactControls" class="voice-compact-controls">
+                  <span id="voiceReadiness" class="voice-readiness" aria-hidden="true"></span>
+                  <button id="voiceRecordToggle" class="primary voice-record-toggle" type="button" aria-label="Start voice recording" title="Start voice recording">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm-6-3a6 6 0 0 0 12 0M12 17v4m-4 0h8" />
+                    </svg>
+                    <span id="voiceRecordLabel">Voice</span>
+                  </button>
+                  <button id="voiceOpenSettings" class="secondary icon-button" type="button" aria-label="Voice settings" title="Voice settings">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4 2-1-2-4-2 1a8 8 0 0 0-2-1l-1-3h-6L8 7a8 8 0 0 0-2 1L4 7l-2 4 2 1v2l-2 1 2 4 2-1a8 8 0 0 0 2 1l1 3h6l1-3a8 8 0 0 0 2-1l2 1 2-4-2-1v-2Z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="voice-command-status-row">

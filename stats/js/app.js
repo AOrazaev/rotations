@@ -249,6 +249,7 @@ const statsShell = document.querySelector('#statsShell');
 const gamePanel = document.querySelector('#gamePanel');
 const hideGamePanelButton = document.querySelector('#hideGamePanel');
 const showGamePanelButton = document.querySelector('#showGamePanel');
+const editActiveGameButton = document.querySelector('#editActiveGame');
 const gamePanelStorageKey = 'basketball-stats-game-panel-collapsed';
 const reviewShell = document.querySelector('#reviewShell');
 const videoCard = document.querySelector('.video-card');
@@ -587,6 +588,13 @@ if (reviewMode) {
     onReviewRequested(gameId) {
       location.assign(buildReviewUrl(gameId, location.pathname));
     },
+  });
+  editActiveGameButton.addEventListener('click', async () => {
+    const game = eventController.getGame();
+    if (!game) return;
+    setGamePanelCollapsed(false);
+    await setupController.openGame(game.id);
+    setupController.focusEditor();
   });
   ready = setupController.ready;
 }
