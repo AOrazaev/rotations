@@ -55,6 +55,14 @@ function formatPercentage(value) {
   return value == null ? '—' : `${Number(value.toFixed(1))}%`;
 }
 
+function markdownText(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/([\[\]])/g, '\\$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function addCell(row, content, className = '') {
   const cell = row.insertCell();
   cell.className = className;
@@ -68,7 +76,8 @@ export function createReportController({
   videoController,
   previewSeconds = 0,
   playerReview = false,
-  initialFeedbackPlayerId = null
+  initialFeedbackPlayerId = null,
+  buildPlayerFeedbackUrl = null
 }) {
   const reportCard = documentObject.querySelector('#reportCard');
   const finalScore = documentObject.querySelector('#reportFinalScore');
@@ -319,7 +328,11 @@ export function createReportController({
     }
     renderFeedbackSummary(player);
     emptyFeedback.classList.toggle('hidden', events.length > 0);
-    copyFeedbackButton.disabled = events.length === 0;
+    const shareablePlayers = game.players.filter(item => feedbackEvents(item).length > 0);
+    copyFeedbackButton.disabled = !buildPlayerFeedbackUrl || shareablePlayers.length === 0;
+    copyFeedbackButton.title = buildPlayerFeedbackUrl
+      ? ''
+      : 'Publish the game to copy player feedback links.';
     copyYouTubeFeedbackButton.disabled = events.length === 0;
     for (const event of events) {
       const item = documentObject.createElement('li');
@@ -372,17 +385,17 @@ export function createReportController({
     return `${player.name} — ${game.title}${opponent}`;
   }
 
-  function telegramFeedbackText() {
-    const selection = selectedFeedback();
-    if (!selection) return '';
-    const entries = selection.events
-      .map(event => [
-        `▶ ${formatVideoTime(feedbackSeconds(event))} — ${describeEvent(event, selection.playersById)}`,
-        `“${event.coachComment.trim()}”`,
-        feedbackUrl(event)
-      ].join('\n'));
+  function feedbackMarkdownText() {
+    if (!buildPlayerFeedbackUrl) return '';
+    const opponent = game.opponentName ? ` vs ${game.opponentName}` : '';
+    const entries = game.players
+      .filter(player => feedbackEvents(player).length > 0)
+      .map(player => {
+        const label = player.number ? `${player.number} ${player.name}` : player.name;
+        return `- [${markdownText(label)}](${buildPlayerFeedbackUrl(player)})`;
+      });
     return entries.length
-      ? `${feedbackHeading(selection.player)}\n\n${entries.join('\n\n')}`
+      ? `## ${markdownText(`${game.title}${opponent}`)}\n\n${entries.join('\n')}`
       : '';
   }
 
@@ -1018,12 +1031,11 @@ export function createReportController({
   nextFeedbackButton.addEventListener('click', () => moveFeedbackMoment(1));
   feedbackList.addEventListener('change', () => {
     const hasSelection = Boolean(feedbackList.querySelector('.feedback-event-select:checked'));
-    copyFeedbackButton.disabled = !hasSelection;
     copyYouTubeFeedbackButton.disabled = !hasSelection;
     setFeedbackStatus();
   });
   copyFeedbackButton.addEventListener('click', () => {
-    copyFeedback(telegramFeedbackText(), 'Copied player feedback for Telegram.');
+    copyFeedback(feedbackMarkdownText(), 'Copied Markdown feedback links.');
   });
   copyYouTubeFeedbackButton.addEventListener('click', () => {
     copyFeedback(youtubeFeedbackText(), 'Copied timestamp comment for YouTube.');

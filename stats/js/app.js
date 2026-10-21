@@ -536,6 +536,22 @@ async function initializeReviewMode() {
     videoController,
     initialTimelineFilters: route.timelineFilters,
     feedbackPlayerId: sharedFeedbackPlayerId,
+    buildPlayerFeedbackUrl: sharedMode
+      ? player => {
+        const matchingNumberCount = player.number
+          ? game.players.filter(item =>
+            String(item.number || '').toLowerCase() === String(player.number).toLowerCase()
+          ).length
+          : 0;
+        const relativeUrl = player.number && matchingNumberCount === 1
+          ? buildSharedFeedbackUrl(route.snapshotName, player.number, location.pathname)
+          : buildSharedReviewUrl(route.snapshotName, location.pathname, {
+            players: [player.id],
+            comment: 'with'
+          });
+        return new URL(relativeUrl, location.origin).href;
+      }
+      : null,
     onPlayerFeedbackStateChanged: updateSharedPlayerFeedbackState,
     onTimelineFiltersChanged: syncReviewUrl
   });

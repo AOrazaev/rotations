@@ -10,6 +10,7 @@ export function createReviewController({
   videoController,
   initialTimelineFilters = null,
   feedbackPlayerId = null,
+  buildPlayerFeedbackUrl = null,
   onPlayerFeedbackStateChanged = () => {},
   onTimelineFiltersChanged = () => {}
 }) {
@@ -200,7 +201,8 @@ export function createReviewController({
     videoController,
     previewSeconds: 3,
     playerReview: true,
-    initialFeedbackPlayerId: feedbackPlayerId
+    initialFeedbackPlayerId: feedbackPlayerId,
+    buildPlayerFeedbackUrl
   });
 
   undoButton.remove();
