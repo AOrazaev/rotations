@@ -139,11 +139,11 @@ test('Review view interactions expose no mutation workflow or game writes', asyn
   await page.locator('#shotChartPlot [data-report-event-id]').click();
   await page.locator('[data-review-section="feedback"]').click();
   await page.locator('#feedbackPlayer').selectOption('p1');
-  await page.locator('#copyPlayerFeedback').click();
+  await expect(page.locator('#copyPlayerFeedback')).toBeDisabled();
   await page.locator('#copyYouTubeFeedback').click();
 
   expect(await page.evaluate(() => window.__reviewStoreWrites)).toEqual({ save: 0, delete: 0 });
-  expect(await page.evaluate(() => window.__clipboardWrites.length)).toBe(2);
+  expect(await page.evaluate(() => window.__clipboardWrites.length)).toBe(1);
 });
 
 test('normal tracker mode still initializes mutation controllers', async ({ page }) => {

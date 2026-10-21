@@ -173,10 +173,10 @@ test('complete Review workflow remains read-only across reload and tracker retur
     ['seek', 129],
     ['play']
   ]);
-  await page.locator('#copyPlayerFeedback').click();
+  await expect(page.locator('#copyPlayerFeedback')).toBeDisabled();
   await page.locator('#copyYouTubeFeedback').click();
   await expect(page.locator('#playerFeedbackStatus')).toHaveText('Copied timestamp comment for YouTube.');
-  expect(await page.evaluate(() => window.__clipboardWrites.length)).toBe(2);
+  expect(await page.evaluate(() => window.__clipboardWrites.length)).toBe(1);
   expect(await page.evaluate(() => Number(sessionStorage.getItem('reviewWriteCount')))).toBe(0);
 
   await page.reload();

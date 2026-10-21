@@ -190,6 +190,38 @@ test('published game opens as a reload-safe zero-write shared Review link', asyn
   await expect(page.locator('#shotReportSummary')).toBeVisible();
   await page.locator('#shotReportScope').selectOption('opponent');
   await page.locator('#shotReportResult').selectOption('missed');
+  await page.locator('[data-review-section="feedback"]').click();
+  await expect(page.locator('#copyPlayerFeedback')).toBeEnabled();
+  await page.locator('#copyPlayerFeedback').evaluate(button => button.click());
+  await expect(page.locator('#playerFeedbackStatus')).toHaveText('Copied Markdown feedback links.');
+  const feedbackPlayers = publishedBackup.game.players.filter(player =>
+    publishedBackup.game.events.some(event =>
+      String(event.coachComment || '').trim()
+      && (
+        [event.playerId, event.playerInId, event.playerOutId].includes(player.id)
+        || [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+          .some(match => match[1].toLowerCase() === String(player.number || '').toLowerCase())
+        || /@team\b/i.test(String(event.coachComment || ''))
+      )
+    )
+  );
+  const markdown = await page.evaluate(() => window.__sharedClipboardWrites.at(-1));
+  const sharedOrigin = new URL(page.url()).origin;
+  expect(markdown).toContain(
+    `## ${publishedBackup.game.title} vs ${publishedBackup.game.opponentName}`
+  );
+  for (const player of feedbackPlayers) {
+    const label = player.number ? `${player.number} ${player.name}` : player.name;
+    const matchingNumberCount = player.number
+      ? publishedBackup.game.players.filter(item => item.number === player.number).length
+      : 0;
+    const href = player.number && matchingNumberCount === 1
+      ? `${sharedOrigin}/stats/?game=game-20260927&feedback=${player.number}`
+      : `${sharedOrigin}/stats/?mode=shared&game=game-20260927`
+        + `&tl-player=${encodeURIComponent(player.id)}&tl-comment=with`;
+    expect(markdown).toContain(`- [${label}](${href})`);
+  }
+  expect(markdown.match(/^- \[/gm)).toHaveLength(feedbackPlayers.length);
   expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
 
   await page.reload();

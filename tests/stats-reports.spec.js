@@ -259,19 +259,14 @@ test('player feedback copies selected coach comments with timestamped YouTube li
   await expect(page.locator('#playerFeedbackList a').nth(1))
     .toHaveAttribute('href', 'https://youtu.be/M7lc1UVf-VE?t=147');
   await expect(page.locator('#playerFeedbackList a')).toHaveText(['1:47.0', '2:27.0']);
+  await expect(page.locator('#copyPlayerFeedback')).toHaveText('Copy Markdown');
+  await expect(page.locator('#copyPlayerFeedback')).toBeDisabled();
+  await expect(page.locator('#copyPlayerFeedback')).toHaveAttribute(
+    'title',
+    'Publish the game to copy player feedback links.'
+  );
 
   await page.locator('.feedback-event-select').last().uncheck();
-  await page.locator('#copyPlayerFeedback').click();
-  await expect(page.locator('#playerFeedbackStatus')).toHaveText('Copied player feedback for Telegram.');
-
-  const copied = await page.evaluate(() => window.__clipboardWrites.at(-1));
-  expect(copied).toContain('Alex — MVP contract verification game vs Falcons');
-  expect(copied).toContain('1:47.0 — Alex made 2PT');
-  expect(copied).toContain('“Attack the space decisively.”');
-  expect(copied).toContain('https://youtu.be/M7lc1UVf-VE?t=107');
-  expect(copied).not.toContain('Good timing on the pass.');
-  expect(copied).not.toContain('Secure the rebound first.');
-
   await page.locator('#copyYouTubeFeedback').click();
   await expect(page.locator('#playerFeedbackStatus')).toHaveText('Copied timestamp comment for YouTube.');
   const youtubeComment = await page.evaluate(() => window.__clipboardWrites.at(-1));

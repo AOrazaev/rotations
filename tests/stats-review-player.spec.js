@@ -128,18 +128,14 @@ test('Review feedback navigation and copying never write game data', async ({ pa
 
   await page.locator('#nextFeedbackMoment').click();
   await page.locator('.feedback-event-select').last().uncheck();
-  await page.locator('#copyPlayerFeedback').click();
+  await expect(page.locator('#copyPlayerFeedback')).toBeDisabled();
   await page.locator('#copyYouTubeFeedback').click();
 
   expect(await page.evaluate(() => window.__reviewStoreWrites)).toEqual({ save: 0, delete: 0 });
   const copied = await page.evaluate(() => window.__clipboardWrites);
-  expect(copied).toHaveLength(2);
-  expect(copied[0]).toContain('Alex — Review view verification game vs Falcons');
-  expect(copied[0]).toContain('1:47.0 — Alex made 2PT');
-  expect(copied[0]).toContain('https://youtu.be/M7lc1UVf-VE?t=107');
-  expect(copied[0]).not.toContain('@team Sprint back together.');
-  expect(copied[1]).toContain('1:47 — Alex made 2PT');
-  expect(copied[1]).not.toContain('youtu.be');
+  expect(copied).toHaveLength(1);
+  expect(copied[0]).toContain('1:47 — Alex made 2PT');
+  expect(copied[0]).not.toContain('youtu.be');
 });
 
 test('Player-focused Review remains contained on mobile', async ({ page }) => {
