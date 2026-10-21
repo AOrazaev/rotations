@@ -59,6 +59,128 @@ test('requires exactly five starters and a valid YouTube URL', async ({ page }) 
   await expect(page.locator('.game-list-item')).toHaveCount(0);
 });
 
+test('active games can add players, edit jerseys, and correct starters from event entry', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__statsFakePlayer = {
+      current: 30,
+      getCurrentSeconds() { return this.current; },
+      seekTo(seconds) { this.current = seconds; },
+      play() {},
+      pause() {},
+      destroy() {}
+    };
+    window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
+  });
+  await openIsolatedStats(page);
+  await page.locator('#addSetupPlayer').click();
+  await page.locator('#gameTitle').fill('Editable roster game');
+  await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
+  const initialRows = page.locator('.setup-player');
+  for (let index = 0; index < 6; index += 1) {
+    await initialRows.nth(index).locator('.setup-number').fill(String(index + 1));
+  }
+  await page.locator('#saveGame').click();
+  await expect(page.locator('#gamesStatus')).toContainText('Saved Editable roster game');
+
+  await page.locator('[data-event-side="opponent"]').click();
+  await page.locator('[data-event-type="shot"][data-shot-value="2"][data-made="false"]').click();
+  const before = await page.evaluate(() => window.__statsApp.eventController.getGame());
+  const originalStarterId = before.startingLineupIds[0];
+  const originalBenchId = before.players.find(player =>
+    !before.startingLineupIds.includes(player.id)
+  ).id;
+
+  await page.locator('#hideGamePanel').click();
+  await expect(page.locator('#gamePanel')).toBeHidden();
+  await page.locator('#editActiveGame').click();
+  await expect(page.locator('#gamePanel')).toBeVisible();
+  await expect(page.locator('#gameSetupTitle')).toHaveText('Edit game');
+  await expect(page.locator('.setup-player')).toHaveCount(6);
+
+  const originalStarterRow = page.locator(`.setup-player[data-player-id="${originalStarterId}"]`);
+  const originalBenchRow = page.locator(`.setup-player[data-player-id="${originalBenchId}"]`);
+  await originalStarterRow.locator('.setup-name').fill('Corrected starter');
+  await originalStarterRow.locator('.setup-number').fill('24');
+  await originalStarterRow.locator('.setup-starter').uncheck();
+  await originalBenchRow.locator('.setup-starter').check();
+  await page.locator('#addSetupPlayer').click();
+  await expect(page.locator('.setup-player')).toHaveCount(7);
+  await expect(page.locator('.setup-player').last().locator('.setup-starter')).not.toBeChecked();
+
+  await originalBenchRow.locator('.setup-number').fill('24');
+  await page.locator('#saveGame').click();
+  await expect(page.locator('#setupError')).toContainText('Jersey number #24');
+  expect((await page.evaluate(() => window.__statsApp.eventController.getGame())).players)
+    .toEqual(before.players);
+
+  await originalBenchRow.locator('.setup-number').fill('6');
+  await page.locator('.setup-player').last().locator('.setup-name').fill('Late addition');
+  await page.locator('.setup-player').last().locator('.setup-number').fill('30');
+  await page.locator('#saveGame').click();
+  await expect(page.locator('#gamesStatus')).toContainText('Saved Editable roster game');
+
+  const after = await page.evaluate(() => window.__statsApp.eventController.getGame());
+  expect(after.players).toHaveLength(7);
+  expect(after.players.find(player => player.id === originalStarterId)).toMatchObject({
+    name: 'Corrected starter',
+    number: '24'
+  });
+  expect(after.players.find(player => player.name === 'Late addition')).toMatchObject({
+    number: '30'
+  });
+  expect(after.startingLineupIds).not.toContain(originalStarterId);
+  expect(after.startingLineupIds).toContain(originalBenchId);
+  expect(after.events[0].lineupIds).toEqual(after.startingLineupIds);
+  await expect(page.locator(`#currentLineup [data-player-id="${originalBenchId}"]`)).toBeVisible();
+  await page.locator('#benchPlayersDetails > summary').click();
+  await expect(page.locator(`#benchPlayers [data-player-id="${originalStarterId}"]`)).toBeVisible();
+});
+
+test('starter corrections reject conflicting event history without partially saving', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__statsFakePlayer = {
+      current: 30,
+      getCurrentSeconds() { return this.current; },
+      seekTo(seconds) { this.current = seconds; },
+      play() {},
+      pause() {},
+      destroy() {}
+    };
+    window.__STATS_PLAYER_FACTORY__ = async () => window.__statsFakePlayer;
+  });
+  await openIsolatedStats(page);
+  await page.locator('#addSetupPlayer').click();
+  await page.locator('#gameTitle').fill('Protected history game');
+  await page.locator('#gameVideoUrl').fill('https://youtu.be/M7lc1UVf-VE');
+  await page.locator('#saveGame').click();
+  await expect(page.locator('#gamesStatus')).toContainText('Saved Protected history game');
+
+  const beforeEvent = await page.evaluate(() => window.__statsApp.eventController.getGame());
+  const originalStarterId = beforeEvent.startingLineupIds[0];
+  const originalBenchId = beforeEvent.players.find(player =>
+    !beforeEvent.startingLineupIds.includes(player.id)
+  ).id;
+  await page.locator(`#currentLineup [data-player-id="${originalStarterId}"]`).click();
+  await page.locator('[data-event-type="assist"]').click();
+  const beforeEdit = await page.evaluate(() => window.__statsApp.eventController.getGame());
+
+  await page.locator('#editActiveGame').click();
+  await page.locator(
+    `.setup-player[data-player-id="${originalStarterId}"] .setup-starter`
+  ).uncheck();
+  await page.locator(
+    `.setup-player[data-player-id="${originalBenchId}"] .setup-starter`
+  ).check();
+  await page.locator('#saveGame').click();
+
+  await expect(page.locator('#setupError')).toContainText('team statistic player must be on court');
+  const activeAfterFailure = await page.evaluate(() => window.__statsApp.eventController.getGame());
+  const storedAfterFailure = await page.evaluate(async gameId =>
+    window.__statsApp.store.getGame(gameId), beforeEdit.id);
+  expect(activeAfterFailure).toEqual(beforeEdit);
+  expect(storedAfterFailure).toEqual(beforeEdit);
+});
+
 test('planner button imports the present roster and planned rotation once', async ({ page }) => {
   const databaseName = `basketball-stats-planner-${Date.now()}-${Math.random()}`;
   await page.addInitScript(name => {

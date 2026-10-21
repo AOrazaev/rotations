@@ -178,6 +178,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
 .section-head p, .message { margin: 0; }
 .recording-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .recording-controls { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.event-entry-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .video-size-actions { display: flex; align-items: center; gap: 6px; }
 .video-size-actions output { min-width: 42px; color: var(--muted); font-size: .8rem; text-align: center; font-variant-numeric: tabular-nums; }
 .video-size-actions button:disabled { cursor: not-allowed; opacity: .45; }
@@ -730,6 +731,7 @@ h2 { margin: 0 0 4px; font-size: 1.2rem; }
   .edit-dependent-fields { grid-column: auto; }
   .lineup-heading { align-items: stretch; flex-direction: column; }
   .lineup-actions { align-items: stretch; justify-content: flex-start; }
+  .event-entry-header-actions { width: 100%; justify-content: space-between; }
   .lineup-actions .event-side { flex: 1 1 auto; }
   .lineup-actions .view-tab { flex: 1; }
   .shot-location-heading { align-items: stretch; flex-direction: column; }
