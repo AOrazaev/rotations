@@ -80,6 +80,35 @@ test('buildRotation() throws when fewer than 5 players are available', async ({ 
   expect(message).toMatch(/at least 5/i);
 });
 
+for (const positions of [['C'], ['C', 'F']]) {
+  test(`buildRotation() penalizes extra pure centers but not versatile centers (${positions.join('/')})`, async ({ page }) => {
+    const players = makePlayers(6);
+    players.forEach((p, i) => {
+      p.positions = i === 0 ? ['C'] : ['G', 'F'];
+      p.skill = 70;
+      if (i < 4) p.minMinutes = 40;
+    });
+    players[4].positions = positions;
+    players[5].skill = 69;
+
+    const output = await page.evaluate(players => buildRotation(players, 4, 0), players);
+    const firstLineup = output.result[0].lineup.map(p => p.id);
+    expect(firstLineup).toContain(positions.length === 1 ? 'p5' : 'p4');
+    expect(firstLineup).not.toContain(positions.length === 1 ? 'p4' : 'p5');
+  });
+}
+
+test('buildRotation() allows multiple pure centers when needed to fill a lineup', async ({ page }) => {
+  const players = makePlayers(5);
+  players[0].positions = ['C'];
+  players[1].positions = ['C'];
+  players[2].positions = ['C'];
+  const output = await page.evaluate(players => buildRotation(players, 4, 50), players);
+  for (const block of output.result) {
+    expect(block.lineup.map(p => p.id).sort()).toEqual(players.map(p => p.id).sort());
+  }
+});
+
 test('buildRotation() guarantees a hard minimum-minutes floor', async ({ page }) => {
   const players = makePlayers(6);
   players[0].minMinutes = 40; // full 40-minute game, must never sit

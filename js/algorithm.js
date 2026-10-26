@@ -181,6 +181,9 @@ function buildRotation(players, blockMinutes, intensity, rng) {
       const weakGuards = lineup.filter(p => p.positions.length===1 && p.positions.includes('G') && p.skill <= 55).length;
       if (weakGuards >= 2) score -= 30;
 
+      const pureCenters = lineup.filter(p => p.positions.length===1 && p.positions.includes('C')).length;
+      if (pureCenters > 1) score -= (pureCenters - 1) * 20;
+
       for (const p of players) {
         const deficit = targetBlocks[p.id] - playedBlocks[p.id];
         if (ids.has(p.id)) {
