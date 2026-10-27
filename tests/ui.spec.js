@@ -28,6 +28,111 @@ test('the compact/edit choice persists across a reload', async ({ page }) => {
   await expect(page.locator('#rosterEditTab')).toHaveClass(/active/);
 });
 
+test('advanced tuning is collapsed by default and its seven controls persist and reset independently', async ({ page }) => {
+  const controls = page.locator('#tuningControls');
+  await expect(controls).toBeHidden();
+  await page.locator('#advancedTuning summary').click();
+  await expect(controls.getByRole('slider')).toHaveCount(7);
+  const tuning = {
+    stintPreference: 120, playingTimeBalance: 20, restEncouragement: 150,
+    centerCoverage: 50, guardCoverage: 150, extraPureCenterPenalty: 40, lineupVariety: 0,
+  };
+  for (const [key, value] of Object.entries(tuning)) {
+    await page.locator(`#tuning-${key}`).fill(String(value));
+  }
+  await expect(page.locator('label[for="tuning-restEncouragement"] output')).toHaveText('150%');
+  await page.reload();
+  await page.locator('#advancedTuning summary').click();
+  for (const [key, value] of Object.entries(tuning)) {
+    await expect(page.locator(`#tuning-${key}`)).toHaveValue(String(value));
+  }
+  await page.locator('#generate').click();
+  expect(await page.evaluate(() => lastRotation.tuning)).toEqual(tuning);
+  const gridBefore = await page.locator('#timelineGrid').innerHTML();
+  const rosterBefore = await page.evaluate(() => state.players);
+  await page.locator('#resetTuning').click();
+  expect(await page.evaluate(() => state.tuning)).toEqual(await page.evaluate(() => resolveRotationTuning()));
+  expect(await page.evaluate(() => state.players)).toEqual(rosterBefore);
+  expect(await page.locator('#timelineGrid').innerHTML()).toBe(gridBefore);
+  expect(await page.evaluate(() => state.rotation.tuning)).toEqual(tuning);
+  await page.reload();
+  expect(await page.evaluate(() => state.tuning)).toEqual(await page.evaluate(() => resolveRotationTuning()));
+  expect(await page.evaluate(() => lastRotation.tuning)).toEqual(tuning);
+});
+
+test('a saved seed uses its own tuning after sliders change and swaps are saved', async ({ page }) => {
+  await page.locator('#advancedTuning summary').click();
+  await page.locator('#tuning-lineupVariety').fill('0');
+  await page.locator('#generate').click();
+  await page.locator('#regenerateSeed').fill('42');
+  await page.locator('#regenerateSeed').press('Tab');
+  const gridBefore = await page.locator('#timelineGrid').innerHTML();
+  await page.locator('#tuning-lineupVariety').fill('100');
+  await page.locator('#swapMode').click();
+  await page.locator('.timeline-cell[data-block="0"][data-status="on"]').first().click();
+  await page.locator('.timeline-cell[data-block="0"][data-status="off"]').first().click();
+  await page.locator('#undoSwap').click();
+  expect(await page.evaluate(() => state.rotation.tuning.lineupVariety)).toBe(0);
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('basketball-rotation-planner-v1'));
+    delete saved.rotation.blocks;
+    localStorage.setItem('basketball-rotation-planner-v1', JSON.stringify(saved));
+  });
+  await page.reload();
+  await expect(page.locator('#regenerateSeed')).toHaveValue('42');
+  expect(await page.locator('#timelineGrid').innerHTML()).toBe(gridBefore);
+  expect(await page.evaluate(() => lastRotation.tuning.lineupVariety)).toBe(0);
+  expect(await page.evaluate(() => state.tuning.lineupVariety)).toBe(100);
+  await page.locator('#regenerateRotation').click();
+  expect(await page.evaluate(() => state.rotation.tuning.lineupVariety)).toBe(100);
+});
+
+test('saved rosters and rotations without tuning use defaults', async ({ page }) => {
+  await page.locator('#generate').click();
+  const gridBefore = await page.locator('#timelineGrid').innerHTML();
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('basketball-rotation-planner-v1'));
+    delete saved.tuning;
+    delete saved.rotation.tuning;
+    delete saved.rotation.blocks;
+    localStorage.setItem('basketball-rotation-planner-v1', JSON.stringify(saved));
+  });
+  await page.reload();
+  expect(await page.locator('#timelineGrid').innerHTML()).toBe(gridBefore);
+  expect(await page.evaluate(() => state.tuning)).toEqual(await page.evaluate(() => resolveRotationTuning()));
+  expect(await page.evaluate(() => lastRotation.tuning)).toEqual(await page.evaluate(() => resolveRotationTuning()));
+});
+
+test('invalid saved tuning is reported and reset without losing the roster', async ({ page }) => {
+  const players = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('basketball-rotation-planner-v1'));
+    saved.tuning = { playingTimeBalance: -1 };
+    localStorage.setItem('basketball-rotation-planner-v1', JSON.stringify(saved));
+    return saved.players;
+  });
+  let message = '';
+  page.once('dialog', async dialog => { message = dialog.message(); await dialog.accept(); });
+  await page.reload();
+  expect(message).toMatch(/Saved advanced tuning was reset to defaults/);
+  expect(await page.evaluate(() => state.players)).toEqual(players);
+  expect(await page.evaluate(() => state.tuning)).toEqual(await page.evaluate(() => resolveRotationTuning()));
+});
+
+test('advanced tuning fits a narrow mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#advancedTuning summary').click();
+  await expect(page.locator('#tuning-lineupVariety')).toBeVisible();
+  const fits = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    return document.documentElement.scrollWidth <= width &&
+      [...document.querySelectorAll('#tuningControls input')].every(input => {
+        const rect = input.getBoundingClientRect();
+        return rect.left >= 0 && rect.right <= width;
+      });
+  });
+  expect(fits).toBe(true);
+});
+
 test('clicking a compact chip toggles that player\'s availability', async ({ page }) => {
   const chip = page.locator('.player-row').nth(2);
   await expect(chip).not.toHaveClass(/chip-off/);
@@ -126,6 +231,28 @@ test('changing Block minutes via the UI changes the number of rendered timeline 
   await page.locator('#generate').click();
   // One header cell per block, plus the leading empty corner cell.
   await expect(page.locator('.timeline-header-cell')).toHaveCount(Math.ceil(40 / 5) + 1);
+});
+
+test('preferred stint minutes persist with the generated rotation and can be cleared', async ({ page }) => {
+  await page.locator('#rosterEditTab').click();
+  const preference = page.locator('.player-row').first().locator('.preferred-stint-minutes');
+  await expect(preference).toHaveValue('');
+  await preference.fill('8');
+  await page.reload();
+  await expect(preference).toHaveValue('8');
+
+  await page.locator('#generate').click();
+  await expect(page.locator('#rotationCard')).toBeVisible();
+  expect(await page.evaluate(() => state.rotation.players[0].preferredStintMinutes)).toBe(8);
+  const gridBefore = await page.locator('#timelineGrid').innerHTML();
+  await page.reload();
+  await expect(preference).toHaveValue('8');
+  expect(await page.locator('#timelineGrid').innerHTML()).toBe(gridBefore);
+
+  await preference.fill('');
+  await page.reload();
+  await expect(preference).toHaveValue('');
+  expect(await page.evaluate(() => state.players[0].preferredStintMinutes)).toBeNull();
 });
 
 test('setting rotation style to Equal minutes via the UI evens out playing time', async ({ page }) => {

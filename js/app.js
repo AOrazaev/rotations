@@ -8,7 +8,7 @@ function generate() {
   saveState();
   const players = state.players.filter(p=>p.present);
   try {
-    lastRotation = buildRotation(players, state.blockMinutes, state.intensity);
+    lastRotation = buildRotation(players, state.blockMinutes, state.intensity, undefined, state.tuning);
     resetSwapHistory();
     renderRotation(lastRotation, players);
     setSwapMode(false);
@@ -21,7 +21,7 @@ function generate() {
 
 function applySeed(seed, players) {
   const rng = createSeededRng(seed);
-  lastRotation = buildRotation(players, state.blockMinutes, state.intensity, rng);
+  lastRotation = buildRotation(players, state.blockMinutes, state.intensity, rng, state.tuning);
   resetSwapHistory();
   renderRotation(lastRotation, players);
   setSwapMode(false);
@@ -30,8 +30,39 @@ function applySeed(seed, players) {
   persistRotation();
 }
 
+function renderTuningControls() {
+  const container = document.querySelector('#tuningControls');
+  container.replaceChildren();
+  for (const [key, rule] of Object.entries(ROTATION_TUNING_RULES)) {
+    const id = `tuning-${key}`;
+    const label = document.createElement('label');
+    label.className = 'tuning-control';
+    label.htmlFor = id;
+    label.innerHTML = `
+      <span class="tuning-heading"><span>${rule.label}</span><output for="${id}"></output></span>
+      <input id="${id}" type="range" min="0" max="${rule.max}" step="${rule.step}" aria-describedby="${id}-help" />
+      <span id="${id}-help" class="tuning-help">${rule.help}</span>`;
+    const input = label.querySelector('input');
+    const output = label.querySelector('output');
+    input.value = String(state.tuning[key]);
+    output.textContent = `${state.tuning[key]}${rule.percent ? '%' : ''}`;
+    input.addEventListener('input', () => {
+      state.tuning[key] = Number(input.value);
+      output.textContent = `${state.tuning[key]}${rule.percent ? '%' : ''}`;
+      saveState();
+    });
+    container.appendChild(label);
+  }
+}
+
+document.querySelector('#resetTuning').addEventListener('click', () => {
+  state.tuning = resolveRotationTuning();
+  renderTuningControls();
+  saveState();
+});
+
 document.querySelector('#addPlayer').addEventListener('click', () => {
-  state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true, minMinutes:null, maxMinutes:null, maxConsecutiveBlocks:null });
+  state.players.push({ id: crypto.randomUUID(), name:'New player', number:'', positions:['F'], skill:60, present:true, minMinutes:null, maxMinutes:null, maxConsecutiveBlocks:null, preferredStintMinutes:null });
   saveState(); renderRoster();
 });
 document.querySelector('#startStatsReview').addEventListener('click', () => {
@@ -74,7 +105,7 @@ intensityInput.addEventListener('input', () => {
 });
 document.querySelector('#resetApp').addEventListener('click', () => {
   if (!confirm('Reset roster and settings to defaults?')) return;
-  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, intensity:100, rosterCompact:true }; saveState(); renderRoster(); setRosterMode(true);
+  localStorage.removeItem(STORAGE_KEY); state = { players: defaultPlayers.map(p=>({...p,id:crypto.randomUUID()})), blockMinutes:4, intensity:100, rosterCompact:true, tuning:resolveRotationTuning() }; saveState(); renderRoster(); setRosterMode(true); renderTuningControls();
   intensityInput.value = '100'; intensityValueEl.textContent = intensityLabel(100);
   lastRotation = null; lastPlayers = null; lastSeed = null;
   resetSwapHistory();
@@ -96,5 +127,6 @@ seedInput.addEventListener('change', () => {
 });
 
 renderRoster();
+renderTuningControls();
 setRosterMode(state.rosterCompact !== false);
 restoreRotation();
