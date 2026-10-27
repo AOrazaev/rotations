@@ -9,7 +9,9 @@ A browser-only basketball toolkit designed for static hosting on GitHub Pages. I
 
 - Edit player names, jersey numbers, positions, skill ratings, and attendance.
 - Set optional minimum/maximum minutes and maximum consecutive blocks.
+- Set optional preferred stint minutes to favor uninterrupted playing time. Preferences round to the nearest block, apply a soft penalty for early substitutions, and move the usual rest threshold to the preferred length. Hard limits take priority, and halftime ends a stint. Leave blank for the original rest scoring.
 - Choose 4- or 5-minute blocks and adjust competitive intensity.
+- Expand **Advanced tuning** to adjust stint preference strength, playing-time balance, rest encouragement, center/guard coverage, extra pure-center penalty, and lineup variety. The seven bounded sliders affect soft preferences only; 100% preserves the original paired rest/coverage scoring, and zero disables that preference. Settings save locally and can be reset independently of the roster. Changes apply to the next generation, not the displayed rotation. Saved rotations retain their tuning; reproducing a seed requires the same players and settings.
 - Generate, regenerate, manually swap, undo, redo, and print rotations.
 - Send the available roster and optional planned rotation into Stats & Video Review.
 

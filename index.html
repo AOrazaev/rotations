@@ -66,6 +66,13 @@
       </div>
     </section>
 
+    <details id="advancedTuning" class="card advanced-tuning">
+      <summary>Advanced tuning</summary>
+      <p class="tuning-note">Adjust soft preferences only; hard minute and consecutive-block limits stay unchanged. Zero disables a preference, and 100% preserves the original paired scoring. Changes apply when you generate or regenerate, not to the rotation already displayed. A seed reproduces a result only with the same players and settings.</p>
+      <div id="tuningControls" class="tuning-grid"></div>
+      <button id="resetTuning" class="secondary" type="button">Reset tuning to defaults</button>
+    </details>
+
     <section id="rotationCard" class="card hidden">
       <div class="section-head">
         <div>
@@ -132,6 +139,7 @@
       <div class="minutes-limits edit-only">
         <label class="limit-field"><span>Min</span><input class="min-minutes" type="number" min="0" step="1" placeholder="—" aria-label="Minimum minutes (optional)" /></label>
         <label class="limit-field"><span>Max</span><input class="max-minutes" type="number" min="0" step="1" placeholder="—" aria-label="Maximum minutes (optional)" /></label>
+        <label class="limit-field" title="Soft preference, rounded to the nearest playing block. Hard limits take priority; halftime ends a stint."><span>Preferred stint (min, soft)</span><input class="preferred-stint-minutes" type="number" min="1" step="1" placeholder="—" aria-label="Preferred stint minutes (optional, soft preference)" /></label>
         <label class="limit-field"><span>Max consecutive blocks (halftime resets)</span><input class="max-consecutive-blocks" type="number" min="1" step="1" placeholder="—" aria-label="Maximum consecutive blocks, reset at halftime (optional)" /></label>
       </div>
     </article>

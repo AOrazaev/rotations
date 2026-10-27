@@ -61,8 +61,32 @@ function createSeededRng(seed) {
 // single best one, so "Regenerate" can offer different, still-solid results.
 const REGENERATE_TOP_K = 3;
 
-function buildRotation(players, blockMinutes, intensity, rng) {
+const ROTATION_TUNING_RULES = {
+  stintPreference: { label: 'Stint preference strength', default: 80, max: 160, step: 5, help: 'Penalty per missing block when ending a preferred stint early.' },
+  playingTimeBalance: { label: 'Playing-time balance', default: 11, max: 30, step: 1, help: 'Points per block below the target playing time; targets follow rotation style.' },
+  restEncouragement: { label: 'Rest encouragement', default: 100, max: 200, step: 10, percent: true, help: 'Scales both the continuing-play penalty and rest bonus after the soft rest threshold.' },
+  centerCoverage: { label: 'Center coverage importance', default: 100, max: 200, step: 10, percent: true, help: 'Scales the center-present bonus and missing-center penalty together.' },
+  guardCoverage: { label: 'Guard coverage importance', default: 100, max: 200, step: 10, percent: true, help: 'Scales the guard-present bonus and missing-guard penalty together.' },
+  extraPureCenterPenalty: { label: 'Extra pure-center penalty', default: 20, max: 80, step: 5, help: 'Penalty per pure center beyond the first; multi-position players do not count.' },
+  lineupVariety: { label: 'Lineup variety', default: 35, max: 100, step: 5, help: 'Penalty for repeating exactly the same five players in the next block.' },
+};
+
+function resolveRotationTuning(tuning = {}) {
+  if (!tuning || typeof tuning !== 'object' || Array.isArray(tuning)) {
+    throw new Error('Advanced tuning must contain numeric rule weights.');
+  }
+  return Object.fromEntries(Object.entries(ROTATION_TUNING_RULES).map(([key, rule]) => {
+    const value = tuning[key] === undefined ? rule.default : tuning[key];
+    if (!Number.isFinite(value) || value < 0 || value > rule.max) {
+      throw new Error(`${rule.label} must be a number between 0 and ${rule.max}.`);
+    }
+    return [key, value];
+  }));
+}
+
+function buildRotation(players, blockMinutes, intensity, rng, tuning) {
   if (players.length < 5) throw new Error('You need at least 5 available players.');
+  const ruleWeights = resolveRotationTuning(tuning);
   const totalMinutes = 40;
   const blocks = Math.ceil(totalMinutes / blockMinutes);
   const combos = combinations(players, 5);
@@ -75,9 +99,14 @@ function buildRotation(players, blockMinutes, intensity, rng) {
   // Unset min => 0 (no floor). Unset max => blocks (no ceiling).
   const minBlocks = {};
   const maxBlocks = {};
+  const preferredBlocks = {};
   for (const p of players) {
     const rawMin = Number(p.minMinutes);
     const rawMax = Number(p.maxMinutes);
+    const rawPreferred = Number(p.preferredStintMinutes);
+    preferredBlocks[p.id] = Number.isFinite(rawPreferred) && rawPreferred > 0
+      ? Math.max(1, Math.round(rawPreferred / blockMinutes))
+      : null;
     minBlocks[p.id] = (p.minMinutes != null && p.minMinutes !== '' && Number.isFinite(rawMin) && rawMin > 0)
       ? Math.min(blocks, Math.round(rawMin / blockMinutes))
       : 0;
@@ -174,21 +203,28 @@ function buildRotation(players, blockMinutes, intensity, rng) {
       const skillScore = lineup.reduce((s,p)=>s+p.skill,0);
       score += skillScore * skillMultiplier;
 
-      if (hasRole(lineup,'C')) score += 26; else score -= 55;
-      if (hasRole(lineup,'G')) score += 18; else score -= 40;
+      score += (hasRole(lineup,'C') ? 26 : -55) * ruleWeights.centerCoverage / 100;
+      score += (hasRole(lineup,'G') ? 18 : -40) * ruleWeights.guardCoverage / 100;
       if (hasRole(lineup,'F')) score += 8;
 
       const weakGuards = lineup.filter(p => p.positions.length===1 && p.positions.includes('G') && p.skill <= 55).length;
       if (weakGuards >= 2) score -= 30;
 
+      const pureCenters = lineup.filter(p => p.positions.length===1 && p.positions.includes('C')).length;
+      if (pureCenters > 1) score -= (pureCenters - 1) * ruleWeights.extraPureCenterPenalty;
+
       for (const p of players) {
         const deficit = targetBlocks[p.id] - playedBlocks[p.id];
+        const restThreshold = preferredBlocks[p.id] ?? 2;
         if (ids.has(p.id)) {
-          score += deficit * 11;
-          if (consecutive[p.id] >= 2) score -= consecutive[p.id] * 12;
+          score += deficit * ruleWeights.playingTimeBalance;
+          if (consecutive[p.id] >= restThreshold) score -= consecutive[p.id] * 12 * ruleWeights.restEncouragement / 100;
           if (b - lastPlayed[p.id] > 1) score += 10;
         } else {
-          if (consecutive[p.id] >= 2) score += 14;
+          if (consecutive[p.id] > 0 && consecutive[p.id] < preferredBlocks[p.id]) {
+            score -= (preferredBlocks[p.id] - consecutive[p.id]) * ruleWeights.stintPreference;
+          }
+          if (consecutive[p.id] >= restThreshold) score += 14 * ruleWeights.restEncouragement / 100;
           if (b - lastPlayed[p.id] >= 2) score -= 8;
         }
       }
@@ -201,7 +237,7 @@ function buildRotation(players, blockMinutes, intensity, rng) {
       // Reduce excessive lineup repetition.
       if (result.length) {
         const overlap = result[result.length-1].lineup.filter(p=>ids.has(p.id)).length;
-        if (overlap === 5) score -= 35;
+        if (overlap === 5) score -= ruleWeights.lineupVariety;
       }
 
       scored.push({ lineup, score });
@@ -231,7 +267,7 @@ function buildRotation(players, blockMinutes, intensity, rng) {
   }
 
   const minutes = Object.fromEntries(players.map(p => [p.id, playedBlocks[p.id]*blockMinutes]));
-  return { result, minutes, blocks, blockMinutes };
+  return { result, minutes, blocks, blockMinutes, intensity: t * 100, tuning: ruleWeights };
 }
 
 function blockLabel(i, blockMinutes) {

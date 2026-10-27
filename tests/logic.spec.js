@@ -80,6 +80,124 @@ test('buildRotation() throws when fewer than 5 players are available', async ({ 
   expect(message).toMatch(/at least 5/i);
 });
 
+for (const positions of [['C'], ['C', 'F']]) {
+  test(`buildRotation() penalizes extra pure centers but not versatile centers (${positions.join('/')})`, async ({ page }) => {
+    const players = makePlayers(6);
+    players.forEach((p, i) => {
+      p.positions = i === 0 ? ['C'] : ['G', 'F'];
+      p.skill = 70;
+      if (i < 4) p.minMinutes = 40;
+    });
+    players[4].positions = positions;
+    players[5].skill = 69;
+
+    const output = await page.evaluate(players => buildRotation(players, 4, 0), players);
+    const firstLineup = output.result[0].lineup.map(p => p.id);
+    expect(firstLineup).toContain(positions.length === 1 ? 'p5' : 'p4');
+    expect(firstLineup).not.toContain(positions.length === 1 ? 'p4' : 'p5');
+  });
+}
+
+test('buildRotation() allows multiple pure centers when needed to fill a lineup', async ({ page }) => {
+  const players = makePlayers(5);
+  players[0].positions = ['C'];
+  players[1].positions = ['C'];
+  players[2].positions = ['C'];
+  const output = await page.evaluate(players => buildRotation(players, 4, 50), players);
+  for (const block of output.result) {
+    expect(block.lineup.map(p => p.id).sort()).toEqual(players.map(p => p.id).sort());
+  }
+});
+
+test('the extra pure-center penalty can be disabled', async ({ page }) => {
+  const players = makePlayers(6);
+  players.forEach((p, i) => {
+    p.positions = i === 0 || i === 4 ? ['C'] : ['G', 'F'];
+    p.skill = i === 5 ? 69 : 70;
+    if (i < 4) p.minMinutes = 40;
+  });
+  const output = await page.evaluate(players => ({
+    enabled: buildRotation(players, 4, 0).result[0].lineup.map(p => p.id),
+    disabled: buildRotation(players, 4, 0, undefined, { extraPureCenterPenalty: 0 }).result[0].lineup.map(p => p.id),
+  }), players);
+  expect(output.enabled).toContain('p5');
+  expect(output.disabled).toContain('p4');
+});
+
+for (const [role, key] of [['C', 'centerCoverage'], ['G', 'guardCoverage']]) {
+  test(`${role} coverage tuning scales both the presence bonus and absence penalty`, async ({ page }) => {
+    const players = makePlayers(6);
+    players.forEach((p, i) => {
+      p.positions = i === 4 ? [role] : (role === 'C' ? ['G', 'F'] : ['C', 'F']);
+      p.skill = i === 4 ? 69 : 70;
+      if (i < 4) p.minMinutes = 40;
+    });
+    const output = await page.evaluate(({ players, key }) => ({
+      enabled: buildRotation(players, 4, 0).result[0].lineup.map(p => p.id),
+      disabled: buildRotation(players, 4, 0, undefined, { [key]: 0 }).result[0].lineup.map(p => p.id),
+    }), { players, key });
+    expect(output.enabled).toContain('p4');
+    expect(output.disabled).toContain('p5');
+  });
+}
+
+for (const [key, block, otherTuning] of [
+  ['playingTimeBalance', 1, { restEncouragement: 0, lineupVariety: 0 }],
+  ['restEncouragement', 2, { playingTimeBalance: 0, lineupVariety: 0 }],
+  ['lineupVariety', 1, { playingTimeBalance: 0, restEncouragement: 0 }],
+]) {
+  test(`${key} tuning changes substitutions without changing hard minimums`, async ({ page }) => {
+    const players = makePlayers(6);
+    players.forEach((p, i) => {
+      p.positions = ['G', 'F', 'C'];
+      p.skill = i === 5 ? 50 : 100;
+      if (i < 4) p.minMinutes = 40;
+    });
+    const output = await page.evaluate(({ players, key, block, otherTuning }) => {
+      const enabled = buildRotation(players, 4, 0, undefined, otherTuning);
+      const disabled = buildRotation(players, 4, 0, undefined, { ...otherTuning, [key]: 0 });
+      return {
+        enabled: enabled.result[block].lineup.map(p => p.id),
+        disabled: disabled.result[block].lineup.map(p => p.id),
+        minutes: [enabled.minutes, disabled.minutes],
+      };
+    }, { players, key, block, otherTuning });
+    expect(output.enabled).toContain('p5');
+    expect(output.disabled).toContain('p4');
+    for (const minutes of output.minutes) {
+      players.slice(0, 4).forEach(p => expect(minutes[p.id]).toBe(40));
+    }
+  });
+}
+
+test('custom tuning is seed-reproducible and cannot override hard player limits', async ({ page }) => {
+  const players = makePlayers(8);
+  players[0].minMinutes = 4;
+  players[0].maxMinutes = 4;
+  players[0].maxConsecutiveBlocks = 1;
+  const output = await page.evaluate(players => {
+    const tuning = {
+      stintPreference: 160, playingTimeBalance: 0, restEncouragement: 0,
+      centerCoverage: 0, guardCoverage: 0, extraPureCenterPenalty: 0, lineupVariety: 0,
+    };
+    players[0].preferredStintMinutes = 12;
+    const first = buildRotation(players, 4, 50, createSeededRng(42), tuning);
+    const second = buildRotation(players, 4, 50, createSeededRng(42), tuning);
+    return { first, second };
+  }, players);
+  expect(output.first).toEqual(output.second);
+  expect(output.first.minutes.p0).toBe(4);
+  expect(output.first.result.filter(block => block.lineup.some(p => p.id === 'p0'))).toHaveLength(1);
+});
+
+test('out-of-range advanced tuning is rejected rather than changing constraint behavior', async ({ page }) => {
+  const message = await page.evaluate(players => {
+    try { buildRotation(players, 4, 50, undefined, { playingTimeBalance: -1 }); return null; }
+    catch (error) { return error.message; }
+  }, makePlayers(6));
+  expect(message).toMatch(/Playing-time balance must be a number between/);
+});
+
 test('buildRotation() guarantees a hard minimum-minutes floor', async ({ page }) => {
   const players = makePlayers(6);
   players[0].minMinutes = 40; // full 40-minute game, must never sit
@@ -119,6 +237,86 @@ test('buildRotation() guarantees a hard maximum-consecutive-block limit', async 
       consecutive = block.lineup.some(p => p.id === player.id) ? consecutive + 1 : 0;
       expect(consecutive).toBeLessThanOrEqual(2);
     }
+  }
+});
+
+for (const [preferredMinutes, blockMinutes, expectedBlocks] of [[8, 4, 2], [12, 4, 3], [8, 5, 2]]) {
+  test(`preferred ${preferredMinutes}-minute stints favor ${expectedBlocks} consecutive ${blockMinutes}-minute blocks`, async ({ page }) => {
+    const players = makePlayers(6);
+    players.forEach(p => { p.positions = ['G', 'F', 'C']; p.skill = 70; });
+    const result = await page.evaluate(({ players, preferredMinutes, blockMinutes }) => {
+      const withoutPreference = buildRotation(players, blockMinutes, 0);
+      players[4].preferredStintMinutes = preferredMinutes;
+      const withPreference = buildRotation(players, blockMinutes, 0);
+      const plays = rotation => rotation.result.map(block => block.lineup.some(p => p.id === 'p4'));
+      const disabled = buildRotation(players, blockMinutes, 0, undefined, { stintPreference: 0 });
+      return { before: plays(withoutPreference), after: plays(withPreference), disabled: plays(disabled) };
+    }, { players, preferredMinutes, blockMinutes });
+
+    expect(result.before[1]).toBe(false);
+    expect(result.after.slice(0, expectedBlocks)).toEqual(Array(expectedBlocks).fill(true));
+    expect(result.after[expectedBlocks]).toBe(false);
+    expect(result.disabled[1]).toBe(false);
+  });
+}
+
+test('hard minute and consecutive-block limits override a preferred stint', async ({ page }) => {
+  const players = makePlayers(6);
+  players.forEach(p => { p.positions = ['G', 'F', 'C']; p.skill = 70; });
+  players[4].preferredStintMinutes = 12;
+  players[4].maxConsecutiveBlocks = 1;
+  players[4].maxMinutes = 8;
+  const output = await page.evaluate(players => buildRotation(players, 4, 0), players);
+  expect(output.result[0].lineup.some(p => p.id === 'p4')).toBe(true);
+  expect(output.result[1].lineup.some(p => p.id === 'p4')).toBe(false);
+  expect(output.minutes.p4).toBeLessThanOrEqual(8);
+  let consecutive = 0;
+  output.result.forEach((block, i) => {
+    if (i === 5) consecutive = 0;
+    consecutive = block.lineup.some(p => p.id === 'p4') ? consecutive + 1 : 0;
+    expect(consecutive).toBeLessThanOrEqual(1);
+  });
+});
+
+for (const intensity of [0, 50, 100]) {
+  test(`8-minute preferences avoid isolated 4-minute stints on the default roster at intensity ${intensity}`, async ({ page }) => {
+    const earlyExits = await page.evaluate(intensity => {
+      const players = defaultPlayers.filter(p => p.present).map(p => ({ ...p, preferredStintMinutes: 8 }));
+      const rotation = buildRotation(players, 4, intensity);
+      const exits = [];
+      for (const player of players) {
+        let run = 0;
+        rotation.result.forEach((block, i) => {
+          if (startsNewHalf(i, rotation.blockMinutes)) run = 0;
+          if (block.lineup.some(p => p.id === player.id)) {
+            run++;
+          } else {
+            if (run === 1) exits.push({ player: player.name, block: i });
+            run = 0;
+          }
+        });
+      }
+      return exits;
+    }, intensity);
+    expect(earlyExits).toEqual([]);
+  });
+}
+
+test('halftime can end a stint before its preferred length', async ({ page }) => {
+  const players = makePlayers(7);
+  players.forEach(p => { p.positions = ['G', 'F', 'C']; p.skill = 70; });
+  players[4].preferredStintMinutes = 12;
+  const output = await page.evaluate(players => buildRotation(players, 4, 0), players);
+  const plays = output.result.map(block => block.lineup.some(p => p.id === 'p4'));
+  expect(plays.slice(3, 6)).toEqual([false, true, false]);
+});
+
+test('preferred stint length does not forbid longer stints when everyone is needed', async ({ page }) => {
+  const players = makePlayers(5);
+  players.forEach(p => { p.preferredStintMinutes = 8; });
+  const output = await page.evaluate(players => buildRotation(players, 4, 50), players);
+  for (const player of players) {
+    expect(output.minutes[player.id]).toBe(40);
   }
 });
 
