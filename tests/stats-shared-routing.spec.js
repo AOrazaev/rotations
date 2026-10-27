@@ -118,11 +118,21 @@ test('shared route parser accepts safe names and rejects paths or file extension
   });
 });
 
-test('short feedback links resolve jersey numbers and remain short across reloads', async ({ page, request }) => {
+test('short feedback links include team comments and remain short across reloads', async ({ page, request }) => {
   await installSharedTestEnvironment(page);
   const publishedBackup = await request.get('/games/game-20260927.json').then(response => response.json());
   const player = publishedBackup.game.players.find(item => item.number === '13');
   expect(player).toBeTruthy();
+  const mentions = event => [...String(event.coachComment || '').matchAll(/@([A-Za-z0-9]+)/g)]
+    .map(match => match[1].toLowerCase());
+  const involvesPlayer = event => [event.playerId, event.playerInId, event.playerOutId].includes(player.id)
+    || mentions(event).includes(String(player.number).toLowerCase());
+  const feedbackEvents = publishedBackup.game.events.filter(event =>
+    String(event.coachComment || '').trim()
+    && (involvesPlayer(event) || mentions(event).includes('team'))
+  ).sort((a, b) => a.videoSeconds - b.videoSeconds || a.sequence - b.sequence);
+  const teamOnlyIndex = feedbackEvents.findIndex(event => !involvesPlayer(event));
+  expect(teamOnlyIndex).toBeGreaterThanOrEqual(0);
 
   await page.goto('/stats/?game=game-20260927&feedback=13&ignored=value');
   await page.evaluate(() => window.__statsApp.ready);
@@ -132,6 +142,17 @@ test('short feedback links resolve jersey numbers and remain short across reload
     `Feedback for #13 ${player.name} · vs ${publishedBackup.game.opponentName}`
   );
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
+  const visibleIds = await page.locator('.event-list-item').evaluateAll(items =>
+    items.map(item => item.dataset.eventId)
+  );
+  expect([...visibleIds].sort()).toEqual(feedbackEvents.map(event => event.id).sort());
+  expect(new Set(visibleIds).size).toBe(visibleIds.length);
+  for (let index = 0; index < teamOnlyIndex; index += 1) {
+    await page.locator('#nextSharedFeedbackMoment').click();
+  }
+  await expect(page.locator('#sharedFeedbackReason')).toHaveText('Team feedback');
+  await expect(page.locator('#sharedFeedbackComment')).toHaveText(feedbackEvents[teamOnlyIndex].coachComment);
   await expect(page.locator('#focusedPlayerReportCard')).toBeVisible();
   await expect(page.locator('#viewFullGameReview')).toHaveAttribute(
     'href',
@@ -143,6 +164,38 @@ test('short feedback links resolve jersey numbers and remain short across reload
   await page.evaluate(() => window.__statsApp.ready);
   expect(new URL(page.url()).search).toBe('?game=game-20260927&feedback=13');
   await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
+  await expect(page.locator('#sharedFeedbackMomentPosition')).toHaveText(`1 of ${feedbackEvents.length}`);
+  expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
+});
+
+test('copied fallback feedback links include team comments for players without a jersey number', async ({ page, request }) => {
+  await installSharedTestEnvironment(page);
+  const backup = await request.get('/games/game-20260927.json').then(response => response.json());
+  const player = backup.game.players.find(item => item.number === '13');
+  player.number = '';
+  const teamOnlyEvent = backup.game.events.find(event =>
+    /@team\b/i.test(String(event.coachComment || ''))
+    && ![event.playerId, event.playerInId, event.playerOutId].includes(player.id)
+  );
+  expect(teamOnlyEvent).toBeTruthy();
+  await page.route('**/games/feedback-without-number.json', route => route.fulfill({ json: backup }));
+  await page.goto('/stats/?mode=shared&game=feedback-without-number');
+  await page.evaluate(() => window.__statsApp.ready);
+  await page.locator('[data-review-section="feedback"]').click();
+  await page.locator('#copyPlayerFeedback').evaluate(button => button.click());
+  const markdown = await page.evaluate(() => window.__sharedClipboardWrites.at(-1));
+  const feedbackUrl = `${new URL(page.url()).origin}/stats/?mode=shared&game=feedback-without-number`
+    + `&tl-player=${encodeURIComponent(player.id)}&tl-team-mention=1&tl-comment=with`;
+  expect(markdown).toContain(`- [${player.name}](${feedbackUrl})`);
+
+  await page.goto(feedbackUrl);
+  await page.evaluate(() => window.__statsApp.ready);
+  await expect(page.locator('#sharedFeedbackPanel')).toBeVisible();
+  await expect(page.locator(`.event-list-item[data-event-id="${teamOnlyEvent.id}"]`)).toHaveCount(1);
+  await page.reload();
+  await page.evaluate(() => window.__statsApp.ready);
+  await expect(page.locator(`.event-list-item[data-event-id="${teamOnlyEvent.id}"]`)).toHaveCount(1);
+  expect(await page.evaluate(() => window.__sharedIndexedDbWrites)).toBe(0);
 });
 
 test('published game opens as a reload-safe zero-write shared Review link', async ({ page, request }) => {
@@ -218,7 +271,7 @@ test('published game opens as a reload-safe zero-write shared Review link', asyn
     const href = player.number && matchingNumberCount === 1
       ? `${sharedOrigin}/stats/?game=game-20260927&feedback=${player.number}`
       : `${sharedOrigin}/stats/?mode=shared&game=game-20260927`
-        + `&tl-player=${encodeURIComponent(player.id)}&tl-comment=with`;
+        + `&tl-player=${encodeURIComponent(player.id)}&tl-team-mention=1&tl-comment=with`;
     expect(markdown).toContain(`- [${label}](${href})`);
   }
   expect(markdown.match(/^- \[/gm)).toHaveLength(feedbackPlayers.length);

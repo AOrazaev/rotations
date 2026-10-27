@@ -417,7 +417,7 @@ function usesShortFeedbackFilters(timelineFilters) {
   return timelineFilters.comment === 'with'
     && timelineFilters.players?.length === 1
     && timelineFilters.players[0] === sharedFeedbackPlayerId
-    && !timelineFilters.teamMention
+    && timelineFilters.teamMention
     && [
       'sides',
       'types',
@@ -528,6 +528,7 @@ async function initializeReviewMode() {
     sharedFeedbackPlayerId = matchingPlayers[0].id;
     route.timelineFilters = {
       players: [sharedFeedbackPlayerId],
+      teamMention: true,
       comment: 'with'
     };
   }
@@ -547,6 +548,7 @@ async function initializeReviewMode() {
           ? buildSharedFeedbackUrl(route.snapshotName, player.number, location.pathname)
           : buildSharedReviewUrl(route.snapshotName, location.pathname, {
             players: [player.id],
+            teamMention: true,
             comment: 'with'
           });
         return new URL(relativeUrl, location.origin).href;

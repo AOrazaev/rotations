@@ -92,6 +92,8 @@ A commented event appears for a player when any of these rules apply:
 
 For example, `@2` applies to jersey 2 but not jersey 20.
 
+Copied player feedback links include `@team` comments by default, both for short jersey-number links and fallback player-ID links. Ordinary player-only timeline filters still exclude team-only mentions unless the `@team comments` filter is selected.
+
 ## Browser-local route limitation
 
 Games are stored in IndexedDB under the current browser and site origin. A Review URL identifies one of those local records; it does not contain or upload the game.
